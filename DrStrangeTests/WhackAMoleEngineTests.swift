@@ -87,6 +87,7 @@ final class WhackAMoleEngineTests: XCTestCase {
         }
         XCTAssertTrue(finished)
         XCTAssertTrue(engine.session.completed)
+        XCTAssertEqual(engine.session.endReason, .timeUp)
         XCTAssertNotNil(engine.session.endedAt)
         XCTAssertEqual(engine.session.activePlayDuration, 60, accuracy: 0.06)
         XCTAssertTrue(engine.advance(by: 1).isEmpty)
@@ -99,6 +100,16 @@ final class WhackAMoleEngineTests: XCTestCase {
         engine.end()
         XCTAssertTrue(engine.isFinished)
         XCTAssertFalse(engine.session.completed)
+        XCTAssertEqual(engine.session.endReason, .stopped)
+    }
+
+    func testRestBreakIsRecorded() {
+        var engine = WhackAMoleEngine(configuration: makeConfiguration())
+        engine.advance(by: 5)
+        engine.end(reason: .restBreak)
+        XCTAssertEqual(engine.session.endReason, .restBreak)
+        XCTAssertFalse(engine.session.completed)
+        XCTAssertTrue(engine.tapHole(4).isEmpty)
     }
 
     func testPerfectPlayPromotesLevel() {
@@ -129,7 +140,9 @@ final class WhackAMoleEngineTests: XCTestCase {
     }
 
     func testSessionRecordRoundTripsThroughJSON() throws {
-        var engine = WhackAMoleEngine(configuration: makeConfiguration())
+        var configuration = makeConfiguration()
+        configuration.patching = PatchingConfiguration(patchedEye: .right, playingEye: .left)
+        var engine = WhackAMoleEngine(configuration: configuration)
         while !engine.isFinished { engine.advance(by: 0.1) }
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let store = SessionStore(directory: directory)
@@ -138,6 +151,8 @@ final class WhackAMoleEngineTests: XCTestCase {
         XCTAssertEqual(loaded.count, 1)
         XCTAssertEqual(loaded.first?.trials, engine.session.trials)
         XCTAssertEqual(loaded.first?.configuration.randomSeed, 11)
+        XCTAssertEqual(loaded.first?.configuration.patching.patchedEye, .right)
+        XCTAssertEqual(loaded.first?.endReason, .timeUp)
         try? FileManager.default.removeItem(at: directory)
     }
 }
@@ -171,35 +186,32 @@ final class DifficultyProgressionTests: XCTestCase {
     }
 }
 
-final class AnaglyphRendererTests: XCTestCase {
-    func testInkRoutesToCorrectEye() {
-        let renderer = AnaglyphRenderer(glasses: AnaglyphGlasses(redFilterEye: .left), backgroundLevel: 1)
-        // Element for the left (red-filter) eye must be cyan: no red component.
-        let leftInk = UIColor(renderer.ink(for: .only(.left), standardColor: .black, contrast: 1))
-        let rightInk = UIColor(renderer.ink(for: .only(.right), standardColor: .black, contrast: 1))
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        leftInk.getRed(&r, green: &g, blue: &b, alpha: &a)
-        XCTAssertEqual(r, 0, accuracy: 0.01)
-        XCTAssertEqual(g, 1, accuracy: 0.01)
-        rightInk.getRed(&r, green: &g, blue: &b, alpha: &a)
-        XCTAssertEqual(r, 1, accuracy: 0.01)
-        XCTAssertEqual(g, 0, accuracy: 0.01)
+final class PatchingConfigurationTests: XCTestCase {
+    func testNothingRecordedByDefault() {
+        let patching = PatchingConfiguration()
+        XCTAssertFalse(patching.isRecorded)
+        XCTAssertTrue(patching.isConsistent)
+        XCTAssertNil(GameConfiguration().patching.patchedEye, "The app must not pick an eye")
     }
 
-    func testLowerContrastIsLighterInk() {
-        let renderer = AnaglyphRenderer(glasses: AnaglyphGlasses(), backgroundLevel: 1)
-        let ink = UIColor(renderer.ink(for: .only(.right), standardColor: .black, contrast: 0.3))
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        ink.getRed(&r, green: &g, blue: &b, alpha: &a)
-        XCTAssertEqual(g, 0.7, accuracy: 0.01)
+    func testSameEyeForPatchAndPlayIsFlagged() {
+        XCTAssertFalse(PatchingConfiguration(patchedEye: .left, playingEye: .left).isConsistent)
+        XCTAssertTrue(PatchingConfiguration(patchedEye: .left, playingEye: .right).isConsistent)
+        XCTAssertTrue(PatchingConfiguration(patchedEye: .left, playingEye: nil).isConsistent)
     }
 
-    func testContrastPerEyeUsesClinicalSettingsOnlyWhenEyeSet() {
-        var therapy = TherapyConfiguration()
-        therapy.fellowEyeContrast = 0.4
-        XCTAssertEqual(therapy.contrast(for: .left), 1)
-        therapy.amblyopicEye = .left
-        XCTAssertEqual(therapy.contrast(for: .left), 1)
-        XCTAssertEqual(therapy.contrast(for: .right), 0.4)
+    func testGameplayDoesNotDependOnPatchedEye() {
+        var left = GameConfiguration()
+        left.randomSeed = 5
+        left.patching = PatchingConfiguration(patchedEye: .left, playingEye: .right)
+        var right = left
+        right.patching = PatchingConfiguration(patchedEye: .right, playingEye: .left)
+        var a = WhackAMoleEngine(configuration: left)
+        var b = WhackAMoleEngine(configuration: right)
+        for _ in 0..<400 {
+            a.advance(by: 0.05)
+            b.advance(by: 0.05)
+        }
+        XCTAssertEqual(a.session.trials, b.session.trials)
     }
 }

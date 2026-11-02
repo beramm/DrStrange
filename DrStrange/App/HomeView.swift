@@ -1,22 +1,8 @@
 import SwiftUI
 
-/// Minimal game list. The Lobby feature can replace this and link to `WhackAMoleSetupView`.
+/// Minimal game list. The Lobby feature can replace this and push `GameHomeView`.
 struct HomeView: View {
-    #if DEBUG
-    /// QA hook: launch with `-WhackAMoleAutostart` to open the game directly with the saved settings.
-    @State private var isAutostarting = ProcessInfo.processInfo.arguments.contains("-WhackAMoleAutostart")
-    #endif
-
     var body: some View {
-        content
-        #if DEBUG
-            .fullScreenCover(isPresented: $isAutostarting) {
-                WhackAMoleGameView(configuration: ConfigurationStore.standard.load()) { isAutostarting = false }
-            }
-        #endif
-    }
-
-    private var content: some View {
         NavigationStack {
             VStack(spacing: 32) {
                 Text("DrStrange")
@@ -24,7 +10,7 @@ struct HomeView: View {
                     .foregroundStyle(WhackAMolePalette.ink)
 
                 NavigationLink {
-                    WhackAMoleSetupView()
+                    GameHomeView()
                 } label: {
                     HStack(spacing: 24) {
                         Image(FoxHammerView.assetName(1))
@@ -49,7 +35,7 @@ struct HomeView: View {
                 }
                 .buttonStyle(.plain)
 
-                Text("A game to support amblyopia care. It does not replace patching or any treatment prescribed by an eye doctor.")
+                Text("Games to play while wearing the eye patch your child's eye doctor prescribed. They do not replace treatment or check-ups.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

@@ -4,11 +4,10 @@ import XCTest
 final class SpawnManagerTests: XCTestCase {
     private func makeManager(
         level: DifficultyLevel = .advanced,
-        therapy: TherapyConfiguration = TherapyConfiguration(),
         rules: SpawnRules = SpawnRules(),
         seed: UInt64 = 42
     ) -> SpawnManager {
-        SpawnManager(settings: .defaults(for: level), rules: rules, therapy: therapy, seed: seed)
+        SpawnManager(settings: .defaults(for: level), rules: rules, seed: seed)
     }
 
     func testSameSeedProducesSameSequence() {
@@ -45,6 +44,7 @@ final class SpawnManagerTests: XCTestCase {
         var rules = SpawnRules()
         rules.noRepeatWindow = 2
         rules.minimumGridDistance = 1.5
+        rules.maximumGridDistance = nil
         var manager = makeManager(level: .advanced, rules: rules)
         var history: [Int] = []
         for _ in 0..<500 {
@@ -122,27 +122,16 @@ final class SpawnManagerTests: XCTestCase {
         XCTAssertLessThan(decoys, 300)
     }
 
-    func testFeatureEyeBalancedWhenAmblyopicEyeNotSet() {
-        var manager = makeManager()
-        var left = 0
-        for _ in 0..<100 where manager.makeSpawn(occupiedHoles: [])!.stimulus.featureEye == .left {
-            left += 1
+    func testNoCornerToCornerJumps() {
+        var manager = makeManager(level: .advanced)
+        var previous: Int?
+        for _ in 0..<1000 {
+            let hole = manager.makeSpawn(occupiedHoles: [])!.holeIndex
+            if let previous {
+                XCTAssertLessThanOrEqual(SpawnManager.gridDistance(hole, previous), 2.3, "\(previous) -> \(hole)")
+            }
+            previous = hole
         }
-        XCTAssertEqual(left, 50)
-    }
-
-    func testFeatureEyeShareFollowsConfiguration() {
-        var therapy = TherapyConfiguration()
-        therapy.amblyopicEye = .right
-        therapy.criticalFeatureAmblyopicShare = 0.7
-        var manager = makeManager(therapy: therapy)
-        var right = 0
-        for _ in 0..<100 {
-            let stimulus = manager.makeSpawn(occupiedHoles: [])!.stimulus
-            XCTAssertNotEqual(stimulus.featureEye, stimulus.bodyEye, "Both eyes must be needed")
-            if stimulus.featureEye == .right { right += 1 }
-        }
-        XCTAssertEqual(right, 70)
     }
 
     func testTimingStaysInConfiguredRanges() {

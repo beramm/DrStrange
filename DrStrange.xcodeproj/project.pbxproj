@@ -19,7 +19,26 @@
 /* Begin PBXFileReference section */
 		A1D500000000000000000020 /* DrStrange.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DrStrange.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1D500000000000000000021 /* DrStrangeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DrStrangeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1D500000000000000000022 /* WhackAMoleGame.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WhackAMoleGame.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A1D5000000000000000000E1 /* Exceptions for "WhackAMoleGame" folder in "DrStrange" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				App/WhackAMoleGameApp.swift,
+				README.md,
+			);
+			target = A1D500000000000000000010 /* DrStrange */;
+		};
+		A1D5000000000000000000E2 /* Exceptions for "WhackAMoleGame" folder in "WhackAMoleGame" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				README.md,
+			);
+			target = A1D500000000000000000012 /* WhackAMoleGame */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A1D500000000000000000030 /* DrStrange */ = {
@@ -30,6 +49,15 @@
 		A1D500000000000000000031 /* DrStrangeTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = DrStrangeTests;
+			sourceTree = "<group>";
+		};
+		A1D500000000000000000032 /* WhackAMoleGame */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A1D5000000000000000000E1 /* Exceptions for "WhackAMoleGame" folder in "DrStrange" target */,
+				A1D5000000000000000000E2 /* Exceptions for "WhackAMoleGame" folder in "WhackAMoleGame" target */,
+			);
+			path = WhackAMoleGame;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -49,6 +77,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1D500000000000000000042 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -56,6 +91,7 @@
 			isa = PBXGroup;
 			children = (
 				A1D500000000000000000030 /* DrStrange */,
+				A1D500000000000000000032 /* WhackAMoleGame */,
 				A1D500000000000000000031 /* DrStrangeTests */,
 				A1D500000000000000000003 /* Products */,
 			);
@@ -66,6 +102,7 @@
 			children = (
 				A1D500000000000000000020 /* DrStrange.app */,
 				A1D500000000000000000021 /* DrStrangeTests.xctest */,
+				A1D500000000000000000022 /* WhackAMoleGame.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,6 +124,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				A1D500000000000000000030 /* DrStrange */,
+				A1D500000000000000000032 /* WhackAMoleGame */,
 			);
 			name = DrStrange;
 			productName = DrStrange;
@@ -114,6 +152,26 @@
 			productReference = A1D500000000000000000021 /* DrStrangeTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		A1D500000000000000000012 /* WhackAMoleGame */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1D500000000000000000069 /* Build configuration list for PBXNativeTarget "WhackAMoleGame" */;
+			buildPhases = (
+				A1D500000000000000000054 /* Sources */,
+				A1D500000000000000000042 /* Frameworks */,
+				A1D500000000000000000055 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A1D500000000000000000032 /* WhackAMoleGame */,
+			);
+			name = WhackAMoleGame;
+			productName = WhackAMoleGame;
+			productReference = A1D500000000000000000022 /* WhackAMoleGame.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -130,6 +188,9 @@
 					A1D500000000000000000011 = {
 						CreatedOnToolsVersion = 27.2;
 						TestTargetID = A1D500000000000000000010;
+					};
+					A1D500000000000000000012 = {
+						CreatedOnToolsVersion = 27.2;
 					};
 				};
 			};
@@ -149,6 +210,7 @@
 			targets = (
 				A1D500000000000000000010 /* DrStrange */,
 				A1D500000000000000000011 /* DrStrangeTests */,
+				A1D500000000000000000012 /* WhackAMoleGame */,
 			);
 		};
 /* End PBXProject section */
@@ -168,6 +230,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1D500000000000000000055 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -179,6 +248,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A1D500000000000000000051 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1D500000000000000000054 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -345,6 +421,62 @@
 			};
 			name = Release;
 		};
+		A1D50000000000000000006A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = WhackAMoleAppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = WhackAMoleAccent;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Whack-a-Mole";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.drstrange.whackamole;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		A1D50000000000000000006B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = WhackAMoleAppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = WhackAMoleAccent;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Whack-a-Mole";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.drstrange.whackamole;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -371,6 +503,15 @@
 			buildConfigurations = (
 				A1D500000000000000000067 /* Debug */,
 				A1D500000000000000000068 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1D500000000000000000069 /* Build configuration list for PBXNativeTarget "WhackAMoleGame" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1D50000000000000000006A /* Debug */,
+				A1D50000000000000000006B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
