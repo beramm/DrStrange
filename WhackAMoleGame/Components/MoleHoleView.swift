@@ -27,8 +27,8 @@ struct MoleHoleView: View {
             let width = proxy.size.width
             let height = proxy.size.height
             let holeWidth = width * 0.72
-            let holeHeight = holeWidth * 0.3
-            let characterSize = min(width * 0.62, height * 0.78) * targetScale
+            let holeHeight = Self.holeHeight(forWidth: width)
+            let characterSize = Self.characterRect(in: proxy.size, targetScale: targetScale).height
 
             ZStack(alignment: .bottom) {
                 Ellipse()
@@ -65,10 +65,23 @@ struct MoleHoleView: View {
             .contentShape(Rectangle())
             .onTapGesture(perform: onTap)
         }
+        .anchorPreference(key: FoxAnchorKey.self, value: .bounds) { [.hole(holeIndex): $0] }
         .accessibilityElement()
         .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(.default, onTap)
+    }
+
+    static func holeHeight(forWidth width: CGFloat) -> CGFloat {
+        width * 0.72 * 0.3
+    }
+
+    /// Where a fully risen character sits inside a hole cell of `size`. Shared with the fox's
+    /// attack so the hammer lands on the character.
+    static func characterRect(in size: CGSize, targetScale: Double) -> CGRect {
+        let side = min(size.width * 0.62, size.height * 0.78) * targetScale
+        let bottom = size.height - holeHeight(forWidth: size.width) / 2
+        return CGRect(x: (size.width - side) / 2, y: bottom - side, width: side, height: side)
     }
 
     private var accessibilityLabel: String {

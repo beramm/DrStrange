@@ -28,8 +28,10 @@ final class WhackAMoleGameViewModel {
     private(set) var settings: DifficultySettings
     private(set) var remainingSeconds: Int
     private(set) var progress: Double = 0
-    /// Increments on every hit; the fox swings its hammer each time it changes.
-    private(set) var hammerSwings = 0
+    /// The fox's attack in progress; `nil` while it waits in its window.
+    /// Updated every frame during an attack, from game time, so pausing freezes the fox exactly.
+    private(set) var foxPose: FoxPose?
+    private(set) var interactionState: GameInteractionState = .idle
     /// Set briefly after an adaptive level change.
     private(set) var levelBanner: DifficultyLevel?
     private(set) var finishedSession: GameSessionRecord?
@@ -46,6 +48,17 @@ final class WhackAMoleGameViewModel {
     @ObservationIgnored private var bannerTask: Task<Void, Never>?
     @ObservationIgnored private let feedback: FeedbackPlayer
     @ObservationIgnored private let sessionStore: SessionStore
+
+    #if DEBUG
+    /// QA hooks for checking animations on the simulator:
+    /// `-WhackAMoleAutoplay YES` taps each awake character 0.6 s after it appears, and
+    /// `-WhackAMoleTimeScale 0.25` runs game time at a quarter speed.
+    @ObservationIgnored private let autoplay = UserDefaults.standard.bool(forKey: "WhackAMoleAutoplay")
+    @ObservationIgnored private let timeScale: Double = {
+        let value = UserDefaults.standard.double(forKey: "WhackAMoleTimeScale")
+        return value > 0 ? value : 1
+    }()
+    #endif
 
     init(configuration: GameConfiguration, sessionStore: SessionStore = .standard) {
         self.configuration = configuration
@@ -102,6 +115,9 @@ final class WhackAMoleGameViewModel {
     func finishEarly(reason: SessionEndReason) {
         guard phase != .finished else { return }
         engine.end(reason: reason)
+        // A hit tapped just before stopping counts even if the hammer had not landed yet.
+        score = engine.session.hits * Self.pointsPerHit
+        foxPose = nil
         phase = .finished
         finishedSession = engine.session
         save(engine.session)
@@ -134,7 +150,17 @@ final class WhackAMoleGameViewModel {
                 phase = .countdown(shown)
             }
         case .playing:
+            #if DEBUG
+            apply(engine.advance(by: delta * timeScale))
+            #else
             apply(engine.advance(by: delta))
+            #endif
+            #if DEBUG
+            if autoplay, engine.attack == nil,
+               let target = engine.targets.first(where: { $0.phase.isUp && $0.role == .target && engine.clock - $0.spawnedAt > 0.6 }) {
+                apply(engine.tapHole(target.holeIndex))
+            }
+            #endif
         case .paused, .finished:
             break
         }
@@ -143,11 +169,11 @@ final class WhackAMoleGameViewModel {
     private func apply(_ events: [EngineEvent]) {
         for event in events {
             switch event {
-            case .spawned, .missed:
+            case .spawned, .missed, .hit, .attackStarted, .attackFinished:
                 break
-            case .hit:
+            case .attackImpact:
+                // Points and sound arrive when the hammer lands, not at the tap.
                 score += Self.pointsPerHit
-                hammerSwings += 1
                 feedback.hit()
             case .decoyTapped:
                 feedback.decoyTapped()
@@ -157,6 +183,7 @@ final class WhackAMoleGameViewModel {
                 feedback.levelChanged()
                 showBanner(for: to)
             case .finished:
+                score = engine.session.hits * Self.pointsPerHit
                 phase = .finished
                 finishedSession = engine.session
                 save(engine.session)
@@ -173,6 +200,13 @@ final class WhackAMoleGameViewModel {
         if seconds != remainingSeconds { remainingSeconds = seconds }
         let roundedProgress = (engine.progress * 200).rounded() / 200
         if roundedProgress != progress { progress = roundedProgress }
+
+        let pose = engine.attack.flatMap { attack in
+            engine.attackState.map { FoxPose(phase: $0.phase, progress: $0.progress, holeIndex: attack.holeIndex) }
+        }
+        if pose != foxPose { foxPose = pose }
+        let state = engine.interactionState
+        if state != interactionState { interactionState = state }
     }
 
     private func showBanner(for level: DifficultyLevel) {

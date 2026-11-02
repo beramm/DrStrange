@@ -44,27 +44,37 @@ struct WhackAMoleGameView: View {
 
     private var gameplay: some View {
         ZStack {
-            WhackAMolePalette.meadow.ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                GameHUDView(viewModel: viewModel, onExit: requestStop)
-                // Side margins keep the fox clear of the holes on every iPad size.
-                GameBoardView(viewModel: viewModel)
-                    .padding(.horizontal, Self.foxSize + 24)
-                    .padding(.bottom, 24)
-            }
-
-            FoxHammerView(swingCount: viewModel.hammerSwings)
-                .frame(width: Self.foxSize, height: Self.foxSize)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                .padding(16)
-                .allowsHitTesting(false)
+            playfield
+                .overlayPreferenceValue(FoxAnchorKey.self) { anchors in
+                    AttackAnimationView(pose: viewModel.foxPose, targetScale: viewModel.settings.targetScale, anchors: anchors)
+                }
 
             overlay
         }
         .confirmationDialog("Stop the game?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
             Button("Stop and see my stars") { viewModel.finishEarly(reason: .stopped) }
             Button("Keep playing", role: .cancel) { viewModel.resume() }
+        }
+    }
+
+    /// Board plus the fox's window. The holes and the window report their positions so the fox
+    /// can fly from one to the other.
+    private var playfield: some View {
+        ZStack {
+            WhackAMolePalette.meadow.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                GameHUDView(viewModel: viewModel, onExit: requestStop)
+                // Side margins keep the fox's window clear of the holes on every iPad size.
+                GameBoardView(viewModel: viewModel)
+                    .padding(.horizontal, Self.foxSize + 24)
+                    .padding(.bottom, 24)
+            }
+
+            FoxWindowView()
+                .frame(width: Self.foxSize, height: Self.foxSize)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(16)
         }
     }
 

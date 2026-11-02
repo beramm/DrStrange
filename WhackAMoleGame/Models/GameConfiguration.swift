@@ -133,6 +133,7 @@ struct GameConfiguration: Codable, Equatable {
     var sessionDuration: TimeInterval = 120
     var adaptiveDifficulty = AdaptiveDifficultyRules()
     var spawnRules = SpawnRules()
+    var foxAttack = FoxAttackTiming()
     var patching = PatchingConfiguration()
     var soundEnabled: Bool = true
     var hapticsEnabled: Bool = true
@@ -146,4 +147,22 @@ struct GameConfiguration: Codable, Equatable {
     static let sessionDurationProvenance = ParameterProvenance.caregiverEntered
     /// Allowed session lengths in minutes for the caregiver stepper.
     static let sessionMinutesRange = 1...60
+}
+
+extension GameConfiguration {
+    /// Missing keys fall back to defaults, so settings saved by an older version of the game
+    /// (for example before `foxAttack` existed) still load instead of being reset.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = GameConfiguration()
+        startingLevel = try container.decodeIfPresent(DifficultyLevel.self, forKey: .startingLevel) ?? defaults.startingLevel
+        sessionDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .sessionDuration) ?? defaults.sessionDuration
+        adaptiveDifficulty = try container.decodeIfPresent(AdaptiveDifficultyRules.self, forKey: .adaptiveDifficulty) ?? defaults.adaptiveDifficulty
+        spawnRules = try container.decodeIfPresent(SpawnRules.self, forKey: .spawnRules) ?? defaults.spawnRules
+        foxAttack = try container.decodeIfPresent(FoxAttackTiming.self, forKey: .foxAttack) ?? defaults.foxAttack
+        patching = try container.decodeIfPresent(PatchingConfiguration.self, forKey: .patching) ?? defaults.patching
+        soundEnabled = try container.decodeIfPresent(Bool.self, forKey: .soundEnabled) ?? defaults.soundEnabled
+        hapticsEnabled = try container.decodeIfPresent(Bool.self, forKey: .hapticsEnabled) ?? defaults.hapticsEnabled
+        randomSeed = try container.decodeIfPresent(UInt64.self, forKey: .randomSeed)
+    }
 }

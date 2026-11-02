@@ -27,7 +27,7 @@ struct GameResultView: View {
 
     private var celebration: some View {
         HStack(spacing: 24) {
-            Image(FoxHammerView.assetName(1))
+            Image(FoxCharacterView.assetName(1))
                 .resizable()
                 .scaledToFit()
                 .frame(width: 180, height: 180)

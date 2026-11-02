@@ -28,9 +28,12 @@ xcodebuild -scheme WhackAMoleGame -destination 'platform=iOS Simulator,name=iPad
 xcodebuild -scheme DrStrange -destination 'platform=iOS Simulator,name=iPad Pro 11-inch (M5)' test
 ```
 
-Debug builds accept the launch argument `-WhackAMoleAutostart` (Product ▸ Scheme ▸ Edit Scheme ▸
-Run ▸ Arguments), which skips the home screen and starts a game with the saved settings. This is
-useful for checking layouts on different iPad sizes.
+Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme ▸ Run ▸ Arguments):
+
+- `-WhackAMoleAutostart`: skips the home screen and starts a game with the saved settings. Useful
+  for checking layouts on different iPad sizes.
+- `-WhackAMoleAutoplay YES`: taps each awake character 0.6 s after it appears.
+- `-WhackAMoleTimeScale 0.2`: runs game time at 20 % speed, to look at the fox animation closely.
 
 ## How patching fits into the game
 
@@ -61,13 +64,57 @@ useful for checking layouts on different iPad sizes.
 
 1. A character rises out of a hole.
 2. The child finds it and taps it. The whole hole area counts, so taps do not need to be precise.
-3. The character squashes, a few stars drift out, "+10" floats up and the fox mascot swings its
-   hammer. There is no flashing and the motion is short.
-4. The character sinks back, and the next one appears somewhere else.
+3. The fox leaves its window in the bottom-left corner and flies to that character, swinging its
+   hammer.
+4. The hammer lands on the character's head. The character squashes, a few stars drift out and
+   "+10" floats up. There is no flashing and the motion is short.
+5. The character sinks into its hole while the fox flies back into its window.
+6. After a short pause the next character appears somewhere else.
 
 Missed characters only sink back: there is no sound, penalty or score loss for a miss. At the
 advanced level some characters are **sleepy** (closed eyes, no star). The child should leave
-these alone; tapping one is recorded but never penalised.
+these alone; tapping one is recorded but never penalised, and the fox does not attack it.
+
+### The fox attack
+
+The fox stands in for the player's hammer. It lives in a small wooden window beside the board, in
+the side margin, so it never covers a hole or takes a touch. It only leaves after a valid tap.
+
+| State (`GameInteractionState`) | What happens | Duration |
+|---|---|---|
+| `idle` | No character on the board; the fox is home. | – |
+| `targetAppearing` | A character is rising out of its hole. | 0.38 s |
+| `targetActive` | A character is up and can be tapped; the fox waits with its hammer raised. | per level |
+| `foxEmerging` | After a valid tap, the fox rises out of its window (frame 1, hammer raised). | 0.28 s |
+| `foxAttacking` | The fox flies to the tapped character while swinging (frames 1→21, speeding up). It ends at impact. | 0.42 s |
+| `targetHit` | The hammer is on the character's head (frame 21); the character squashes, with stars and "+10". | 0.38 s |
+| `foxReturning` | The character sinks; the fox flies home, lifting the hammer (frames 21→1). | 0.34 s |
+| `nextTarget` | The fox is home; a short pause before the next character may appear. | 0.4 s |
+
+The durations are `FoxAttackTiming` in `GameConfiguration` (gameplay placeholders).
+
+Rules, enforced in `WhackAMoleEngine` and covered by unit tests:
+
+- Only an awake character that is up can start an attack, and the fox attacks the character that
+  was tapped.
+- Taps on empty holes never start an attack.
+- While an attack runs, every tap is ignored. Rapid or repeated taps cannot start a second attack,
+  and attacks never overlap.
+- No new character appears during an attack. Characters already up are not penalised: their hide
+  timer is paused while the fox is busy.
+- The hit and response time are recorded at the tap; points and the hit sound arrive at impact.
+  The tapped character cannot hide or disappear before the hammer lands.
+- Stopping the game during an attack cancels it. Play again starts with the fox at home.
+
+How the animation is driven:
+
+- The engine's game clock drives the animation, not SwiftUI timers. `AttackAnimationView` works
+  out the fox's position, size and frame from the attack progress on every frame.
+- So pausing freezes the fox exactly, and the impact frame always lines up with the character's
+  reaction.
+- The fox stands to the right of its target and swings left. For characters in the right-hand
+  column it is mirrored and stands on the left.
+- With Reduce Motion on, the fox stays in its window and swings there.
 
 ## Folder structure
 
@@ -76,9 +123,11 @@ WhackAMoleGame/
 ├── App/            WhackAMoleGameApp (@main, standalone only), GameEntryView
 ├── Views/          GameHomeView, PatchingSetupView, WhackAMoleGameView, GameBoardView,
 │                   GameHUDView, GameResultView
-├── Components/     CharacterView, MoleHoleView, ScoreView, FeedbackView (hit effect, fox)
+├── Components/     CharacterView (target), MoleHoleView, ScoreView, FeedbackView (stars),
+│                   FoxCharacterView, FoxWindowView, AttackAnimationView
 ├── ViewModels/     WhackAMoleGameViewModel
-├── Models/         GameConfiguration, PatchingConfiguration, GameCharacter, GameSession
+├── Models/         GameConfiguration, PatchingConfiguration, GameCharacter, GameSession,
+│                   FoxAttack (timing, phases, interaction state)
 ├── Managers/       WhackAMoleEngine, SpawnManager, DifficultyProgression, Randomness,
 │                   GameSessionManager (session and settings storage), FeedbackPlayer
 ├── Utilities/      GameConstants (colours)
@@ -193,8 +242,12 @@ clinical improvement.
 
 - **Provided (Google Drive `FRAME PALU`):** 21 frames of the fox mascot swinging a hammer. They
   were cropped to their shared bounds, scaled to 640 px with transparency kept, and stored in
-  `Resources/Assets.xcassets/Characters/FoxHammer/Frame01…21`. The fox swings once per hit and
-  appears on the home and result screens.
+  `Resources/Assets.xcassets/Characters/FoxHammer/Frame01…21`.
+  - Frame 1 (hammer raised) is the waiting and emerging pose, frames 1→21 are the attack swing,
+    and frame 21 is the impact.
+  - The frames include the fox's yellow card background, so the fox flies out as a card. A cut-out
+    fox without the card would look more natural, if the artist can supply one.
+  - The fox also appears on the home and result screens.
 - **Missing:**
   - **Pop-up character art.** The Drive folder has no pop-up characters, so vector placeholders are
     drawn. To use real art, add image sets named `Character<Name>` (awake, with a star) and
@@ -205,17 +258,33 @@ clinical improvement.
 
 ## Testing
 
-- `DrStrangeTests`: 32 unit tests covering:
+- `DrStrangeTests`: 44 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - session end, stop and rest-break reasons, adaptive levels, JSON round trip
   - patching record validation, and that gameplay is identical whichever eye is patched
+  - the fox attack:
+    - starts only on a valid tap, aims at the tapped character, and runs its phases in order
+    - the character waits for the impact
+    - rapid taps start one attack, nothing spawns during an attack, and spawning resumes after
+    - other characters don't hide meanwhile, and decoys don't trigger it
+    - stopping cancels it
+    - frame mapping
+    - the hammer lands on the tapped character, normal and mirrored
+    - the fox stays home when idle or with Reduce Motion
+    - settings saved by older versions still load
 - Manual checks on the iPad Pro 11-inch simulator:
   - patching setup, including the same-eye warning
   - play and hit animation
   - pause, Rest my eyes, ✕ then stop
   - result screen and Play again
   - DrStrange app navigation into the game
+- The fox attack, checked in slow motion with autoplay at 20 % speed:
+  - the sequence: the fox emerges and flies to the character, the hammer lands on its head at the
+    same moment as the squash and "+10", the character sinks, the fox returns, and the next
+    character appears after the pause
+  - pausing mid-attack freezes the fox, and resuming finishes it
+- Advanced level (9 holes, decoys) checked on iPad Pro 11-inch and iPad mini.
 - Layout checked by screenshot on iPad mini and iPad Pro 13-inch.
 
 ## Changes from the first (dichoptic) version

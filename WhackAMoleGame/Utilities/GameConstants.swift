@@ -11,6 +11,7 @@ enum WhackAMolePalette {
     static let star = Color(red: 1.0, green: 0.78, blue: 0.2)
     static let cream = Color(red: 1.0, green: 0.97, blue: 0.9)
     static let accent = Color(red: 0.93, green: 0.56, blue: 0.18)
+    static let windowInterior = Color(red: 0.98, green: 0.88, blue: 0.62)
 
     static func body(_ variant: CharacterVariant) -> Color {
         switch variant {

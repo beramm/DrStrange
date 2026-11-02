@@ -32,6 +32,9 @@ enum TargetRole: String, Codable {
 
 enum TargetPhase: Equatable {
     case up
+    /// Tapped; the fox is on its way. The character stays still and cannot expire.
+    case targeted
+    /// Struck (by the fox), or a sleepy decoy that was tapped. Reacts, then sinks.
     case hit(at: TimeInterval)
     case leaving(at: TimeInterval)
 
@@ -46,6 +49,17 @@ struct ActiveTarget: Identifiable, Equatable {
     let spawnedAt: TimeInterval
     let visibleDuration: TimeInterval
     var phase: TargetPhase = .up
+    /// When the character hides if not tapped. Pushed back while the fox is attacking another
+    /// character, so the child is never penalised for watching the animation.
+    var expiresAt: TimeInterval
 
-    var expiresAt: TimeInterval { spawnedAt + visibleDuration }
+    init(id: Int, holeIndex: Int, variant: CharacterVariant, role: TargetRole, spawnedAt: TimeInterval, visibleDuration: TimeInterval) {
+        self.id = id
+        self.holeIndex = holeIndex
+        self.variant = variant
+        self.role = role
+        self.spawnedAt = spawnedAt
+        self.visibleDuration = visibleDuration
+        self.expiresAt = spawnedAt + visibleDuration
+    }
 }

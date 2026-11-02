@@ -32,7 +32,7 @@ struct GameHomeView: View {
 
     private var childPanel: some View {
         VStack(spacing: 32) {
-            Image(FoxHammerView.assetName(1))
+            Image(FoxCharacterView.assetName(1))
                 .resizable()
                 .scaledToFit()
                 .frame(height: 200)

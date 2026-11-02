@@ -5,6 +5,12 @@ enum EngineEvent: Equatable {
     case hit(ActiveTarget, responseTime: TimeInterval)
     case missed(ActiveTarget)
     case decoyTapped(ActiveTarget)
+    /// The fox leaves its window towards the tapped character.
+    case attackStarted(ActiveTarget)
+    /// The hammer connects; the character starts its hit reaction.
+    case attackImpact(ActiveTarget)
+    /// The fox is back in its window.
+    case attackFinished
     case levelChanged(from: DifficultyLevel, to: DifficultyLevel)
     case finished
 }
@@ -20,12 +26,39 @@ struct WhackAMoleEngine {
     private var progression: DifficultyProgression
     private var nextSpawnAt: TimeInterval
     private var nextTargetID = 0
+    /// The attack in progress. While set, no new character spawns and further taps are ignored.
+    private(set) var attack: FoxAttack?
+    private var lastAttackEndedAt: TimeInterval?
 
     var level: DifficultyLevel { progression.level }
     var settings: DifficultySettings { spawnManager.settings }
     private(set) var isFinished = false
     var remainingTime: TimeInterval { max(configuration.sessionDuration - clock, 0) }
     var progress: Double { min(clock / max(configuration.sessionDuration, 1), 1) }
+
+    /// Phase and progress of the current attack, if any.
+    var attackState: (phase: FoxAttackPhase, progress: Double)? {
+        attack?.state(at: clock, timing: configuration.foxAttack)
+    }
+
+    /// Seconds a newly spawned character spends rising out of its hole (matches the UI spring).
+    static let appearDuration: TimeInterval = 0.38
+
+    var interactionState: GameInteractionState {
+        if let state = attackState {
+            switch state.phase {
+            case .emerging: return .foxEmerging
+            case .attacking: return .foxAttacking
+            case .hitting: return .targetHit
+            case .returning: return .foxReturning
+            }
+        }
+        let upTargets = targets.filter { $0.phase.isUp }
+        if upTargets.contains(where: { clock - $0.spawnedAt < Self.appearDuration }) { return .targetAppearing }
+        if !upTargets.isEmpty { return .targetActive }
+        if let lastAttackEndedAt, clock - lastAttackEndedAt < configuration.foxAttack.nextTargetDelay { return .nextTarget }
+        return .idle
+    }
 
     init(configuration: GameConfiguration, startedAt: Date = Date()) {
         self.configuration = configuration
@@ -49,6 +82,7 @@ struct WhackAMoleEngine {
         session.activePlayDuration = clock
         var events: [EngineEvent] = []
 
+        advanceAttack(by: delta, into: &events)
         expireTargets(into: &events)
         removeFinishedAnimations()
 
@@ -58,7 +92,7 @@ struct WhackAMoleEngine {
             return events
         }
 
-        if clock >= nextSpawnAt {
+        if attack == nil, clock >= nextSpawnAt {
             if let target = spawn() {
                 events.append(.spawned(target))
                 nextSpawnAt = clock + spawnManager.nextInterval()
@@ -69,27 +103,36 @@ struct WhackAMoleEngine {
         return events
     }
 
-    /// Tap on a hole. Taps on empty holes are counted but never penalised.
+    /// Tap on a hole.
+    ///
+    /// - An awake character starts the fox's attack on that character. The hit (and response
+    ///   time) is recorded at the tap; the character reacts when the hammer lands.
+    /// - A sleepy decoy reacts by itself; the fox does not attack it.
+    /// - Taps on empty holes are counted but never penalised.
+    /// - While an attack is running, every tap is ignored, so rapid or repeated taps can never
+    ///   start a second attack.
     @discardableResult
     mutating func tapHole(_ holeIndex: Int) -> [EngineEvent] {
-        guard !isFinished else { return [] }
+        guard !isFinished, attack == nil else { return [] }
         guard let index = targets.firstIndex(where: { $0.holeIndex == holeIndex && $0.phase.isUp }) else {
             session.offTargetTaps += 1
             return []
         }
-        targets[index].phase = .hit(at: clock)
         let target = targets[index]
 
         switch target.role {
         case .target:
+            targets[index].phase = .targeted
+            attack = FoxAttack(targetID: target.id, holeIndex: target.holeIndex, startedAt: clock)
             let responseTime = clock - target.spawnedAt
             record(target, outcome: .hit(responseTime: responseTime))
-            var events: [EngineEvent] = [.hit(target, responseTime: responseTime)]
+            var events: [EngineEvent] = [.hit(target, responseTime: responseTime), .attackStarted(targets[index])]
             if let change = recordProgression(hit: true) { events.append(change) }
             return events
         case .decoy:
+            targets[index].phase = .hit(at: clock)
             record(target, outcome: .decoyTapped)
-            return [.decoyTapped(target)]
+            return [.decoyTapped(targets[index])]
         }
     }
 
@@ -100,6 +143,29 @@ struct WhackAMoleEngine {
     }
 
     // MARK: - Private
+
+    private mutating func advanceAttack(by delta: TimeInterval, into events: inout [EngineEvent]) {
+        guard let attack else { return }
+        let timing = configuration.foxAttack
+
+        // Characters the child is not attacking wait while the animation plays.
+        for index in targets.indices where targets[index].phase.isUp {
+            targets[index].expiresAt += delta
+        }
+
+        let impactAt = attack.startedAt + timing.impactOffset
+        if clock >= impactAt, let index = targets.firstIndex(where: { $0.id == attack.targetID && $0.phase == .targeted }) {
+            targets[index].phase = .hit(at: impactAt)
+            events.append(.attackImpact(targets[index]))
+        }
+
+        if clock >= attack.startedAt + timing.total {
+            self.attack = nil
+            lastAttackEndedAt = clock
+            nextSpawnAt = max(nextSpawnAt, clock + timing.nextTargetDelay)
+            events.append(.attackFinished)
+        }
+    }
 
     private mutating func spawn() -> ActiveTarget? {
         let busy = Set(targets.map(\.holeIndex))
@@ -145,10 +211,16 @@ struct WhackAMoleEngine {
 
     private mutating func removeFinishedAnimations() {
         let linger = configuration.spawnRules.exitAnimationDuration
+        let hitReaction = configuration.foxAttack.hitReaction
         targets.removeAll { target in
             switch target.phase {
-            case .up: false
-            case let .hit(at), let .leaving(at): clock - at >= linger
+            case .up, .targeted:
+                false
+            case let .hit(at):
+                // A struck character sinks when its reaction ends, as the fox heads home.
+                clock - at >= (target.role == .target ? hitReaction : linger)
+            case let .leaving(at):
+                clock - at >= linger
             }
         }
     }
@@ -169,6 +241,7 @@ struct WhackAMoleEngine {
 
     private mutating func finish(reason: SessionEndReason, now: Date) {
         targets.removeAll()
+        attack = nil
         session.completed = reason == .timeUp
         session.endReason = reason
         session.endedAt = now

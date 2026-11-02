@@ -45,9 +45,10 @@ final class WhackAMoleEngineTests: XCTestCase {
         var engine = WhackAMoleEngine(configuration: makeConfiguration())
         let target = try XCTUnwrap(advanceToSpawn(&engine))
         XCTAssertFalse(engine.tapHole(target.holeIndex).isEmpty)
+        // The fox is attacking: a second tap is ignored, neither a hit nor an off-target tap.
         XCTAssertTrue(engine.tapHole(target.holeIndex).isEmpty)
         XCTAssertEqual(engine.session.hits, 1)
-        XCTAssertEqual(engine.session.offTargetTaps, 1)
+        XCTAssertEqual(engine.session.offTargetTaps, 0)
     }
 
     func testExpiredTargetIsMissedWithoutPenalty() throws {
