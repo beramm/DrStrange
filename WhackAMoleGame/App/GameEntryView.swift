@@ -14,6 +14,7 @@ struct GameEntryView: View {
         }
         #if DEBUG
         .fullScreenCover(isPresented: $isAutostarting) {
+            // Direct autostart intentionally remains touch-only for simulator animation QA.
             WhackAMoleGameView(configuration: ConfigurationStore.standard.load()) { isAutostarting = false }
         }
         #endif
