@@ -65,34 +65,56 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 
 ## Gameplay
 
-1. A character rises out of a hole.
+1. The game starts on an empty painted meadow, with no holes showing. A hole opens at a random spot and a
+   mole climbs out of it, frame by frame.
 2. The child finds it and taps it. The whole hole area counts, so taps do not need to be precise.
-3. The fox leaves its window in the bottom-left corner and flies to that character, swinging its
-   hammer.
-4. The hammer lands on the character's head. The character squashes, a few stars drift out and
-   "+10" floats up. There is no flashing and the motion is short.
-5. The character sinks into its hole while the fox flies back into its window.
-6. After a short pause the next character appears somewhere else.
+3. The fox's yellow card opens beside that mole: it grows from its centre as a rounded square with
+   a slight spring, and a square ring ripples out. Meanwhile the fox fades out of its corner.
+4. The fox rises up from the bottom of the card and swings. Its hammer slides out from behind the
+   card and lands on the mole's helmet. The mole squashes, its head wobbles, a few stars circle its
+   helmet and "+10" floats up. There is no flashing and the motion is short.
+5. The mole's climb plays backwards, taking it down into the hole. The hammer slides back behind
+   the card, the fox sinks down out of its bottom, the empty card shrinks away and the fox is back
+   in its corner.
+6. The hole closes. After a short pause another hole opens somewhere else.
 
-Missed characters only sink back: there is no sound, penalty or score loss for a miss. At the
-advanced level some characters are **sleepy** (closed eyes, no star). The child should leave
-these alone; tapping one is recorded but never penalised, and the fox does not attack it.
+The characters are moles in a yellow miner's helmet and a red-and-white striped shirt. They come
+out of dirt holes drawn by the artist (three variations, used evenly).
+A mole climbs out of the dark opening and stands in it up to its shirt; the hole's front edge hides
+the rest. The fox's hammer lands on the helmet. Moles that are not tapped go back down the same way.
+
+Missed moles only sink back: there is no sound, penalty or score loss for a miss. At the advanced
+level some moles are **asleep**: drawn in grey with a "z z" bubble. The child should leave these
+alone; tapping one is recorded but never penalised, and the fox does not attack it.
 
 ### The fox attack
 
-The fox stands in for the player's hammer. It lives in a small wooden window beside the board, in
-the side margin, so it never covers a hole or takes a touch. It only leaves after a valid tap.
+The fox stands in for the player's hammer. When idle it waits in a fixed spot in the bottom-left
+corner, in the side margin beside the board, with no frame showing. It only moves after a valid
+tap, and it never takes a touch.
+
+The "frame" is the fox's own yellow card from the artwork (rounded, with an orange border).
+`FoxWindowView` draws it on its own, using colours and proportions measured from the frames, so
+when the fox image fades in on top the two cards line up exactly.
+
+The sequence always runs in this order:
 
 | State (`GameInteractionState`) | What happens | Duration |
 |---|---|---|
-| `idle` | No character on the board; the fox is home. | – |
-| `targetAppearing` | A character is rising out of its hole. | 0.38 s |
+| `idle` | No character on the board; the fox waits in its corner. | – |
+| `targetAppearing` | A mole is climbing out of its hole (24 frames). | 0.55 s |
 | `targetActive` | A character is up and can be tapped; the fox waits with its hammer raised. | per level |
-| `foxEmerging` | After a valid tap, the fox rises out of its window (frame 1, hammer raised). | 0.28 s |
-| `foxAttacking` | The fox flies to the tapped character while swinging (frames 1→21, speeding up). It ends at impact. | 0.42 s |
-| `targetHit` | The hammer is on the character's head (frame 21); the character squashes, with stars and "+10". | 0.38 s |
-| `foxReturning` | The character sinks; the fox flies home, lifting the hammer (frames 21→1). | 0.34 s |
-| `nextTarget` | The fox is home; a short pause before the next character may appear. | 0.4 s |
+| `frameAppearing` | After a valid tap, the yellow card opens beside the character: the whole card, border included, grows from its centre as a rounded square with a slight spring, and a square ring ripples out. The corner fox fades away. | 0.34 s |
+| `foxEmerging` | The fox rises up from the bottom of the card, clipped to the inside of the card, with its hammer hidden. | 0.36 s |
+| `foxAttacking` | The fox leans in and swings (frames 1→21, speeding up) while the hammer slides out from behind the card. It ends at impact. | 0.36 s |
+| `targetHit` | The hammer is on the helmet (frame 21). The mole squashes, its head wobbles, stars circle the helmet and "+10" floats up. | 0.45 s |
+| `foxRetracting` | The mole's climb plays backwards (0.45 s, carrying on into the next step). The hammer slides back behind the card, then the fox sinks down out of the card's bottom. | 0.36 s |
+| `frameDisappearing` | The empty card shrinks back to its centre; the fox fades back in at its corner. | 0.28 s |
+| `nextTarget` | A short pause before the next character may appear. | 0.3 s |
+
+The view model also exposes the fox's own state as `FoxAnimationState`: `idle`,
+`frameAppearing`, `foxEmerging`, `attacking`, `targetHit`, `foxRetracting` and
+`frameDisappearing`.
 
 The durations are `FoxAttackTiming` in `GameConfiguration` (gameplay placeholders).
 
@@ -112,12 +134,25 @@ Rules, enforced in `WhackAMoleEngine` and covered by unit tests:
 How the animation is driven:
 
 - The engine's game clock drives the animation, not SwiftUI timers. `AttackAnimationView` works
-  out the fox's position, size and frame from the attack progress on every frame.
+  out the fox's position, size, opacity and animation frame, and the card's reveal and scale,
+  from the attack progress on every frame.
 - So pausing freezes the fox exactly, and the impact frame always lines up with the character's
   reaction.
 - The fox stands to the right of its target and swings left. For characters in the right-hand
   column it is mirrored and stands on the left.
-- With Reduce Motion on, the fox stays in its window and swings there.
+- The card is drawn behind the fox. While the fox lunges and swings, only the fox's own card
+  (part of the image) is shown, so the two never sit out of line.
+- While the fox rises or sinks, only the inside of its own card is drawn (no border, no hammer),
+  clipped to the inside of the drawn card, so nothing slides across the card's edge.
+- The hammer sticks out of the card in the artwork. It is kept hidden until the swing starts, then
+  the part of the image beside the card slides out from behind the card's edge. It slides back the
+  same way afterwards, so it never pops in outside the frame.
+- Mole frames also come from the game clock (`WhackAMoleEngine.moleVisual(for:)`), so pausing
+  freezes them too.
+- One phase starts only when the previous one has finished, because every phase comes from the
+  same attack clock. There are no separate timers or delays to drift apart.
+- With Reduce Motion on, the fox stays in its corner and swings there, no card opens, and moles
+  fade in and out instead of climbing.
 
 ## Folder structure
 
@@ -163,14 +198,23 @@ same name.
 Everything random goes through `SeededGenerator` (SplitMix64). Each saved session stores its seed,
 so a session can be replayed exactly. Set `GameConfiguration.randomSeed` to fix it for QA.
 
+No holes are shown in advance, so the child cannot tell where the next mole will be. Each hole is
+placed in two steps: first a zone of a hidden 3 x 3 grid, then a random spot inside that zone.
+
 | What | Rule | Why |
 |---|---|---|
-| Hole | Free, active hole not used in the last `noRepeatWindow` (2) spawns, at least `minimumGridDistance` (1 cell) and at most `maximumGridDistance` (2.3 cells) from the previous one. Rules relax one at a time until at least two holes qualify. Among those, weight `1 / (1 + times used)`. | Characters never reappear in the same spot straight away and are spread across the board. No corner-to-corner jumps, which keeps eye movements comfortable. Avoids predictable cycles: with 3 holes, a strict rule would allow only one hole and produce an A-B-C loop. |
+| Zone | A free, allowed zone not used in the last `noRepeatWindow` (2) spawns, at least `minimumGridDistance` (1 zone) and at most `maximumGridDistance` (2.3 zones) from the previous one. Rules relax one at a time until at least two zones qualify. Among those, weight `1 / (1 + times used)`. | Spreads moles over the board without a pattern. No corner-to-corner jumps, which keeps eye movements comfortable. |
+| Spot | A random point inside the zone, at least `minimumHoleSeparation` (0.42 of the area used) from other open holes and, where possible, from the previous hole. Clearing open holes comes first. Holes open only on the painted grass, below the horizon and above the fence. | Positions are continuous, not a fixed set, and holes do not overlap. |
+| Board area | `boardSpread` limits holes to the central 75 % / 90 % / 100 % of the board by level. Room is kept above the highest holes for the fox's card. | Shorter eye movements for beginners; the fox never covers the top bar. |
 | Interval | Uniform in the level's `spawnIntervalRange`. | Varied but never rushed. |
-| Visible time | `visibleDuration × (1 ± jitter)`. | Enough time to find and tap. |
+| Visible time | `visibleDuration × (1 ± jitter)`, counted from when the mole starts to appear. | Enough time to find and tap. |
 | At once | At most `maxSimultaneousTargets` (1 at beginner, 2 later). | Limits visual load. |
+| Hole image | Shuffle bag over the three images. | Each is used equally often. |
 | Look | Shuffle bag over the level's looks: each appears equally often. | Consistent looks within a level, and no look dominates. |
 | Decoy | Advanced only, 25 %, never more than two in a row. | Adds identification without long waits. |
+
+A hole takes 0.28 s to open before its mole starts climbing, and 0.25 s to close after the mole has
+gone. Each trial in the session file records the spot where its hole opened (`position`).
 
 This randomization is a gameplay design. It is not a clinically validated protocol.
 
@@ -178,16 +222,16 @@ This randomization is a gameplay design. It is not a clinically validated protoc
 
 | | Beginner | Intermediate | Advanced |
 |---|---|---|---|
-| Active holes | 3 (one row) | 6 (two rows) | 9 |
-| Character size (share of cell) | 0.95 | 0.80 | 0.68 |
+| Zones where holes can open | 3 (one row) | 6 (two rows) | 9 |
+| Board area used | central 75 % | central 90 % | all |
+| Hole and mole size | 100 % | 84 % | 72 % |
 | Spawn interval (s) | 2.6–3.6 | 1.9–2.9 | 1.5–2.5 |
 | Visible for (s) | 3.2 ±10 % | 2.6 ±10 % | 2.2 ±15 % |
 | Max up at once | 1 | 2 | 2 |
-| Character looks | 1 | 3 | 4 |
-| Sleepy decoys | none | none | 25 % |
-| Background | plain | plain | few static, low-contrast decorations in the margins |
+| Character looks (all the same mole art for now) | 1 | 3 | 4 |
+| Sleeping moles (decoys) | none | none | 25 % |
 
-Only rows with active holes take space, so beginner characters are also the largest on screen.
+The hole and mole scale together, so the mole always fits its hole as drawn.
 
 **Adjust level from performance** (on by default, can be switched off): after 10 real targets
 (decoys excluded), accuracy ≥ 85 % moves up one level and ≤ 50 % moves down one level. Time spent
@@ -251,17 +295,36 @@ clinical improvement.
   - The frames include the fox's yellow card background, so the fox flies out as a card. A cut-out
     fox without the card would look more natural, if the artist can supply one.
   - The fox also appears on the home and result screens.
+- **Provided (Google Drive, mole animation folder):** 24 frames (`1`–`24 END`) of the miner mole
+  climbing out of a hole, stored in `Resources/Assets.xcassets/Characters/MoleRise/Frame01…24`.
+  - The frames were painted with the mole and hole together. The dirt was removed by its colour so
+    the moles can sit in the three separate hole images, and each frame still ends along the hole's
+    front edge. All 24 frames share one crop.
+  - `MoleArt` in `MoleHoleView.swift` records where the frames sit relative to the hole's front edge.
+  - Awake moles are drawn in full colour; sleeping moles (decoys) in grey with a "z z" bubble.
+- **Provided (Google Drive, background folder):** `Background whackamole.png`, a 4:3 painted meadow
+  with sky, grass and a fence. It is stored as a JPEG in
+  `Resources/Assets.xcassets/GameBackgrounds/Meadow`, fills the screen behind the game, and is cropped
+  slightly at the top and bottom on wider iPads. `GameBackgroundView` holds where the grass is in the
+  painting.
+- **Provided (Google Drive, hole folder):** `IMG_0021`–`IMG_0023`, three dirt holes. Each was
+  cropped to its visible area and stored in `Resources/Assets.xcassets/Holes/Hole1…3`.
+  - The dark opening of each was measured from the art (`HoleArt` in `MoleHoleView.swift`).
+  - The image is scaled so its opening matches the hole's tap area.
+  - The mole is clipped to the area above the middle of the opening plus the opening itself, so it
+    disappears behind the front edge.
+  - The hole images are small (400–443 px wide), so they can look slightly soft on the largest
+    iPads. Larger exports would fix that.
 - **Missing:**
-  - **Pop-up character art.** The Drive folder has no pop-up characters, so vector placeholders are
-    drawn. To use real art, add image sets named `Character<Name>` (awake, with a star) and
-    `Character<Name>Sleepy` (decoy) for `Sunny`, `Berry`, `Leafy` and `Sky`. `CharacterView` uses
-    them automatically.
-  - Board art, gentle sound effects (built-in system sounds stand in), optional background music,
+  - **More mole art.** There is a single mole animation, so the per-level "character looks" all
+    show the same mole. A sleeping mole (eyes closed) would make decoys clearer than the grey
+    version with a bubble. A hit or dizzy pose would also help.
+  - Gentle sound effects (built-in system sounds stand in), optional background music,
     and an app icon.
 
 ## Testing
 
-- `DrStrangeTests`: 50 unit tests covering:
+- `DrStrangeTests`: 78 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - session end, stop and rest-break reasons, adaptive levels, JSON round trip

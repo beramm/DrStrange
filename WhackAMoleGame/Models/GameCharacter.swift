@@ -1,8 +1,7 @@
 import Foundation
 
-/// Character looks. Each look can have artwork in the asset catalog
-/// (`Character<Name>` awake, `Character<Name>Sleepy` for decoys); until that exists a vector
-/// placeholder is drawn instead.
+/// Character looks. All looks currently use the same mole animation; the variant is still chosen
+/// and recorded per spawn so per-look artwork can be added later without changing game logic.
 enum CharacterVariant: Int, CaseIterable, Codable {
     case sunny
     case berry
@@ -17,16 +16,12 @@ enum CharacterVariant: Int, CaseIterable, Codable {
         case .sky: "Sky"
         }
     }
-
-    func assetName(for role: TargetRole) -> String {
-        role == .target ? "Character\(name)" : "Character\(name)Sleepy"
-    }
 }
 
 enum TargetRole: String, Codable {
-    /// Awake character with a star: tap it.
+    /// Awake mole: tap it.
     case target
-    /// Sleepy character without a star: leave it. Tapping is recorded but never penalised.
+    /// Sleeping mole (grey, with a "z z" bubble): leave it. Tapping is recorded but never penalised.
     case decoy
 }
 
@@ -39,6 +34,39 @@ enum TargetPhase: Equatable {
     case leaving(at: TimeInterval)
 
     var isUp: Bool { self == .up }
+}
+
+/// A spot on the board as fractions of its width and height (0...1).
+struct BoardPoint: Codable, Equatable {
+    var x: Double
+    var y: Double
+
+    func distance(to other: BoardPoint) -> Double {
+        ((x - other.x) * (x - other.x) + (y - other.y) * (y - other.y)).squareRoot()
+    }
+}
+
+/// A hole currently on the board. Holes exist only around a mole: they open, the mole comes and
+/// goes, and they close again.
+struct HoleVisual: Identifiable, Equatable {
+    let id: Int
+    /// Zone of the board; at most one hole per zone at a time.
+    let holeIndex: Int
+    let position: BoardPoint
+    /// Which of the hole images to draw.
+    let artIndex: Int
+    /// 0 = closed, 1 = fully open.
+    var openness: Double
+}
+
+/// What a mole looks like right now.
+struct MoleVisual: Equatable {
+    /// 1 (helmet tip) ... `frameCount` (fully out of the hole).
+    var frame: Int
+    /// 0...1 through the reaction to being hit; `nil` when not reacting.
+    var hitProgress: Double?
+
+    static let frameCount = 24
 }
 
 struct ActiveTarget: Identifiable, Equatable {

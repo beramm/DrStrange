@@ -69,9 +69,12 @@ struct GazeInteractionView: View {
                       let anchor = anchors[.hole(target.holeIndex)] else { return nil }
 
                 let holeRect = proxy[anchor]
+                let artIndex = viewModel.holes.first {
+                    $0.holeIndex == target.holeIndex
+                }?.artIndex ?? 0
                 let localCharacterRect = MoleHoleView.characterRect(
-                    in: holeRect.size,
-                    targetScale: viewModel.settings.targetScale
+                    artIndex: artIndex,
+                    in: holeRect.size
                 )
                 let characterCenter = CGPoint(
                     x: holeRect.minX + localCharacterRect.midX,

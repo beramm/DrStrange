@@ -29,6 +29,33 @@ struct WhackAMoleEngine {
     /// The attack in progress. While set, no new character spawns and further taps are ignored.
     private(set) var attack: FoxAttack?
     private var lastAttackEndedAt: TimeInterval?
+    private var holes: [OpenHole] = []
+    private var nextHoleID = 0
+
+    /// A hole on the board and where it is in its life: opening, waiting for its mole, closing.
+    private struct OpenHole {
+        let id: Int
+        let request: SpawnRequest
+        let openedAt: TimeInterval
+        var moleArrived = false
+        var closingAt: TimeInterval?
+    }
+
+    /// The holes currently on the board, for drawing.
+    var holeVisuals: [HoleVisual] {
+        let rules = configuration.spawnRules
+        return holes.map { hole in
+            let opening = min(max((clock - hole.openedAt) / max(rules.holeOpenDuration, 0.001), 0), 1)
+            let closing = hole.closingAt.map { min(max((clock - $0) / max(rules.holeCloseDuration, 0.001), 0), 1) } ?? 0
+            return HoleVisual(
+                id: hole.id,
+                holeIndex: hole.request.holeIndex,
+                position: hole.request.position,
+                artIndex: hole.request.artIndex,
+                openness: opening * (1 - closing)
+            )
+        }
+    }
 
     var level: DifficultyLevel { progression.level }
     var settings: DifficultySettings { spawnManager.settings }
@@ -41,20 +68,48 @@ struct WhackAMoleEngine {
         attack?.state(at: clock, timing: configuration.foxAttack)
     }
 
-    /// Seconds a newly spawned character spends rising out of its hole (matches the UI spring).
-    static let appearDuration: TimeInterval = 0.38
+    /// How each mole should be drawn at the current moment. Driven by game time, so pausing
+    /// freezes the animation.
+    func moleVisual(for target: ActiveTarget) -> MoleVisual {
+        let rules = configuration.spawnRules
+        let count = MoleVisual.frameCount
+        func riseFrame(at time: TimeInterval) -> Int {
+            let progress = min(max((time - target.spawnedAt) / max(rules.moleRiseDuration, 0.001), 0), 1)
+            return 1 + Int((Double(count - 1) * progress).rounded())
+        }
+        func sinkFrame(from start: TimeInterval) -> Int {
+            let startFrame = riseFrame(at: start)
+            let progress = min(max((clock - start) / max(rules.exitAnimationDuration, 0.001), 0), 1)
+            return startFrame - Int((Double(startFrame - 1) * progress).rounded())
+        }
+        switch target.phase {
+        case .up, .targeted:
+            return MoleVisual(frame: riseFrame(at: clock))
+        case let .leaving(at):
+            return MoleVisual(frame: sinkFrame(from: at))
+        case let .hit(at):
+            guard target.role == .target else { return MoleVisual(frame: sinkFrame(from: at)) }
+            let reaction = configuration.foxAttack.hitReaction
+            if clock < at + reaction {
+                return MoleVisual(frame: riseFrame(at: clock), hitProgress: min(max((clock - at) / max(reaction, 0.001), 0), 1))
+            }
+            return MoleVisual(frame: sinkFrame(from: at + reaction))
+        }
+    }
 
     var interactionState: GameInteractionState {
         if let state = attackState {
             switch state.phase {
-            case .emerging: return .foxEmerging
+            case .frameAppearing: return .frameAppearing
+            case .foxEmerging: return .foxEmerging
             case .attacking: return .foxAttacking
             case .hitting: return .targetHit
-            case .returning: return .foxReturning
+            case .foxRetracting: return .foxRetracting
+            case .frameDisappearing: return .frameDisappearing
             }
         }
         let upTargets = targets.filter { $0.phase.isUp }
-        if upTargets.contains(where: { clock - $0.spawnedAt < Self.appearDuration }) { return .targetAppearing }
+        if upTargets.contains(where: { clock - $0.spawnedAt < configuration.spawnRules.moleRiseDuration }) { return .targetAppearing }
         if !upTargets.isEmpty { return .targetActive }
         if let lastAttackEndedAt, clock - lastAttackEndedAt < configuration.foxAttack.nextTargetDelay { return .nextTarget }
         return .idle
@@ -85,6 +140,7 @@ struct WhackAMoleEngine {
         advanceAttack(by: delta, into: &events)
         expireTargets(into: &events)
         removeFinishedAnimations()
+        advanceHoles(into: &events)
 
         if clock >= configuration.sessionDuration {
             finish(reason: .timeUp, now: now)
@@ -93,8 +149,7 @@ struct WhackAMoleEngine {
         }
 
         if attack == nil, clock >= nextSpawnAt {
-            if let target = spawn() {
-                events.append(.spawned(target))
+            if openHole() {
                 nextSpawnAt = clock + spawnManager.nextInterval()
             } else {
                 nextSpawnAt = clock + configuration.spawnRules.busyRetryDelay
@@ -103,11 +158,17 @@ struct WhackAMoleEngine {
         return events
     }
 
+    /// Tap on the empty board, away from any hole. Counted but never penalised.
+    mutating func tapBoard() {
+        guard !isFinished, attack == nil else { return }
+        session.offTargetTaps += 1
+    }
+
     /// Tap on a hole.
     ///
     /// - An awake character starts the fox's attack on that character. The hit (and response
     ///   time) is recorded at the tap; the character reacts when the hammer lands.
-    /// - A sleepy decoy reacts by itself; the fox does not attack it.
+    /// - A sleeping mole (decoy) reacts by itself; the fox does not attack it.
     /// - Taps on empty holes are counted but never penalised.
     /// - While an attack is running, every tap is ignored, so rapid or repeated taps can never
     ///   start a second attack.
@@ -127,7 +188,8 @@ struct WhackAMoleEngine {
         case .target:
             targets[index].phase = .targeted
             targets[index].pointsAwarded = awardedPoints
-            attack = FoxAttack(targetID: target.id, holeIndex: target.holeIndex, startedAt: clock)
+            let artIndex = holes.first { $0.request.holeIndex == target.holeIndex }?.request.artIndex ?? 0
+            attack = FoxAttack(targetID: target.id, holeIndex: target.holeIndex, artIndex: artIndex, startedAt: clock)
             let responseTime = clock - target.spawnedAt
             record(target, outcome: .hit(responseTime: responseTime), pointsAwarded: awardedPoints)
             var events: [EngineEvent] = [.hit(target, responseTime: responseTime), .attackStarted(targets[index])]
@@ -171,12 +233,40 @@ struct WhackAMoleEngine {
         }
     }
 
-    private mutating func spawn() -> ActiveTarget? {
-        let busy = Set(targets.map(\.holeIndex))
-        let upCount = targets.filter { $0.phase.isUp }.count
-        guard upCount < settings.maxSimultaneousTargets,
-              let request = spawnManager.makeSpawn(occupiedHoles: busy) else { return nil }
+    /// Opens a new hole at a random spot, if the level allows another mole. Its mole follows once
+    /// the hole is open.
+    private mutating func openHole() -> Bool {
+        let molesOnTheWay = holes.filter { !$0.moleArrived }.count
+        let upCount = targets.filter { $0.phase.isUp }.count + molesOnTheWay
+        guard upCount < settings.maxSimultaneousTargets else { return false }
+        let busy = Set(holes.map(\.request.holeIndex))
+        guard let request = spawnManager.makeSpawn(occupiedHoles: busy, openPositions: holes.map(\.request.position)) else { return false }
+        nextHoleID += 1
+        holes.append(OpenHole(id: nextHoleID, request: request, openedAt: clock))
+        return true
+    }
 
+    /// Brings moles out of holes that have finished opening, and closes holes whose mole has gone.
+    private mutating func advanceHoles(into events: inout [EngineEvent]) {
+        let rules = configuration.spawnRules
+        for index in holes.indices {
+            let zone = holes[index].request.holeIndex
+            if !holes[index].moleArrived {
+                // New moles wait while the fox is attacking.
+                if attack == nil, clock >= holes[index].openedAt + rules.holeOpenDuration {
+                    holes[index].moleArrived = true
+                    events.append(.spawned(addTarget(from: holes[index].request)))
+                }
+            } else if holes[index].closingAt == nil, !targets.contains(where: { $0.holeIndex == zone }) {
+                holes[index].closingAt = clock
+            }
+        }
+        holes.removeAll { hole in
+            hole.closingAt.map { clock - $0 >= rules.holeCloseDuration } ?? false
+        }
+    }
+
+    private mutating func addTarget(from request: SpawnRequest) -> ActiveTarget {
         nextTargetID += 1
         let target = ActiveTarget(
             id: nextTargetID,
@@ -193,7 +283,8 @@ struct WhackAMoleEngine {
             variant: target.variant,
             role: target.role,
             level: level,
-            spawnedAt: clock
+            spawnedAt: clock,
+            position: request.position
         ))
         return target
     }
@@ -221,8 +312,8 @@ struct WhackAMoleEngine {
             case .up, .targeted:
                 false
             case let .hit(at):
-                // A struck character sinks when its reaction ends, as the fox heads home.
-                clock - at >= (target.role == .target ? hitReaction : linger)
+                // A struck mole reacts first, then plays its rise backwards into the hole.
+                clock - at >= (target.role == .target ? hitReaction + linger : linger)
             case let .leaving(at):
                 clock - at >= linger
             }
@@ -250,6 +341,7 @@ struct WhackAMoleEngine {
 
     private mutating func finish(reason: SessionEndReason, now: Date) {
         targets.removeAll()
+        holes.removeAll()
         attack = nil
         session.completed = reason == .timeUp
         session.endReason = reason

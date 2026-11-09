@@ -1,88 +1,95 @@
 import SwiftUI
 
-/// 3 x 3 grid of hole positions. Only the holes active at the current level are drawn and only
-/// rows that contain them take space, so beginners see a calm board with a few large holes.
+/// The board starts as an empty field. A hole opens at a random spot when a mole is about to
+/// appear, and closes again after the mole has gone, so the child cannot tell where the next one
+/// will be.
 struct GameBoardView: View {
     let viewModel: WhackAMoleGameViewModel
+    /// The whole screen, used to find where the painted grass is.
+    let screenSize: CGSize
 
-    private let columns = SpawnManager.gridColumns
-
-    private var rows: [Int] {
-        Array(Set(viewModel.settings.activeHoleIndices.map { $0 / columns })).sorted()
-    }
+    /// Width of a hole's area as a share of the board at the largest level size, and its shape.
+    private static let cellWidthShare: CGFloat = 0.25
+    private static let cellAspect: CGFloat = 0.85
 
     var body: some View {
         GeometryReader { proxy in
-            // Never taller than half the board, so a single row of holes stays in proportion.
-            let cellHeight = proxy.size.height / CGFloat(max(rows.count, 2))
-            let cellWidth = min(proxy.size.width / CGFloat(columns), cellHeight * 1.5)
-            let gridWidth = cellWidth * CGFloat(columns)
-
+            let cell = Self.cellSize(board: proxy.size, targetScale: viewModel.settings.targetScale)
+            let boardTop = proxy.frame(in: .global).minY
+            let grass = GameBackgroundView.grassBand(screen: screenSize)
+            let ground = (grass.lowerBound - boardTop)...(grass.upperBound - boardTop)
             ZStack {
-                if viewModel.settings.showsBackgroundDecorations {
-                    BoardDecorationsView()
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { viewModel.tapBoard() }
+
+                ForEach(viewModel.holes) { hole in
+                    MoleHoleView(
+                        hole: hole,
+                        target: viewModel.target(inHole: hole.holeIndex),
+                        visual: viewModel.moleVisuals[hole.holeIndex],
+                        onTap: { viewModel.tapHole(hole.holeIndex) }
+                    )
+                    .frame(width: cell.width, height: cell.height)
+                    .position(Self.center(of: hole.position, board: proxy.size, cell: cell, ground: ground))
                 }
-                VStack(spacing: 0) {
-                    ForEach(rows, id: \.self) { row in
-                        HStack(spacing: 0) {
-                            ForEach(0..<columns, id: \.self) { column in
-                                cell(index: row * columns + column)
-                                    .frame(width: cellWidth, height: cellHeight)
-                            }
-                        }
-                    }
-                }
-                .frame(width: gridWidth)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .animation(.easeInOut(duration: 0.5), value: viewModel.settings.activeHoleIndices)
         }
     }
 
-    @ViewBuilder
-    private func cell(index: Int) -> some View {
-        if viewModel.activeHoles.contains(index) {
-            MoleHoleView(
-                holeIndex: index,
-                target: viewModel.target(inHole: index),
-                targetScale: viewModel.settings.targetScale,
-                onTap: { viewModel.tapHole(index) }
-            )
-            .transition(.opacity.combined(with: .scale(scale: 0.8)))
-        } else {
-            Color.clear
+    static func cellSize(board: CGSize, targetScale: Double) -> CGSize {
+        let beginnerScale = DifficultySettings.defaults(for: .beginner).targetScale
+        let width = min(board.width * cellWidthShare, board.height * 0.41) * CGFloat(targetScale / beginnerScale)
+        return CGSize(width: width, height: width * cellAspect)
+    }
+
+    /// Space kept above the highest holes for the fox's card, which appears above the mole.
+    private static func foxRoom(cell: CGSize) -> CGFloat { cell.width * 0.42 }
+
+    /// Screen position for a board point, keeping the hole on the grass (`ground`, in board
+    /// coordinates) and the hole, mole and fox on the board.
+    static func center(of point: BoardPoint, board: CGSize, cell: CGSize, ground: ClosedRange<CGFloat>? = nil) -> CGPoint {
+        var lowest = foxRoom(cell: cell) + cell.height / 2
+        var highest = board.height - cell.height / 2
+        if let ground {
+            // The hole's front edge is at the bottom of its cell; its dirt reaches this far around it.
+            lowest = max(lowest, ground.lowerBound + cell.width * 0.42 - cell.height / 2)
+            highest = min(highest, ground.upperBound - cell.width * 0.12 - cell.height / 2)
         }
+        highest = max(highest, lowest)
+        return CGPoint(
+            x: cell.width / 2 + CGFloat(point.x) * (board.width - cell.width),
+            y: lowest + CGFloat(point.y) * (highest - lowest)
+        )
     }
 }
 
-/// Static, low-contrast scenery for the advanced level. Kept in the margins and never animated,
-/// so it adds a little visual complexity without hiding or competing with characters.
-struct BoardDecorationsView: View {
+/// The painted meadow behind the game: sky at the top, grass in the middle, a fence along the bottom.
+struct GameBackgroundView: View {
+    let screenSize: CGSize
+
+    private static let imageSize = CGSize(width: 2752, height: 2064)
+    /// The part of the painting where holes may open, as fractions of its height: below the
+    /// horizon and above the fence, measured from the art.
+    private static let grassTop: CGFloat = 0.37
+    private static let grassBottom: CGFloat = 0.8
+
     var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            ZStack {
-                ForEach(Self.spots.indices, id: \.self) { index in
-                    let spot = Self.spots[index]
-                    Group {
-                        if index.isMultiple(of: 2) {
-                            StarShape(points: 6).fill(WhackAMolePalette.cream.opacity(0.7))
-                        } else {
-                            Ellipse().fill(WhackAMolePalette.meadowDeep.opacity(0.6))
-                        }
-                    }
-                    .frame(width: spot.size, height: spot.size * (index.isMultiple(of: 2) ? 1 : 0.5))
-                    .position(x: size.width * spot.x, y: size.height * spot.y)
-                }
-            }
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        Image("Meadow")
+            .resizable()
+            .interpolation(.high)
+            .scaledToFill()
+            .frame(width: screenSize.width, height: screenSize.height)
+            .clipped()
+            .accessibilityHidden(true)
     }
 
-    /// Fixed positions in the margins between holes (unit coordinates).
-    private static let spots: [(x: CGFloat, y: CGFloat, size: CGFloat)] = [
-        (0.04, 0.12, 34), (0.96, 0.18, 40), (0.03, 0.55, 46), (0.97, 0.62, 30),
-        (0.06, 0.92, 38), (0.94, 0.94, 44), (0.33, 0.02, 26), (0.67, 0.03, 30),
-    ]
+    /// Where the grass is on a screen of `screen` size, with the painting filling the screen and
+    /// centred (the same way `body` draws it).
+    static func grassBand(screen: CGSize) -> ClosedRange<CGFloat> {
+        let scale = max(screen.width / imageSize.width, screen.height / imageSize.height)
+        let height = imageSize.height * scale
+        let top = (screen.height - height) / 2
+        return (top + grassTop * height)...(top + grassBottom * height)
+    }
 }

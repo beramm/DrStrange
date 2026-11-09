@@ -32,6 +32,12 @@ final class WhackAMoleGameViewModel {
     /// Updated every frame during an attack, from game time, so pausing freezes the fox exactly.
     private(set) var foxPose: FoxPose?
     private(set) var interactionState: GameInteractionState = .idle
+    /// The holes on the board right now. There are none until a mole is about to appear.
+    private(set) var holes: [HoleVisual] = []
+    /// How each visible mole should be drawn, by hole. Updated from game time.
+    private(set) var moleVisuals: [Int: MoleVisual] = [:]
+
+    var foxAnimationState: FoxAnimationState { FoxAnimationState(foxPose) }
     /// Set briefly after an adaptive level change.
     private(set) var levelBanner: DifficultyLevel?
     private(set) var finishedSession: GameSessionRecord?
@@ -70,8 +76,6 @@ final class WhackAMoleGameViewModel {
         self.feedback = FeedbackPlayer(soundEnabled: configuration.soundEnabled, hapticsEnabled: configuration.hapticsEnabled)
         self.sessionStore = sessionStore
     }
-
-    var activeHoles: Set<Int> { Set(settings.activeHoleIndices) }
 
     func target(inHole hole: Int) -> ActiveTarget? {
         targets.first { $0.holeIndex == hole }
@@ -118,6 +122,8 @@ final class WhackAMoleGameViewModel {
         // A hit tapped just before stopping counts even if the hammer had not landed yet.
         score = engine.session.score
         foxPose = nil
+        moleVisuals = [:]
+        holes = []
         phase = .finished
         finishedSession = engine.session
         save(engine.session)
@@ -144,6 +150,12 @@ final class WhackAMoleGameViewModel {
         apply(engine.tapHole(activation.holeIndex, awardedPoints: activation.tier.points))
     }
 
+    /// A tap on the empty board.
+    func tapBoard() {
+        guard phase == .playing else { return }
+        engine.tapBoard()
+    }
+
     // MARK: - Loop
 
     private func tick() {
@@ -167,7 +179,7 @@ final class WhackAMoleGameViewModel {
             apply(engine.advance(by: delta))
             #endif
             #if DEBUG
-            if autoplay, engine.attack == nil,
+            if autoplay, engine.attack == nil, phase == .playing,
                let target = engine.targets.first(where: { $0.phase.isUp && $0.role == .target && engine.clock - $0.spawnedAt > 0.6 }) {
                 apply(engine.tapHole(target.holeIndex))
             }
@@ -207,13 +219,17 @@ final class WhackAMoleGameViewModel {
 
     private func syncFromEngine() {
         if targets != engine.targets { targets = engine.targets }
+        let visuals = Dictionary(uniqueKeysWithValues: engine.targets.map { ($0.holeIndex, engine.moleVisual(for: $0)) })
+        if visuals != moleVisuals { moleVisuals = visuals }
+        let holeVisuals = engine.holeVisuals
+        if holeVisuals != holes { holes = holeVisuals }
         let seconds = Int(engine.remainingTime.rounded(.up))
         if seconds != remainingSeconds { remainingSeconds = seconds }
         let roundedProgress = (engine.progress * 200).rounded() / 200
         if roundedProgress != progress { progress = roundedProgress }
 
         let pose = engine.attack.flatMap { attack in
-            engine.attackState.map { FoxPose(phase: $0.phase, progress: $0.progress, holeIndex: attack.holeIndex) }
+            engine.attackState.map { FoxPose(phase: $0.phase, progress: $0.progress, holeIndex: attack.holeIndex, artIndex: attack.artIndex) }
         }
         if pose != foxPose { foxPose = pose }
         let state = engine.interactionState
