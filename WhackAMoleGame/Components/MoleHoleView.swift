@@ -54,7 +54,7 @@ struct MoleHoleView: View {
                     .frame(width: holeWidth * 1.04, height: holeHeight * 0.58)
 
                 if let hitTarget {
-                    HitFeedbackView()
+                    HitFeedbackView(points: hitTarget.pointsAwarded ?? GameSessionRecord.defaultPointsPerHit)
                         .id(hitTarget.id)
                         .frame(width: characterSize, height: characterSize)
                         .padding(.bottom, holeHeight)

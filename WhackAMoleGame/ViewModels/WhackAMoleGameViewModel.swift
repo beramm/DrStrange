@@ -13,7 +13,7 @@ final class WhackAMoleGameViewModel {
         case finished
     }
 
-    static let pointsPerHit = 10
+    static let pointsPerHit = GameSessionRecord.defaultPointsPerHit
     private static let countdownSeconds = 3.0
     /// Upper bound on one frame step, so a hitch (or the app returning from background) cannot
     /// skip a whole character.
@@ -116,7 +116,7 @@ final class WhackAMoleGameViewModel {
         guard phase != .finished else { return }
         engine.end(reason: reason)
         // A hit tapped just before stopping counts even if the hammer had not landed yet.
-        score = engine.session.hits * Self.pointsPerHit
+        score = engine.session.score
         foxPose = nil
         phase = .finished
         finishedSession = engine.session
@@ -131,6 +131,17 @@ final class WhackAMoleGameViewModel {
         // Bring the engine clock up to the moment of the tap for an accurate response time.
         tick()
         apply(engine.tapHole(hole))
+    }
+
+    func activateGazeTarget(_ activation: GazeActivation) {
+        guard phase == .playing else { return }
+        // Advance first, then verify identity so a dwell cannot land on a replacement character
+        // that happened to appear in the same hole.
+        tick()
+        guard engine.targets.contains(where: {
+            $0.id == activation.targetID && $0.holeIndex == activation.holeIndex && $0.phase.isUp
+        }) else { return }
+        apply(engine.tapHole(activation.holeIndex, awardedPoints: activation.tier.points))
     }
 
     // MARK: - Loop
@@ -173,7 +184,7 @@ final class WhackAMoleGameViewModel {
                 break
             case .attackImpact:
                 // Points and sound arrive when the hammer lands, not at the tap.
-                score += Self.pointsPerHit
+                score = engine.session.score
                 feedback.hit()
             case .decoyTapped:
                 feedback.decoyTapped()
@@ -183,7 +194,7 @@ final class WhackAMoleGameViewModel {
                 feedback.levelChanged()
                 showBanner(for: to)
             case .finished:
-                score = engine.session.hits * Self.pointsPerHit
+                score = engine.session.score
                 phase = .finished
                 finishedSession = engine.session
                 save(engine.session)

@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// Soft burst of stars plus a "+10" that floats up. One short, slow animation; no flashing.
+/// Soft burst of stars plus the awarded points that float up. One short animation; no flashing.
 struct HitFeedbackView: View {
+    let points: Int
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var expanded = false
 
@@ -23,7 +25,7 @@ struct HitFeedbackView: View {
                             )
                     }
                 }
-                Text("+\(WhackAMoleGameViewModel.pointsPerHit)")
+                Text("+\(points)")
                     .font(.system(size: radius * 0.32, weight: .heavy, design: .rounded))
                     .foregroundStyle(WhackAMolePalette.ink)
                     .offset(y: expanded && !reduceMotion ? -radius * 0.9 : -radius * 0.5)

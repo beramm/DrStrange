@@ -49,6 +49,8 @@ struct ActiveTarget: Identifiable, Equatable {
     let spawnedAt: TimeInterval
     let visibleDuration: TimeInterval
     var phase: TargetPhase = .up
+    /// Set for a real target when an input is accepted. Gaze hits may award more for proximity.
+    var pointsAwarded: Int?
     /// When the character hides if not tapped. Pushed back while the fox is attacking another
     /// character, so the child is never penalised for watching the animation.
     var expiresAt: TimeInterval

@@ -112,7 +112,10 @@ struct WhackAMoleEngine {
     /// - While an attack is running, every tap is ignored, so rapid or repeated taps can never
     ///   start a second attack.
     @discardableResult
-    mutating func tapHole(_ holeIndex: Int) -> [EngineEvent] {
+    mutating func tapHole(
+        _ holeIndex: Int,
+        awardedPoints: Int = GameSessionRecord.defaultPointsPerHit
+    ) -> [EngineEvent] {
         guard !isFinished, attack == nil else { return [] }
         guard let index = targets.firstIndex(where: { $0.holeIndex == holeIndex && $0.phase.isUp }) else {
             session.offTargetTaps += 1
@@ -123,9 +126,10 @@ struct WhackAMoleEngine {
         switch target.role {
         case .target:
             targets[index].phase = .targeted
+            targets[index].pointsAwarded = awardedPoints
             attack = FoxAttack(targetID: target.id, holeIndex: target.holeIndex, startedAt: clock)
             let responseTime = clock - target.spawnedAt
-            record(target, outcome: .hit(responseTime: responseTime))
+            record(target, outcome: .hit(responseTime: responseTime), pointsAwarded: awardedPoints)
             var events: [EngineEvent] = [.hit(target, responseTime: responseTime), .attackStarted(targets[index])]
             if let change = recordProgression(hit: true) { events.append(change) }
             return events
@@ -225,9 +229,14 @@ struct WhackAMoleEngine {
         }
     }
 
-    private mutating func record(_ target: ActiveTarget, outcome: TrialOutcome) {
+    private mutating func record(
+        _ target: ActiveTarget,
+        outcome: TrialOutcome,
+        pointsAwarded: Int? = nil
+    ) {
         guard let index = session.trials.lastIndex(where: { $0.id == target.id }) else { return }
         session.trials[index].outcome = outcome
+        session.trials[index].pointsAwarded = pointsAwarded
     }
 
     private mutating func recordProgression(hit: Bool) -> EngineEvent? {
