@@ -49,7 +49,7 @@ struct GazeCalibrationView: View {
             Spacer(minLength: 110)
             Text("Set up eye control")
                 .font(.system(size: 42, weight: .heavy, design: .rounded))
-            Text("Use the preview to centre your face. Keep the right eye open and look directly at each target.")
+            Text("Put on the prescribed patch, then use the preview to centre your face. Keep the right eye open and look directly at each target.")
                 .font(.title3)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 680)
@@ -91,6 +91,7 @@ struct GazeCalibrationView: View {
                 Text("tracking \(controller.sample.trackingState.rawValue)")
                 Text("setup \(controller.sample.setupState.rawValue)")
                 Text("eye \(controller.sample.eyeAvailability.rawValue)")
+                Text("patch \(String(describing: controller.patchWearState))")
                 Text("calibration \(controller.sample.calibrationState.rawValue)")
             }
             .font(.caption.monospaced())
