@@ -1,7 +1,7 @@
 # Gaze Tracker Planning Pack
 
-Status: Phase 2 complete; custom Phase 3 calibration and screen mapping is next
-Last updated: 2026-11-03
+Status: Phase 3 prototype integrated; raw p90 gate failed; ML candidate assessment complete
+Last updated: 2026-11-09
 Scope: gaze tracking on iPad for the DrStrange amblyopia therapeutic game
 
 No tracker implementation was created during Phase 0. Later implementation is authorized only within its numbered phase and a separate work session after the preceding gate passes.
@@ -18,12 +18,13 @@ Scope is limited to the custom gaze-tracker technology under `GazeTracker/`: cam
 6. [06-repository-structure.md](06-repository-structure.md) — current folder ownership and future layout options.
 7. [07-apple-gaze-tracking-lessons.md](07-apple-gaze-tracking-lessons.md) — Apple-informed design lessons, recording evidence, and custom Phase 3 radius-reduction guidance.
 8. [08-apple-inspired-custom-phase3.md](08-apple-inspired-custom-phase3.md) — approved Phase 3 implementation brief, ≤4 cm gate, and copy-ready next-session prompt.
-9. [plan.md](plan.md) — phase-gated development roadmap and stop rules.
-10. [tasks.md](tasks.md) — live checklist, phase gates, evidence, and session log.
+9. [09-ml-deep-learning-assessment.md](09-ml-deep-learning-assessment.md) — current model search, BlazeGaze recommendation, portability/licensing blockers, and exact-device experiment gate.
+10. [plan.md](plan.md) — phase-gated development roadmap and stop rules.
+11. [tasks.md](tasks.md) — live checklist, phase gates, evidence, and session log.
 
 ## Current position
 
-Phase 1 is complete under the accepted selected-right ARKit interaction-fit contract. Phase 2 module, tests, documentation, and demo host build/install/run are complete on the exact target iPad. The next permitted work is custom Phase 3 calibration and screen mapping in a new session. The Apple recording is reference evidence for improving our own setup guidance, calibration flow, filtering, and interaction quality; it does not change the selected custom-tracker architecture.
+Phase 1 is complete under the accepted selected-right ARKit interaction-fit contract. Phase 2 module, tests, documentation, and demo host build/install/run are complete on the exact target iPad. Phase 3 is implemented and functionally integrated, but its corrected raw p90 result of 6.26 cm fails the fixed 4.0 cm gate. The 2026-11-09 ML assessment selects WebEyeTrack/BlazeGaze only for an isolated shadow experiment; it does not add a model or replace the current architecture. The Apple recording remains reference evidence for improving our own setup guidance, calibration flow, filtering, and interaction quality.
 
 The repository separates `GazeTracker/` and `Slicing/`. The gaze planning pack lives under `GazeTracker/mdFiles/`; the production-oriented Swift Package, tests, and gaze-owned demo host live under `GazeTracker/`. `Phase1Probe/` remains separate disposable evidence. The referenced `RTK.md` instruction file is still not present in this checkout, so no additional repository-specific instructions could be applied.
 

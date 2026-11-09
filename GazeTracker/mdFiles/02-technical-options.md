@@ -1,6 +1,6 @@
 # Technical Options
 
-Status: Phase 2 complete; custom Phase 3 calibration and mapping is next
+Status: Phase 3 ARKit mapping measured; ML shadow candidate assessed
 
 Repository note: Phase 2 created the production-oriented Swift Package, isolated ARKit platform adapter, focused tests, and gaze-owned demo host. Phase 3 will implement the selected custom-coordinate route.
 
@@ -100,6 +100,24 @@ If ARKit cannot meet the agreed thresholds, compare a Vision-based prototype and
 ## Current recommendation after Phase 2
 
 Continue with custom Phase 3 using the accepted selected-right ARKit observation source. Preserve the existing quadratic as a baseline, then test fixation-gated robust calibration and a geometric 3D eye-ray/screen-plane mapping. Use the Apple recording only to inform setup/calibration presentation and interaction-quality goals. Do not add a system Eye Tracking activation spike or replace the custom `GazeSample` contract.
+
+## ML / deep-learning addendum — 2026-11-09
+
+The corrected Phase 3 raw result (median 2.14 cm, p90 6.26 cm, worst
+6.34 cm) does not pass the 4.0 cm p90 gate. A current Hugging Face/GitHub
+review therefore considered pretrained appearance-based models as a bounded
+alternative. WebEyeTrack's BlazeGaze is the strongest candidate because it is
+small, predicts a direct normalized screen point, and has a reproducible Core
+ML conversion path. It is not a drop-in replacement: exact two-eye
+preprocessing, patched-eye robustness, iPadOS 17 conversion, calibration,
+coordinate convention, end-to-end latency, and checkpoint rights all remain
+open gates.
+
+The approved next experiment is an internal shadow comparison against the
+existing ARKit mapper. No model may drive gameplay or change the public sample
+contract until it passes the unchanged exact-device validation and privacy
+gates. See [09-ml-deep-learning-assessment.md](09-ml-deep-learning-assessment.md)
+for the candidate table, artifact hashes, and pass/stop protocol.
 
 ## Calibration model candidates for the spike
 
