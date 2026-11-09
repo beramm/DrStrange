@@ -46,7 +46,8 @@ struct ContentView: View {
             .navigationDestination(for: LobbyRoute.self) { route in
                 switch route {
                 case .characterSelect: CharacterSelectView { path.append(.randomizer) }
-                case .randomizer:      RandomizerPlaceholder()
+                case .randomizer:      RandomizerView { game in path.append(.game(game)) }
+                case .game(let game):  GamePlaceholder(game: game)
                 case .settings:        SettingsPlaceholder()
                 }
             }
