@@ -9,6 +9,8 @@ import UIKit
 @MainActor
 @Observable
 final class GazeInputController {
+    private static let calibrationLayout = CalibrationLayout.ninePosition
+
     private(set) var sample: GazeSample
     private(set) var activeCalibrationTarget: NormalizedGazePoint?
     private(set) var status = "Starting the front camera…"
@@ -112,7 +114,7 @@ final class GazeInputController {
         status = "Hold still — calibration begins in 3 seconds"
 
         do {
-            try tracker.beginCalibration(layout: .perimeterToCentre13)
+            try tracker.beginCalibration(layout: Self.calibrationLayout)
         } catch {
             transitionPending = false
             isPreparingCalibration = false
@@ -123,7 +125,7 @@ final class GazeInputController {
         calibrationTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
             guard let self, !Task.isCancelled else { return }
-            calibrationTargets = CalibrationLayout.perimeterToCentre13.targets
+            calibrationTargets = Self.calibrationLayout.targets
             targetIndex = 0
             transitionPending = false
             isPreparingCalibration = false
