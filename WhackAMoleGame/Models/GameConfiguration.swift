@@ -35,9 +35,12 @@ enum DifficultyLevel: Int, CaseIterable, Codable, Identifiable, Comparable {
 
 /// Per-level gameplay parameters. All values are `.gameDesign` placeholders unless noted.
 struct DifficultySettings: Codable, Equatable {
-    /// Indices into the 3 x 3 hole grid (0 = top-left, 8 = bottom-right) that can spawn characters.
+    /// Zones of the board (a hidden 3 x 3 grid, 0 = top-left, 8 = bottom-right) where holes may open.
+    /// No hole is shown until a mole is about to appear, at a random spot inside its zone.
     var activeHoleIndices: [Int]
-    /// Character height as a fraction of a hole cell. Larger is easier to see.
+    /// How much of the board (0...1, centred) holes may open in. Smaller keeps eye movements short.
+    var boardSpread: Double
+    /// Size of the hole and its mole, relative to the largest size. Larger is easier to see.
     var targetScale: Double
     /// Seconds between one spawn and the next, drawn uniformly from this range.
     var spawnIntervalRange: ClosedRange<Double>
@@ -49,7 +52,7 @@ struct DifficultySettings: Codable, Equatable {
     var maxSimultaneousTargets: Int
     /// How many of the available character looks are mixed in at this level.
     var characterVariantCount: Int
-    /// Chance that a spawn is a "sleepy" decoy that should be left alone (no penalty if tapped).
+    /// Chance that a spawn is a sleeping mole (decoy) that should be left alone (no penalty if tapped).
     var decoyProbability: Double
     /// Static, low-contrast decorations around the board (extra visual elements at higher levels).
     var showsBackgroundDecorations: Bool
@@ -59,6 +62,7 @@ struct DifficultySettings: Codable, Equatable {
         case .beginner:
             DifficultySettings(
                 activeHoleIndices: [3, 4, 5],
+                boardSpread: 0.75,
                 targetScale: 0.95,
                 spawnIntervalRange: 2.6...3.6,
                 visibleDuration: 3.2,
@@ -71,6 +75,7 @@ struct DifficultySettings: Codable, Equatable {
         case .intermediate:
             DifficultySettings(
                 activeHoleIndices: [0, 1, 2, 3, 4, 5],
+                boardSpread: 0.9,
                 targetScale: 0.8,
                 spawnIntervalRange: 1.9...2.9,
                 visibleDuration: 2.6,
@@ -83,6 +88,7 @@ struct DifficultySettings: Codable, Equatable {
         case .advanced:
             DifficultySettings(
                 activeHoleIndices: Array(0..<9),
+                boardSpread: 1,
                 targetScale: 0.68,
                 spawnIntervalRange: 1.5...2.5,
                 visibleDuration: 2.2,
@@ -105,11 +111,20 @@ struct SpawnRules: Codable, Equatable {
     /// Maximum grid distance from the previous spawn, so the eye never has to jump corner to
     /// opposite corner (2.83 cells). `nil` removes the limit.
     var maximumGridDistance: Double? = 2.3
+    /// Minimum distance between a new hole and other open holes or the previous hole, as a fraction
+    /// of the board, so holes never overlap or reappear in the same spot.
+    var minimumHoleSeparation: Double = 0.3
+    /// Seconds a hole takes to open before its mole starts climbing out.
+    var holeOpenDuration: Double = 0.28
+    /// Seconds a hole takes to close after its mole has gone.
+    var holeCloseDuration: Double = 0.25
     /// Delay before the first character of a session.
     var leadInDelay: Double = 1.0
     /// Retry delay when every allowed hole is busy.
     var busyRetryDelay: Double = 0.25
-    /// Seconds a hidden or hit character stays on the board for its exit animation.
+    /// Seconds a mole takes to climb out of its hole (the rise frames, played forwards).
+    var moleRiseDuration: Double = 0.55
+    /// Seconds a mole takes to go back down (the same frames, played backwards).
     var exitAnimationDuration: Double = 0.45
 }
 
@@ -158,8 +173,9 @@ extension GameConfiguration {
         startingLevel = try container.decodeIfPresent(DifficultyLevel.self, forKey: .startingLevel) ?? defaults.startingLevel
         sessionDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .sessionDuration) ?? defaults.sessionDuration
         adaptiveDifficulty = try container.decodeIfPresent(AdaptiveDifficultyRules.self, forKey: .adaptiveDifficulty) ?? defaults.adaptiveDifficulty
-        spawnRules = try container.decodeIfPresent(SpawnRules.self, forKey: .spawnRules) ?? defaults.spawnRules
-        foxAttack = try container.decodeIfPresent(FoxAttackTiming.self, forKey: .foxAttack) ?? defaults.foxAttack
+        spawnRules = (try? container.decodeIfPresent(SpawnRules.self, forKey: .spawnRules)) ?? defaults.spawnRules
+        // Timing saved by an older version has different fields; fall back to the defaults.
+        foxAttack = (try? container.decodeIfPresent(FoxAttackTiming.self, forKey: .foxAttack)) ?? defaults.foxAttack
         patching = try container.decodeIfPresent(PatchingConfiguration.self, forKey: .patching) ?? defaults.patching
         soundEnabled = try container.decodeIfPresent(Bool.self, forKey: .soundEnabled) ?? defaults.soundEnabled
         hapticsEnabled = try container.decodeIfPresent(Bool.self, forKey: .hapticsEnabled) ?? defaults.hapticsEnabled

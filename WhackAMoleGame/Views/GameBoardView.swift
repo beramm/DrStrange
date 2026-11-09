@@ -1,62 +1,62 @@
 import SwiftUI
 
-/// 3 x 3 grid of hole positions. Only the holes active at the current level are drawn and only
-/// rows that contain them take space, so beginners see a calm board with a few large holes.
+/// The board starts as an empty meadow. A hole opens at a random spot when a mole is about to
+/// appear, and closes again after the mole has gone, so the child cannot tell where the next one
+/// will be.
 struct GameBoardView: View {
     let viewModel: WhackAMoleGameViewModel
 
-    private let columns = SpawnManager.gridColumns
-
-    private var rows: [Int] {
-        Array(Set(viewModel.settings.activeHoleIndices.map { $0 / columns })).sorted()
-    }
+    /// Width of a hole's area as a share of the board at the largest level size, and its shape.
+    private static let cellWidthShare: CGFloat = 0.25
+    private static let cellAspect: CGFloat = 0.85
 
     var body: some View {
         GeometryReader { proxy in
-            // Never taller than half the board, so a single row of holes stays in proportion.
-            let cellHeight = proxy.size.height / CGFloat(max(rows.count, 2))
-            let cellWidth = min(proxy.size.width / CGFloat(columns), cellHeight * 1.5)
-            let gridWidth = cellWidth * CGFloat(columns)
-
+            let cell = Self.cellSize(board: proxy.size, targetScale: viewModel.settings.targetScale)
             ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { viewModel.tapBoard() }
+
                 if viewModel.settings.showsBackgroundDecorations {
                     BoardDecorationsView()
                 }
-                VStack(spacing: 0) {
-                    ForEach(rows, id: \.self) { row in
-                        HStack(spacing: 0) {
-                            ForEach(0..<columns, id: \.self) { column in
-                                cell(index: row * columns + column)
-                                    .frame(width: cellWidth, height: cellHeight)
-                            }
-                        }
-                    }
+
+                ForEach(viewModel.holes) { hole in
+                    MoleHoleView(
+                        hole: hole,
+                        target: viewModel.target(inHole: hole.holeIndex),
+                        visual: viewModel.moleVisuals[hole.holeIndex],
+                        onTap: { viewModel.tapHole(hole.holeIndex) }
+                    )
+                    .frame(width: cell.width, height: cell.height)
+                    .position(Self.center(of: hole.position, board: proxy.size, cell: cell))
                 }
-                .frame(width: gridWidth)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .animation(.easeInOut(duration: 0.5), value: viewModel.settings.activeHoleIndices)
         }
     }
 
-    @ViewBuilder
-    private func cell(index: Int) -> some View {
-        if viewModel.activeHoles.contains(index) {
-            MoleHoleView(
-                holeIndex: index,
-                target: viewModel.target(inHole: index),
-                targetScale: viewModel.settings.targetScale,
-                onTap: { viewModel.tapHole(index) }
-            )
-            .transition(.opacity.combined(with: .scale(scale: 0.8)))
-        } else {
-            Color.clear
-        }
+    static func cellSize(board: CGSize, targetScale: Double) -> CGSize {
+        let beginnerScale = DifficultySettings.defaults(for: .beginner).targetScale
+        let width = min(board.width * cellWidthShare, board.height * 0.41) * CGFloat(targetScale / beginnerScale)
+        return CGSize(width: width, height: width * cellAspect)
+    }
+
+    /// Space kept above the highest holes for the fox's card, which appears above the mole.
+    private static func foxRoom(cell: CGSize) -> CGFloat { cell.width * 0.42 }
+
+    /// Screen position for a board point, keeping the hole, the mole and the fox on the board.
+    static func center(of point: BoardPoint, board: CGSize, cell: CGSize) -> CGPoint {
+        let top = foxRoom(cell: cell)
+        return CGPoint(
+            x: cell.width / 2 + CGFloat(point.x) * (board.width - cell.width),
+            y: top + cell.height / 2 + CGFloat(point.y) * (board.height - cell.height - top)
+        )
     }
 }
 
-/// Static, low-contrast scenery for the advanced level. Kept in the margins and never animated,
-/// so it adds a little visual complexity without hiding or competing with characters.
+/// Static, low-contrast scenery for the advanced level. Never animated, so it adds a little visual
+/// complexity without competing with the moles.
 struct BoardDecorationsView: View {
     var body: some View {
         GeometryReader { proxy in

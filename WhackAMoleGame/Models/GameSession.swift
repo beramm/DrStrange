@@ -16,6 +16,8 @@ struct TrialRecord: Codable, Equatable, Identifiable {
     let level: DifficultyLevel
     /// Seconds of active play (pauses excluded) when the character appeared.
     let spawnedAt: TimeInterval
+    /// Where on the board the hole opened. Missing in sessions saved before holes were random.
+    var position: BoardPoint?
     var outcome: TrialOutcome?
 }
 

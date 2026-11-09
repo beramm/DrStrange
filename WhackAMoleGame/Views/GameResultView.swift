@@ -55,9 +55,9 @@ struct GameResultView: View {
     private var encouragement: String {
         if session.endReason == .restBreak { return "Resting your eyes was a good choice." }
         switch session.hits {
-        case 0: return "The friends will be back next time."
-        case 1: return "You found 1 friend!"
-        default: return "You found \(session.hits) friends!"
+        case 0: return "The moles will be back next time."
+        case 1: return "You got 1 mole!"
+        default: return "You got \(session.hits) moles!"
         }
     }
 

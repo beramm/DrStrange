@@ -46,7 +46,7 @@ struct WhackAMoleGameView: View {
         ZStack {
             playfield
                 .overlayPreferenceValue(FoxAnchorKey.self) { anchors in
-                    AttackAnimationView(pose: viewModel.foxPose, targetScale: viewModel.settings.targetScale, anchors: anchors)
+                    AttackAnimationView(pose: viewModel.foxPose, anchors: anchors)
                 }
 
             overlay
@@ -57,21 +57,21 @@ struct WhackAMoleGameView: View {
         }
     }
 
-    /// Board plus the fox's window. The holes and the window report their positions so the fox
-    /// can fly from one to the other.
+    /// Board plus the fox's corner spot. The holes and the corner report their positions so the
+    /// fox and its frame can be placed beside the tapped character.
     private var playfield: some View {
         ZStack {
             WhackAMolePalette.meadow.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 GameHUDView(viewModel: viewModel, onExit: requestStop)
-                // Side margins keep the fox's window clear of the holes on every iPad size.
+                // Side margins keep the fox's corner clear of the moles on every iPad size.
                 GameBoardView(viewModel: viewModel)
                     .padding(.horizontal, Self.foxSize + 24)
                     .padding(.bottom, 24)
             }
 
-            FoxWindowView()
+            FoxHomeAnchor()
                 .frame(width: Self.foxSize, height: Self.foxSize)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(16)

@@ -2,6 +2,8 @@ import Foundation
 
 struct SpawnRequest: Equatable {
     let holeIndex: Int
+    let position: BoardPoint
+    let artIndex: Int
     let variant: CharacterVariant
     let role: TargetRole
     let visibleDuration: TimeInterval
@@ -11,11 +13,13 @@ struct SpawnRequest: Equatable {
 /// and every session can be reproduced from `seed`.
 ///
 /// Rules (all configurable, see `SpawnRules` and `DifficultySettings`):
-/// - Position: a free, active hole that was not used in the last `noRepeatWindow` spawns and is
-///   between `minimumGridDistance` and `maximumGridDistance` cells from the previous spawn (spaced
-///   out, but no corner-to-corner jumps). Among those, less-used holes are
-///   weighted higher so coverage evens out without becoming a fixed rotation. Constraints are
-///   relaxed one at a time until at least two holes qualify, so the next spawn is never certain.
+/// - Position: first a free, active zone of the board (a hidden 3 x 3 grid) that was not used in the
+///   last `noRepeatWindow` spawns and is between `minimumGridDistance` and `maximumGridDistance`
+///   cells from the previous spawn (spaced out, but no corner-to-corner jumps). Among those,
+///   less-used zones are weighted higher so coverage evens out without becoming a fixed rotation.
+///   Constraints are relaxed one at a time until at least two zones qualify, so the next spawn is
+///   never certain. Then a random spot inside that zone, at least `minimumHoleSeparation` from other
+///   open holes and the previous hole. Nothing is shown until the hole opens there.
 /// - Timing: uniform draw from `spawnIntervalRange`; visibility = `visibleDuration` +/- jitter.
 /// - Look: shuffle bag over the level's character variants, so each look appears equally often.
 /// - Role: decoys with `decoyProbability`, never more than two in a row.
@@ -28,6 +32,8 @@ struct SpawnManager {
 
     private var generator: SeededGenerator
     private var variantBag: ShuffleBag<CharacterVariant>
+    private var artBag = ShuffleBag([0, 1, 2])
+    private var previousPosition: BoardPoint?
     private(set) var recentHoles: [Int] = []
     private(set) var holeCounts: [Int: Int] = [:]
     private var consecutiveDecoys = 0
@@ -51,8 +57,9 @@ struct SpawnManager {
         Double.random(in: settings.spawnIntervalRange, using: &generator)
     }
 
-    /// Returns `nil` when every active hole is occupied.
-    mutating func makeSpawn(occupiedHoles: Set<Int>) -> SpawnRequest? {
+    /// Returns `nil` when every active zone is occupied.
+    /// `openPositions` are the holes currently on the board, which the new one must keep clear of.
+    mutating func makeSpawn(occupiedHoles: Set<Int>, openPositions: [BoardPoint] = []) -> SpawnRequest? {
         guard let hole = chooseHole(occupied: occupiedHoles) else { return nil }
         recentHoles.append(hole)
         if recentHoles.count > max(rules.noRepeatWindow, 1) { recentHoles.removeFirst() }
@@ -61,8 +68,13 @@ struct SpawnManager {
         let jitter = settings.visibleDurationJitter
         let duration = settings.visibleDuration * Double.random(in: (1 - jitter)...(1 + jitter), using: &generator)
 
+        let position = choosePosition(inZone: hole, avoiding: openPositions + (previousPosition.map { [$0] } ?? []))
+        previousPosition = position
+
         return SpawnRequest(
             holeIndex: hole,
+            position: position,
+            artIndex: artBag.next(using: &generator),
             variant: variantBag.next(using: &generator),
             role: chooseRole(),
             visibleDuration: duration
@@ -76,6 +88,22 @@ struct SpawnManager {
     }
 
     // MARK: - Private
+
+    /// A random spot inside the zone, spread over the part of the board this level uses.
+    private mutating func choosePosition(inZone zone: Int, avoiding others: [BoardPoint]) -> BoardPoint {
+        let rows = Array(Set(settings.activeHoleIndices.map { $0 / Self.gridColumns })).sorted()
+        let rowIndex = rows.firstIndex(of: zone / Self.gridColumns) ?? 0
+        let column = zone % Self.gridColumns
+        let spread = settings.boardSpread
+        var candidate = BoardPoint(x: 0.5, y: 0.5)
+        for _ in 0..<24 {
+            let x = (Double(column) + Double.random(in: 0..<1, using: &generator)) / Double(Self.gridColumns)
+            let y = (Double(rowIndex) + Double.random(in: 0..<1, using: &generator)) / Double(rows.count)
+            candidate = BoardPoint(x: 0.5 + (x - 0.5) * spread, y: 0.5 + (y - 0.5) * spread)
+            if others.allSatisfy({ $0.distance(to: candidate) >= rules.minimumHoleSeparation }) { break }
+        }
+        return candidate
+    }
 
     private mutating func chooseHole(occupied: Set<Int>) -> Int? {
         let free = settings.activeHoleIndices.filter { !occupied.contains($0) }
