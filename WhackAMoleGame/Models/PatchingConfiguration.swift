@@ -11,9 +11,9 @@ enum Eye: String, Codable, CaseIterable, Identifiable {
 
 /// Caregiver-entered record of the patching routine for a session.
 ///
-/// This is documentation only. The game plays the same whichever eye is patched. The app never
-/// works out which eye is amblyopic, never checks the patch (no camera), and never suggests how
-/// long a patch should be worn: those follow the child's ophthalmologist.
+/// This is documentation only. The game never works out which eye is amblyopic and never suggests
+/// how long a patch should be worn: those follow the child's ophthalmologist. The separate live
+/// camera check can only infer that one eye is obscured; it does not alter this caregiver record.
 struct PatchingConfiguration: Codable, Equatable {
     /// Eye covered by the patch, as prescribed. `nil` means not recorded.
     var patchedEye: Eye?

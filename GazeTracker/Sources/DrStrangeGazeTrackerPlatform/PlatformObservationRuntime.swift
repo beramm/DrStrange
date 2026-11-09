@@ -215,6 +215,11 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         )
         let distance = simd_length(faceTranslation)
         let selectedEyeBlink = Double(face.blendShapes[.eyeBlinkLeft]?.floatValue ?? 0)
+        let otherEyeBlink = Double(face.blendShapes[.eyeBlinkRight]?.floatValue ?? 0)
+        let eyeAvailability = EyeAvailabilityClassifier.classify(
+            eyeBlinkLeft: selectedEyeBlink,
+            eyeBlinkRight: otherEyeBlink
+        )
         let finite = (0..<4).allSatisfy { column in
             let value = eyeInCamera[column]
             return value.x.isFinite && value.y.isFinite && value.z.isFinite && value.w.isFinite
@@ -231,7 +236,7 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         } else {
             .ready
         }
-        let eyeOpen = selectedEyeBlink < 0.70
+        let selectedEyeOpen = eyeAvailability == .both || eyeAvailability == .rightOnly
         let ray = finite ? SelectedEyeRayObservation(
             originX: origin.x,
             originY: origin.y,
@@ -253,9 +258,9 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         ) : nil
         publish(
             frameTimestamp: frame.timestamp,
-            tracking: finite && eyeOpen && setup == .ready ? .limited : (finite ? .limited : .lost),
+            tracking: finite && selectedEyeOpen && setup == .ready ? .limited : (finite ? .limited : .lost),
             setup: setup,
-            eyes: finite && eyeOpen ? .rightOnly : .none,
+            eyes: finite ? eyeAvailability : .none,
             ray: ray
         )
     }
