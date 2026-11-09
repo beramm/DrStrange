@@ -1,19 +1,21 @@
 import SwiftUI
 
-/// Shows the unsmoothed custom-tracker point and converts a continuous one-second dwell near
-/// an active character into a proximity-scored game action.
+/// Smooths the custom-tracker point for interaction and converts a continuous one-second dwell
+/// near an active character into a proximity-scored game action.
 struct GazeInteractionView: View {
     let controller: GazeInputController
     let viewModel: WhackAMoleGameViewModel
     let anchors: [FoxAnchorID: Anchor<CGRect>]
 
     @State private var selector = GazeDwellSelector()
+    @State private var smoother = GazePointSmoother()
+    @State private var smoothedNormalizedPoint: CGPoint?
     @State private var dwellProgress: Double = 0
     @State private var proximityTier: GazeProximityTier?
 
     var body: some View {
         GeometryReader { proxy in
-            let point = cursorPoint(in: proxy.size)
+            let point = cursorPoint(for: smoothedNormalizedPoint, in: proxy.size)
 
             ZStack {
                 if let point, controller.hasUsableGaze {
@@ -56,13 +58,19 @@ struct GazeInteractionView: View {
         .accessibilityHidden(true)
     }
 
-    private func cursorPoint(in size: CGSize) -> CGPoint? {
-        guard let gaze = controller.sample.pointNormalized else { return nil }
-        return CGPoint(x: gaze.x * size.width, y: gaze.y * size.height)
+    private func cursorPoint(for normalizedPoint: CGPoint?, in size: CGSize) -> CGPoint? {
+        guard let normalizedPoint else { return nil }
+        return CGPoint(x: normalizedPoint.x * size.width, y: normalizedPoint.y * size.height)
     }
 
     private func consumeSample(in proxy: GeometryProxy) {
-        let point = cursorPoint(in: proxy.size)
+        let rawPoint = controller.sample.pointNormalized.map { CGPoint(x: $0.x, y: $0.y) }
+        smoothedNormalizedPoint = smoother.consume(
+            point: rawPoint,
+            timestampNanoseconds: controller.sample.timestamp.uptimeNanoseconds,
+            isUsable: controller.hasUsableGaze
+        )
+        let point = cursorPoint(for: smoothedNormalizedPoint, in: proxy.size)
         let candidate = point.flatMap { point in
             viewModel.targets.compactMap { target -> GazeFocusCandidate? in
                 guard target.phase.isUp,
@@ -120,6 +128,8 @@ struct GazeInteractionView: View {
 
     private func resetDwell() {
         selector.reset()
+        smoother.reset()
+        smoothedNormalizedPoint = nil
         dwellProgress = 0
         proximityTier = nil
     }

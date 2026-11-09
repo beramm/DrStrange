@@ -324,11 +324,12 @@ clinical improvement.
 
 ## Testing
 
-- `DrStrangeTests`: 78 unit tests covering:
+- `DrStrangeTests`: 83 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - session end, stop and rest-break reasons, adaptive levels, JSON round trip
   - patching record validation, and that gameplay is identical whichever eye is patched
+  - interaction-layer gaze smoothing, including jitter damping and tracking-loss reset
   - the fox attack:
     - starts only on a valid tap, aims at the tapped character, and runs its phases in order
     - the character waits for the impact
