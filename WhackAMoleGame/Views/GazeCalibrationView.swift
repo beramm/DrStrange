@@ -13,7 +13,7 @@ struct GazeCalibrationView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color(red: 0.03, green: 0.04, blue: 0.07).ignoresSafeArea()
+                Color.white.ignoresSafeArea()
 
                 if let target = controller.activeCalibrationTarget {
                     CalibrationFixationTarget()
@@ -30,7 +30,7 @@ struct GazeCalibrationView: View {
                     .padding(20)
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
         .statusBarHidden()
         .onAppear { controller.startCamera() }
         .onChange(of: controller.isCalibrated) { _, calibrated in
@@ -78,6 +78,7 @@ struct GazeCalibrationView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(32)
+        .foregroundStyle(.black)
     }
 
     private var statusPanel: some View {
@@ -97,6 +98,7 @@ struct GazeCalibrationView: View {
             .font(.caption.monospaced())
         }
         .padding(14)
+        .foregroundStyle(.white)
         .background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 16))
     }
 }
@@ -113,7 +115,7 @@ private struct CalibrationFixationTarget: View {
 
     var body: some View {
         ZStack {
-            Circle().stroke(.white, lineWidth: 5).frame(width: 72, height: 72)
+            Circle().stroke(.black, lineWidth: 5).frame(width: 72, height: 72)
             Circle().fill(.orange).frame(width: 30, height: 30)
                 .scaleEffect(contracted ? 0.35 : 1)
                 .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: contracted)
