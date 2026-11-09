@@ -31,7 +31,7 @@ struct NameEditSheet: View {
                 .submitLabel(.done)
                 .focused($isFocused)
                 .padding(.vertical, 16)
-                .background(RoundedRectangle(cornerRadius: 24).fill(Color.namePlate.opacity(0.4)))
+                .background(RoundedRectangle(cornerRadius: 24).fill(Color.star.opacity(0.4)))
                 .onChange(of: draft) { _, newValue in
                     // Keep the name short enough to fit the name plate.
                     if newValue.count > Buddy.maxNameLength {

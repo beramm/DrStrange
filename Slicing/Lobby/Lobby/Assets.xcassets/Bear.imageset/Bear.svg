@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <!-- Placeholder bear. Replace with the design team's artwork. -->
+  <circle cx="95" cy="110" r="52" fill="#9A6440"/>
+  <circle cx="305" cy="110" r="52" fill="#9A6440"/>
+  <circle cx="95" cy="110" r="26" fill="#D9A77E"/>
+  <circle cx="305" cy="110" r="26" fill="#D9A77E"/>
+  <circle cx="200" cy="215" r="150" fill="#B07850"/>
+  <ellipse cx="200" cy="275" rx="70" ry="55" fill="#E8C8A6"/>
+  <ellipse cx="145" cy="200" rx="15" ry="19" fill="#2B211C"/>
+  <ellipse cx="255" cy="200" rx="15" ry="19" fill="#2B211C"/>
+  <circle cx="150" cy="193" r="5" fill="#FFFFFF"/>
+  <circle cx="260" cy="193" r="5" fill="#FFFFFF"/>
+  <ellipse cx="200" cy="255" rx="24" ry="16" fill="#2B211C"/>
+  <path d="M178 290 Q200 308 222 290" stroke="#2B211C" stroke-width="6" fill="none" stroke-linecap="round"/>
+</svg>

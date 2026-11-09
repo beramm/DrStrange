@@ -25,7 +25,7 @@ struct ContentView: View {
                     VStack(spacing: 28) {
                         Spacer()
                         KidButton(title: "Start", systemImage: "play.fill", kind: .primary) {
-                            path.append(.gameSelect)
+                            path.append(.characterSelect)
                         }
                         KidButton(title: "Settings", systemImage: "gearshape.fill", kind: .secondary) {
                             path.append(.settings)
@@ -45,8 +45,9 @@ struct ContentView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: LobbyRoute.self) { route in
                 switch route {
-                case .gameSelect: GameSelectPlaceholder()
-                case .settings:   SettingsPlaceholder()
+                case .characterSelect: CharacterSelectView { path.append(.randomizer) }
+                case .randomizer:      RandomizerPlaceholder()
+                case .settings:        SettingsPlaceholder()
                 }
             }
         }

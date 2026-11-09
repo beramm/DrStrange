@@ -1,6 +1,6 @@
 //
 //  KidButton.swift
-//  Big chunky button used across the app.
+//  Big flat capsule button used across the app (same style as the whack-a-mole Play button).
 //
 
 import SwiftUI
@@ -17,37 +17,23 @@ struct KidButton: View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .labelStyle(.titleAndIcon)
-                .font(.system(size: kind == .primary ? 44 : 28, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .font(.system(size: kind == .primary ? 40 : 28, weight: .heavy, design: .rounded))
+                // Primary: white on orange. Secondary: brown on cream.
+                .foregroundStyle(kind == .primary ? Color.white : Color.ink)
                 .frame(maxWidth: .infinity)
-                .frame(height: kind == .primary ? 130 : 84)
+                .frame(height: kind == .primary ? 110 : 80)
+                .background(Capsule().fill(kind == .primary ? Color.accent : Color.cream))
         }
-        .buttonStyle(ChunkyButtonStyle(
-            face: kind == .primary ? .playGreen : .settingsBlue,
-            edge: kind == .primary ? .playGreenDark : .settingsBlueDark
-        ))
+        .buttonStyle(PressableButtonStyle())
     }
 }
 
-struct ChunkyButtonStyle: ButtonStyle {
-    let face: Color
-    let edge: Color
-    private let depth: CGFloat = 10
-
+/// Shrinks the button a little while it's pressed, with a small haptic tap.
+struct PressableButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let pressed = configuration.isPressed
-        return configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: 34, style: .continuous).fill(face)
-            )
-            .offset(y: pressed ? depth - 2 : 0)
-            .background(
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(edge)
-                    .offset(y: depth)
-            )
-            .scaleEffect(pressed ? 0.98 : 1)
-            .animation(.spring(response: 0.18, dampingFraction: 0.6), value: pressed)
-            .sensoryFeedback(.impact(weight: .medium), trigger: pressed) { _, new in new }
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.spring(response: 0.18, dampingFraction: 0.6), value: configuration.isPressed)
+            .sensoryFeedback(.impact(weight: .medium), trigger: configuration.isPressed) { _, new in new }
     }
 }

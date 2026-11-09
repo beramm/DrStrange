@@ -1,20 +1,20 @@
 //
 //  Color+Palette.swift
 //  App colors in one place.
+//  Same values as `WhackAMolePalette` on the whack-a-mole branch, so all screens match.
 //
 
 import SwiftUI
 
 extension Color {
-    static let skyTop           = Color(red: 0.78, green: 0.91, blue: 0.99)
-    static let skyBottom        = Color(red: 0.96, green: 0.98, blue: 0.93)
-    static let hill             = Color(red: 0.62, green: 0.84, blue: 0.55)
-    static let hillFar          = Color(red: 0.74, green: 0.90, blue: 0.66)
-    static let cardFill         = Color.white.opacity(0.92)
-    static let namePlate        = Color(red: 1.00, green: 0.85, blue: 0.40)
-    static let ink              = Color(red: 0.13, green: 0.17, blue: 0.24)
-    static let playGreen        = Color(red: 0.25, green: 0.72, blue: 0.40)
-    static let playGreenDark    = Color(red: 0.15, green: 0.50, blue: 0.27)
-    static let settingsBlue     = Color(red: 0.36, green: 0.55, blue: 0.90)
-    static let settingsBlueDark = Color(red: 0.22, green: 0.38, blue: 0.68)
+    /// Light green background behind every screen.
+    static let meadow     = Color(red: 0.80, green: 0.91, blue: 0.70)
+    /// Cards and tiles.
+    static let cream      = Color(red: 1.00, green: 0.97, blue: 0.90)
+    /// Main buttons and the selected-item border.
+    static let accent     = Color(red: 0.93, green: 0.56, blue: 0.18)
+    /// Text and icons.
+    static let ink        = Color(red: 0.24, green: 0.16, blue: 0.12)
+    /// Stars and the name plate.
+    static let star       = Color(red: 1.00, green: 0.78, blue: 0.20)
 }

@@ -18,8 +18,7 @@ struct CharacterCard: View {
         VStack(spacing: 18) {
             ZStack {
                 RoundedRectangle(cornerRadius: 40, style: .continuous)
-                    .fill(Color.cardFill)
-                    .shadow(color: .black.opacity(0.12), radius: 14, y: 8)
+                    .fill(Color.cream)
 
                 Image(imageName)
                     .resizable()
@@ -46,7 +45,7 @@ struct CharacterCard: View {
                 .foregroundStyle(Color.ink)
                 .padding(.horizontal, 32)
                 .padding(.vertical, 10)
-                .background(Capsule().fill(Color.namePlate))
+                .background(Capsule().fill(Color.star))
             }
             .buttonStyle(.plain)
         }

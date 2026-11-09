@@ -6,6 +6,7 @@
 import Foundation
 
 nonisolated enum LobbyRoute: Hashable {
-    case gameSelect
+    case characterSelect
+    case randomizer
     case settings
 }
