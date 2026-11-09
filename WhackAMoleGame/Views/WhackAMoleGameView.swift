@@ -75,13 +75,27 @@ struct WhackAMoleGameView: View {
     /// Board plus the fox's corner spot. The holes and the corner report their positions so the
     /// fox and its frame can be placed beside the tapped character.
     private var playfield: some View {
-        ZStack {
-            WhackAMolePalette.meadow.ignoresSafeArea()
+        GeometryReader { screen in
+            let insets = screen.safeAreaInsets
+            let fullScreen = CGSize(
+                width: screen.size.width + insets.leading + insets.trailing,
+                height: screen.size.height + insets.top + insets.bottom
+            )
+            ZStack {
+                GameBackgroundView(screenSize: fullScreen)
+                    .position(x: fullScreen.width / 2 - insets.leading, y: fullScreen.height / 2 - insets.top)
 
+                playfieldContent(screenSize: fullScreen)
+            }
+        }
+    }
+
+    private func playfieldContent(screenSize: CGSize) -> some View {
+        ZStack {
             VStack(spacing: 0) {
                 GameHUDView(viewModel: viewModel, onExit: requestStop)
                 // Side margins keep the fox's corner clear of the moles on every iPad size.
-                GameBoardView(viewModel: viewModel)
+                GameBoardView(viewModel: viewModel, screenSize: screenSize)
                     .padding(.horizontal, Self.foxSize + 24)
                     .padding(.bottom, 24)
             }

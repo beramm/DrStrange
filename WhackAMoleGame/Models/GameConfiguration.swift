@@ -54,8 +54,6 @@ struct DifficultySettings: Codable, Equatable {
     var characterVariantCount: Int
     /// Chance that a spawn is a sleeping mole (decoy) that should be left alone (no penalty if tapped).
     var decoyProbability: Double
-    /// Static, low-contrast decorations around the board (extra visual elements at higher levels).
-    var showsBackgroundDecorations: Bool
 
     static func defaults(for level: DifficultyLevel) -> DifficultySettings {
         switch level {
@@ -69,8 +67,7 @@ struct DifficultySettings: Codable, Equatable {
                 visibleDurationJitter: 0.1,
                 maxSimultaneousTargets: 1,
                 characterVariantCount: 1,
-                decoyProbability: 0,
-                showsBackgroundDecorations: false
+                decoyProbability: 0
             )
         case .intermediate:
             DifficultySettings(
@@ -82,8 +79,7 @@ struct DifficultySettings: Codable, Equatable {
                 visibleDurationJitter: 0.1,
                 maxSimultaneousTargets: 2,
                 characterVariantCount: 3,
-                decoyProbability: 0,
-                showsBackgroundDecorations: false
+                decoyProbability: 0
             )
         case .advanced:
             DifficultySettings(
@@ -95,8 +91,7 @@ struct DifficultySettings: Codable, Equatable {
                 visibleDurationJitter: 0.15,
                 maxSimultaneousTargets: 2,
                 characterVariantCount: 4,
-                decoyProbability: 0.25,
-                showsBackgroundDecorations: true
+                decoyProbability: 0.25
             )
         }
     }
@@ -113,7 +108,7 @@ struct SpawnRules: Codable, Equatable {
     var maximumGridDistance: Double? = 2.3
     /// Minimum distance between a new hole and other open holes or the previous hole, as a fraction
     /// of the board, so holes never overlap or reappear in the same spot.
-    var minimumHoleSeparation: Double = 0.3
+    var minimumHoleSeparation: Double = 0.42
     /// Seconds a hole takes to open before its mole starts climbing out.
     var holeOpenDuration: Double = 0.28
     /// Seconds a hole takes to close after its mole has gone.

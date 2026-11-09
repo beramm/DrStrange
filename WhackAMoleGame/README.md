@@ -62,7 +62,7 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 
 ## Gameplay
 
-1. The board starts as an empty meadow, with no holes showing. A hole opens at a random spot and a
+1. The game starts on an empty painted meadow, with no holes showing. A hole opens at a random spot and a
    mole climbs out of it, frame by frame.
 2. The child finds it and taps it. The whole hole area counts, so taps do not need to be precise.
 3. The fox's yellow card opens beside that mole: it grows from its centre as a rounded square with
@@ -201,7 +201,7 @@ placed in two steps: first a zone of a hidden 3 x 3 grid, then a random spot ins
 | What | Rule | Why |
 |---|---|---|
 | Zone | A free, allowed zone not used in the last `noRepeatWindow` (2) spawns, at least `minimumGridDistance` (1 zone) and at most `maximumGridDistance` (2.3 zones) from the previous one. Rules relax one at a time until at least two zones qualify. Among those, weight `1 / (1 + times used)`. | Spreads moles over the board without a pattern. No corner-to-corner jumps, which keeps eye movements comfortable. |
-| Spot | A random point inside the zone, at least `minimumHoleSeparation` (0.3 of the board) from other open holes and from the previous hole. | Positions are continuous, not a fixed set, and holes never overlap. |
+| Spot | A random point inside the zone, at least `minimumHoleSeparation` (0.42 of the area used) from other open holes and, where possible, from the previous hole. Clearing open holes comes first. Holes open only on the painted grass, below the horizon and above the fence. | Positions are continuous, not a fixed set, and holes do not overlap. |
 | Board area | `boardSpread` limits holes to the central 75 % / 90 % / 100 % of the board by level. Room is kept above the highest holes for the fox's card. | Shorter eye movements for beginners; the fox never covers the top bar. |
 | Interval | Uniform in the level's `spawnIntervalRange`. | Varied but never rushed. |
 | Visible time | `visibleDuration × (1 ± jitter)`, counted from when the mole starts to appear. | Enough time to find and tap. |
@@ -227,7 +227,6 @@ This randomization is a gameplay design. It is not a clinically validated protoc
 | Max up at once | 1 | 2 | 2 |
 | Character looks (all the same mole art for now) | 1 | 3 | 4 |
 | Sleeping moles (decoys) | none | none | 25 % |
-| Background | plain | plain | few static, low-contrast decorations in the margins |
 
 The hole and mole scale together, so the mole always fits its hole as drawn.
 
@@ -300,6 +299,11 @@ clinical improvement.
     front edge. All 24 frames share one crop.
   - `MoleArt` in `MoleHoleView.swift` records where the frames sit relative to the hole's front edge.
   - Awake moles are drawn in full colour; sleeping moles (decoys) in grey with a "z z" bubble.
+- **Provided (Google Drive, background folder):** `Background whackamole.png`, a 4:3 painted meadow
+  with sky, grass and a fence. It is stored as a JPEG in
+  `Resources/Assets.xcassets/GameBackgrounds/Meadow`, fills the screen behind the game, and is cropped
+  slightly at the top and bottom on wider iPads. `GameBackgroundView` holds where the grass is in the
+  painting.
 - **Provided (Google Drive, hole folder):** `IMG_0021`–`IMG_0023`, three dirt holes. Each was
   cropped to its visible area and stored in `Resources/Assets.xcassets/Holes/Hole1…3`.
   - The dark opening of each was measured from the art (`HoleArt` in `MoleHoleView.swift`).
@@ -312,12 +316,12 @@ clinical improvement.
   - **More mole art.** There is a single mole animation, so the per-level "character looks" all
     show the same mole. A sleeping mole (eyes closed) would make decoys clearer than the grey
     version with a bubble. A hit or dizzy pose would also help.
-  - Background art, gentle sound effects (built-in system sounds stand in), optional background music,
+  - Gentle sound effects (built-in system sounds stand in), optional background music,
     and an app icon.
 
 ## Testing
 
-- `DrStrangeTests`: 63 unit tests covering:
+- `DrStrangeTests`: 67 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - session end, stop and rest-break reasons, adaptive levels, JSON round trip

@@ -68,7 +68,7 @@ struct SpawnManager {
         let jitter = settings.visibleDurationJitter
         let duration = settings.visibleDuration * Double.random(in: (1 - jitter)...(1 + jitter), using: &generator)
 
-        let position = choosePosition(inZone: hole, avoiding: openPositions + (previousPosition.map { [$0] } ?? []))
+        let position = choosePosition(inZone: hole, openPositions: openPositions)
         previousPosition = position
 
         return SpawnRequest(
@@ -89,20 +89,30 @@ struct SpawnManager {
 
     // MARK: - Private
 
-    /// A random spot inside the zone, spread over the part of the board this level uses.
-    private mutating func choosePosition(inZone zone: Int, avoiding others: [BoardPoint]) -> BoardPoint {
+    /// A random spot inside the zone, spread over the part of the board this level uses. If no spot
+    /// clears everything, staying clear of open holes matters most, then the previous hole.
+    private mutating func choosePosition(inZone zone: Int, openPositions: [BoardPoint]) -> BoardPoint {
         let rows = Array(Set(settings.activeHoleIndices.map { $0 / Self.gridColumns })).sorted()
         let rowIndex = rows.firstIndex(of: zone / Self.gridColumns) ?? 0
         let column = zone % Self.gridColumns
         let spread = settings.boardSpread
-        var candidate = BoardPoint(x: 0.5, y: 0.5)
-        for _ in 0..<24 {
+        let separation = rules.minimumHoleSeparation
+        var best = BoardPoint(x: 0.5, y: 0.5)
+        var bestScore = -Double.infinity
+        for _ in 0..<64 {
             let x = (Double(column) + Double.random(in: 0..<1, using: &generator)) / Double(Self.gridColumns)
             let y = (Double(rowIndex) + Double.random(in: 0..<1, using: &generator)) / Double(rows.count)
-            candidate = BoardPoint(x: 0.5 + (x - 0.5) * spread, y: 0.5 + (y - 0.5) * spread)
-            if others.allSatisfy({ $0.distance(to: candidate) >= rules.minimumHoleSeparation }) { break }
+            let candidate = BoardPoint(x: 0.5 + (x - 0.5) * spread, y: 0.5 + (y - 0.5) * spread)
+            let fromOpen = openPositions.map { $0.distance(to: candidate) }.min() ?? .infinity
+            let fromPrevious = previousPosition?.distance(to: candidate) ?? .infinity
+            if fromOpen >= separation && fromPrevious >= separation { return candidate }
+            let score = min(fromOpen, separation) * 2 + min(fromPrevious, separation)
+            if score > bestScore {
+                best = candidate
+                bestScore = score
+            }
         }
-        return candidate
+        return best
     }
 
     private mutating func chooseHole(occupied: Set<Int>) -> Int? {

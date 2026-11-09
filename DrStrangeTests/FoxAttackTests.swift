@@ -442,4 +442,25 @@ final class FoxAttackTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(cardTop, 0, "fox card must not cover the top bar at scale \(scale)")
         }
     }
+
+    // MARK: - Background
+
+    func testHolesStayOnTheGrass() {
+        // iPad Pro 11-inch, iPad mini and iPad Pro 13-inch screens.
+        for screen in [CGSize(width: 1210, height: 834), CGSize(width: 1133, height: 744), CGSize(width: 1376, height: 1032)] {
+            let boardTop: CGFloat = 84
+            let board = CGSize(width: screen.width - 308, height: screen.height - boardTop - 44)
+            let grass = GameBackgroundView.grassBand(screen: screen)
+            let ground = (grass.lowerBound - boardTop)...(grass.upperBound - boardTop)
+            for scale in [0.95, 0.8, 0.68] {
+                let cell = GameBoardView.cellSize(board: board, targetScale: scale)
+                for y in [0.0, 0.5, 1.0] {
+                    let center = GameBoardView.center(of: BoardPoint(x: 0.5, y: y), board: board, cell: cell, ground: ground)
+                    let frontEdge = center.y + cell.height / 2
+                    XCTAssertGreaterThanOrEqual(frontEdge - cell.width * 0.42, ground.lowerBound - 0.5, "\(screen) \(scale) \(y)")
+                    XCTAssertLessThanOrEqual(frontEdge + cell.width * 0.12, ground.upperBound + 0.5, "\(screen) \(scale) \(y)")
+                }
+            }
+        }
+    }
 }

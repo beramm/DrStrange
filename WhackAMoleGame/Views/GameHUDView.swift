@@ -65,7 +65,10 @@ struct SessionProgressView: View {
         HStack(spacing: 12) {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.7))
+                    // Outlined so the track stays visible over the painted clouds.
+                    Capsule()
+                        .fill(.white.opacity(0.85))
+                        .overlay(Capsule().stroke(ink.opacity(0.35), lineWidth: 1.5))
                     Capsule()
                         .fill(ink.opacity(0.55))
                         .frame(width: max(proxy.size.height, proxy.size.width * progress))
