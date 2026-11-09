@@ -3,8 +3,16 @@ import SwiftUI
 /// Entry screen for the game: a big level picker for the child and a panel for the adult
 /// with the patching session record and game options.
 struct GameHomeView: View {
+    private enum PresentedScreen: String, Identifiable {
+        case calibration
+        case game
+
+        var id: String { rawValue }
+    }
+
     @State private var configuration = ConfigurationStore.standard.load()
-    @State private var isPlaying = false
+    @State private var gazeController = GazeInputController()
+    @State private var presentedScreen: PresentedScreen?
     @State private var showsPatchingSetup = false
 
     var body: some View {
@@ -20,8 +28,20 @@ struct GameHomeView: View {
         .onChange(of: configuration) { _, newValue in
             ConfigurationStore.standard.save(newValue)
         }
-        .fullScreenCover(isPresented: $isPlaying) {
-            WhackAMoleGameView(configuration: configuration) { isPlaying = false }
+        .fullScreenCover(item: $presentedScreen) { screen in
+            switch screen {
+            case .calibration:
+                GazeCalibrationView(
+                    controller: gazeController,
+                    onCalibrated: { presentedScreen = .game },
+                    onCancel: { presentedScreen = nil }
+                )
+            case .game:
+                WhackAMoleGameView(configuration: configuration, gazeController: gazeController) {
+                    gazeController.stop()
+                    presentedScreen = nil
+                }
+            }
         }
         .sheet(isPresented: $showsPatchingSetup) {
             PatchingSetupView(configuration: $configuration)
@@ -47,9 +67,9 @@ struct GameHomeView: View {
             }
 
             Button {
-                isPlaying = true
+                presentedScreen = .calibration
             } label: {
-                Label("Play", systemImage: "play.fill")
+                Label("Calibrate & Play", systemImage: "eye.fill")
                     .font(.system(size: 36, weight: .heavy, design: .rounded))
                     .frame(minWidth: 280, minHeight: 84)
             }

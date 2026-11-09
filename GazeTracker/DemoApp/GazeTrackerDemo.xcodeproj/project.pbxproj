@@ -1,0 +1,93 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+		A10000000000000000000001 /* GazeTrackerDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* GazeTrackerDemoApp.swift */; };
+		A10000000000000000000002 /* DrStrangeGazeTracker in Frameworks */ = {isa = PBXBuildFile; productRef = A11000000000000000000001 /* DrStrangeGazeTracker */; };
+
+		A20000000000000000000001 /* GazeTrackerDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GazeTrackerDemoApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000003 /* GazeTrackerDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GazeTrackerDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+
+		A30000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A30000000000000000000002 /* App */,
+				A30000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A30000000000000000000002 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* GazeTrackerDemoApp.swift */,
+				A20000000000000000000002 /* Info.plist */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (A20000000000000000000003 /* GazeTrackerDemo.app */);
+			name = Products;
+			sourceTree = "<group>";
+		};
+
+		A40000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2720;
+				LastUpgradeCheck = 2720;
+				TargetAttributes = { A50000000000000000000001 = { CreatedOnToolsVersion = 27.2; }; };
+			};
+			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = A30000000000000000000001;
+			packageReferences = (A12000000000000000000001 /* XCLocalSwiftPackageReference ".." */);
+			productRefGroup = A30000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (A50000000000000000000001 /* GazeTrackerDemo */);
+		};
+
+		A50000000000000000000001 /* GazeTrackerDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget */;
+			buildPhases = (
+				A60000000000000000000001 /* Sources */,
+				A60000000000000000000002 /* Frameworks */,
+				A60000000000000000000003 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = GazeTrackerDemo;
+			packageProductDependencies = (A11000000000000000000001 /* DrStrangeGazeTracker */);
+			productName = GazeTrackerDemo;
+			productReference = A20000000000000000000003 /* GazeTrackerDemo.app */;
+			productType = "com.apple.product-type.application";
+		};
+
+		A60000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001 /* GazeTrackerDemoApp.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
+		A60000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000002 /* DrStrangeGazeTracker in Frameworks */); runOnlyForDeploymentPostprocessing = 0; };
+		A60000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+
+		A70000000000000000000001 /* Project Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; ENABLE_TESTABILITY = YES; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
+		A70000000000000000000002 /* Project Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; }; name = Release; };
+		A80000000000000000000001 /* Target Debug */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_IDENTITY = "Apple Development"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 8; DEVELOPMENT_TEAM = 8H23JMG37G; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = App/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 17.0; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chandra.DrStrange.GazeTrackerDemo; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = iphoneos; SUPPORTS_MACCATALYST = NO; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 2; }; name = Debug; };
+		A80000000000000000000002 /* Target Release */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_IDENTITY = "Apple Development"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 8; DEVELOPMENT_TEAM = 8H23JMG37G; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = App/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 17.0; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chandra.DrStrange.GazeTrackerDemo; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = iphoneos; SUPPORTS_MACCATALYST = NO; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 2; }; name = Release; };
+
+		A90000000000000000000001 /* Build configuration list for PBXProject */ = {isa = XCConfigurationList; buildConfigurations = (A70000000000000000000001, A70000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A90000000000000000000002 /* Build configuration list for PBXNativeTarget */ = {isa = XCConfigurationList; buildConfigurations = (A80000000000000000000001, A80000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+
+		A11000000000000000000001 /* DrStrangeGazeTracker */ = {isa = XCSwiftPackageProductDependency; package = A12000000000000000000001 /* XCLocalSwiftPackageReference ".." */; productName = DrStrangeGazeTracker; };
+		A12000000000000000000001 /* XCLocalSwiftPackageReference ".." */ = {isa = XCLocalSwiftPackageReference; relativePath = ..; };
+	};
+	rootObject = A40000000000000000000001 /* Project object */;
+}

@@ -6,14 +6,20 @@ struct WhackAMoleGameView: View {
     private static let foxSize: CGFloat = 130
 
     let configuration: GameConfiguration
+    let gazeController: GazeInputController?
     let onClose: () -> Void
 
     @State private var viewModel: WhackAMoleGameViewModel
     @State private var isConfirmingStop = false
     @Environment(\.scenePhase) private var scenePhase
 
-    init(configuration: GameConfiguration, onClose: @escaping () -> Void) {
+    init(
+        configuration: GameConfiguration,
+        gazeController: GazeInputController? = nil,
+        onClose: @escaping () -> Void
+    ) {
         self.configuration = configuration
+        self.gazeController = gazeController
         self.onClose = onClose
         _viewModel = State(initialValue: WhackAMoleGameViewModel(configuration: configuration))
     }
@@ -46,7 +52,16 @@ struct WhackAMoleGameView: View {
         ZStack {
             playfield
                 .overlayPreferenceValue(FoxAnchorKey.self) { anchors in
-                    AttackAnimationView(pose: viewModel.foxPose, anchors: anchors)
+                    ZStack {
+                        AttackAnimationView(pose: viewModel.foxPose, anchors: anchors)
+                        if let gazeController {
+                            GazeInteractionView(
+                                controller: gazeController,
+                                viewModel: viewModel,
+                                anchors: anchors
+                            )
+                        }
+                    }
                 }
 
             overlay

@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A1D500000000000000000105 /* DrStrangeGazeTracker in Frameworks */ = {isa = PBXBuildFile; productRef = A1D500000000000000000103 /* DrStrangeGazeTracker */; };
+		A1D500000000000000000106 /* DrStrangeGazeTracker in Frameworks */ = {isa = PBXBuildFile; productRef = A1D500000000000000000104 /* DrStrangeGazeTracker */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A1D5000000000000000000F1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -67,6 +72,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1D500000000000000000105 /* DrStrangeGazeTracker in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -81,6 +87,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1D500000000000000000106 /* DrStrangeGazeTracker in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +134,9 @@
 				A1D500000000000000000032 /* WhackAMoleGame */,
 			);
 			name = DrStrange;
+			packageProductDependencies = (
+				A1D500000000000000000103 /* DrStrangeGazeTracker */,
+			);
 			productName = DrStrange;
 			productReference = A1D500000000000000000020 /* DrStrange.app */;
 			productType = "com.apple.product-type.application";
@@ -168,6 +178,9 @@
 				A1D500000000000000000032 /* WhackAMoleGame */,
 			);
 			name = WhackAMoleGame;
+			packageProductDependencies = (
+				A1D500000000000000000104 /* DrStrangeGazeTracker */,
+			);
 			productName = WhackAMoleGame;
 			productReference = A1D500000000000000000022 /* WhackAMoleGame.app */;
 			productType = "com.apple.product-type.application";
@@ -205,6 +218,9 @@
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A1D500000000000000000003 /* Products */;
+			packageReferences = (
+				A1D500000000000000000102 /* XCLocalSwiftPackageReference "GazeTracker" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -341,6 +357,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DrStrange;
+				INFOPLIST_KEY_NSCameraUsageDescription = "DrStrange uses the front camera for its custom on-device gaze tracker.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -369,6 +386,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DrStrange;
+				INFOPLIST_KEY_NSCameraUsageDescription = "DrStrange uses the front camera for its custom on-device gaze tracker.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -431,6 +449,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Whack-a-Mole";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Whack-a-Mole uses the front camera for its custom on-device gaze tracker.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -459,6 +478,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Whack-a-Mole";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Whack-a-Mole uses the front camera for its custom on-device gaze tracker.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -517,6 +537,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A1D500000000000000000102 /* XCLocalSwiftPackageReference "GazeTracker" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = GazeTracker;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1D500000000000000000103 /* DrStrangeGazeTracker */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1D500000000000000000102 /* XCLocalSwiftPackageReference "GazeTracker" */;
+			productName = DrStrangeGazeTracker;
+		};
+		A1D500000000000000000104 /* DrStrangeGazeTracker */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1D500000000000000000102 /* XCLocalSwiftPackageReference "GazeTracker" */;
+			productName = DrStrangeGazeTracker;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1D500000000000000000001 /* Project object */;
 }
