@@ -1,78 +1,111 @@
 //
 //  RandomizerView.swift
-//  Picks which mini-game the child plays. A highlight hops across the three
-//  game cards, slows down and stops on the chosen game; then Go appears.
+//  The "Game Map": picks which mini-game the child plays.
+//  A highlight hops across the three game cards. The highlighted card pops up
+//  to full size while the others shrink back. It slows down, stops on the
+//  chosen game, and after a short pause opens that game by itself.
+//
+//  Every position below is taken from the 1194 × 834 Figma frame and then
+//  scaled to the real screen (same approach as LobbyView).
 //
 
 import SwiftUI
 
 struct RandomizerView: View {
-    /// Called with the chosen game when the child taps Go.
-    let onGo: (MiniGame) -> Void
+    /// Called with the chosen game once the highlight has stopped.
+    let onChosen: (MiniGame) -> Void
+    /// Called when the settings button is tapped.
+    let onSettings: () -> Void
 
     /// The last game picked, saved so the same game isn't picked twice in a row.
     @AppStorage(MiniGame.lastGameStorageKey) private var lastGameID = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dismiss) private var dismiss
 
-    /// The card the highlight is on right now.
+    /// The card that is popped up right now (nil before the spin starts).
     @State private var highlighted: MiniGame?
-    /// The final pick. Stays nil while the highlight is still hopping.
-    @State private var chosen: MiniGame?
+
+    /// Size of the Figma frame the design was made in.
+    private let design = CGSize(width: 1194, height: 834)
+    /// Card centres in the design, left to right (same order as `MiniGame.allCases`).
+    private let cardCentersX: [CGFloat] = [207, 596, 976]
+    private let cardCenterY: CGFloat = 428
+    /// Size of the cards that aren't popped up, compared with the popped-up one.
+    private let smallCardScale: CGFloat = 0.765
 
     var body: some View {
-        VStack(spacing: 56) {
-            Spacer()
-            HStack(spacing: 28) {
-                ForEach(MiniGame.allCases, id: \.self) { game in
-                    MiniGameCard(game: game, isHighlighted: game == highlighted)
+        GeometryReader { geo in
+            let sx = geo.size.width / design.width
+            let sy = geo.size.height / design.height
+            let s = min(sx, sy)
+
+            ZStack {
+                LobbyScenery()
+
+                // Top bar: back, title, settings.
+                RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62 * s) {
+                    dismiss()
+                }
+                .position(x: 68 * sx, y: 83 * sy)
+
+                Text("Game map")
+                    .textCase(.uppercase)
+                    .font(.doodle(80 * s))
+                    .foregroundStyle(Color.titleBrown)
+                    .position(x: 598 * sx, y: 80 * sy)
+                    .accessibilityAddTraits(.isHeader)
+
+                RoundIconButton(systemImage: "gearshape.fill", label: "Settings", size: 62 * s, action: onSettings)
+                    .position(x: 1128 * sx, y: 83 * sy)
+
+                // The three game cards. The highlighted one is full size and in front.
+                ForEach(Array(MiniGame.allCases.enumerated()), id: \.element) { index, game in
+                    let isPopped = game == highlighted
+                    MiniGameCard(game: game, scale: s)
+                        .scaleEffect(isPopped ? 1 : smallCardScale)
+                        .zIndex(isPopped ? 1 : 0)
+                        .position(x: cardCentersX[index] * sx, y: cardCenterY * sy)
+                        .accessibilityAddTraits(isPopped ? .isSelected : [])
                 }
             }
-            KidButton(title: "Go", systemImage: "play.fill", kind: .primary) {
-                if let chosen { onGo(chosen) }
-            }
-            .frame(maxWidth: 380)
-            // Hidden (but still taking up space, so nothing jumps) until a game is chosen.
-            .opacity(chosen == nil ? 0 : 1)
-            .disabled(chosen == nil)
-            Spacer()
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: highlighted)
         }
-        .padding(.horizontal, 48)
-        .padding(.top, 32)
-        // Keep tappable things away from the bottom edge (wrists rest there).
-        .padding(.bottom, 72)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(LobbyBackground())
-        // A small tap feeling each time the highlight hops.
+        .ignoresSafeArea()
+        .toolbar(.hidden, for: .navigationBar)
+        // A small tap feeling each time a card pops up.
         .sensoryFeedback(.selection, trigger: highlighted)
         // Runs every time this screen appears, so coming back picks a new game.
         .task { await spin() }
     }
 
     private func spin() async {
-        chosen = nil
+        highlighted = nil
         let pick = MiniGame.randomPick(avoiding: MiniGame(rawValue: lastGameID))
 
-        if !reduceMotion {
-            let games = MiniGame.allCases
-            // Two full rounds, then stop on the picked game.
-            let hops = games.count * 2 + (games.firstIndex(of: pick) ?? 0)
-            for step in 0...hops {
-                highlighted = games[step % games.count]
-                // Each hop waits a little longer, so it slows down before stopping.
-                do {
-                    try await Task.sleep(for: .milliseconds(80 + step * 25))
-                } catch {
-                    return  // The child left this screen; stop here.
+        do {
+            if !reduceMotion {
+                let games = MiniGame.allCases
+                // Two full rounds, then stop on the picked game.
+                let hops = games.count * 2 + (games.firstIndex(of: pick) ?? 0)
+                for step in 0...hops {
+                    highlighted = games[step % games.count]
+                    // Each hop waits a little longer, so it slows down before stopping.
+                    try await Task.sleep(for: .milliseconds(140 + step * 45))
                 }
             }
-        }
 
-        highlighted = pick
-        chosen = pick
-        lastGameID = pick.rawValue
+            highlighted = pick
+            lastGameID = pick.rawValue
+
+            // Let the child see which game was picked, then open it.
+            try await Task.sleep(for: .seconds(1.5))
+            onChosen(pick)
+        } catch {
+            // The child left this screen (for example with the back button); stop here.
+        }
     }
 }
 
-#Preview("Randomizer", traits: .landscapeLeft) {
-    RandomizerView(onGo: { _ in })
+#Preview("Game map", traits: .landscapeLeft) {
+    RandomizerView(onChosen: { _ in }, onSettings: {})
 }

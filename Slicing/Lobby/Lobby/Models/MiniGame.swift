@@ -6,24 +6,38 @@
 import Foundation
 
 nonisolated enum MiniGame: String, CaseIterable, Hashable {
+    // Listed in the order the cards appear on the Game Map (left, middle, right).
+    case veggieDash      // smooth pursuit
     case whackAMole      // saccade
-    case fixation        // fixation
-    case followTheFox    // smooth pursuit
+    case veggieKeeper    // fixation
 
+    /// Shown on the game card (in capitals) and on the game page.
     var title: String {
         switch self {
+        case .veggieDash:   "Veggie Dash"
         case .whackAMole:   "Whack a Mole"
-        case .fixation:     "Fixation"
-        case .followTheFox: "Follow the Fox"
+        case .veggieKeeper: "Veggie Keeper"
         }
     }
 
-    /// SF Symbol shown on the game's card.
-    var systemImage: String {
+    /// The title split over two lines, as on the game card.
+    var cardTitle: String {
         switch self {
-        case .whackAMole:   "hammer.fill"
-        case .fixation:     "eye.fill"
-        case .followTheFox: "point.topleft.down.to.point.bottomright.curvepath"
+        case .veggieDash:   "Veggie\nDash"
+        case .whackAMole:   "Whack\na Mole"
+        case .veggieKeeper: "Veggie\nKeeper"
+        }
+    }
+
+    /// Short line under the title on the game card.
+    var tagline: String {
+        switch self {
+        case .veggieDash:
+            "“Eyes on the move! Follow your little courier and make sure every veggie arrives safely!”"
+        case .whackAMole:
+            "“Pop goes the mole!\nStay quick, gaze, and catch every cheeky little troublemaker!”"
+        case .veggieKeeper:
+            "“Keep your eyes on the stall\nThose sneaky thieves are after your veggies!”"
         }
     }
 
