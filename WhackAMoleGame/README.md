@@ -47,14 +47,17 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
     The default of 2 minutes only makes the game playable out of the box; it is not a
     recommendation.
   - Start and end time are recorded automatically.
-- The app never works out which eye is amblyopic, never suggests patch wear time, and does not use
-  the camera, so it cannot and does not claim that the patch is worn or on the correct eye.
+- The app never works out which eye is amblyopic or suggests patch wear time. Its on-device camera
+  heuristic requires the selected right eye to remain visible while the other eye is obscured; it
+  cannot confirm the patch material, fit, or prescription.
 - The patching screen includes short guidance for parents and caregivers: patch first, supervise,
   stop if there is discomfort, keep check-ups, and scores are not an eye test.
 
 ### Comfort and stopping
 
 - **Pause** (top right) freezes the game clock. Leaving the app pauses automatically.
+- If both eyes remain visible for 1 second, the game pauses. Play stays disabled until only the
+  selected right eye has been consistently visible again for 1.5 seconds.
 - The pause screen has **Rest my eyes**, which ends the session straight away and shows the
   summary. It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
 - **✕** (top left) asks "Stop the game?" and then also shows the summary.
@@ -220,8 +223,8 @@ clinical improvement.
 
 ## Clinical limitations
 
-- The app cannot see whether the patch is worn or which eye it covers. A caregiver should
-  supervise.
+- The camera can only infer sustained one-eye versus two-eye visibility from ARKit blink signals.
+  It cannot confirm patch material, fit, or the prescription, so a caregiver should supervise.
 - It does not decide or check which eye is amblyopic, and does not recommend patch wear time,
   session length or frequency.
 - Game time is not a substitute for prescribed patching hours or for check-ups.
@@ -258,7 +261,7 @@ clinical improvement.
 
 ## Testing
 
-- `DrStrangeTests`: 44 unit tests covering:
+- `DrStrangeTests`: 50 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - session end, stop and rest-break reasons, adaptive levels, JSON round trip
@@ -273,6 +276,7 @@ clinical improvement.
     - the hammer lands on the tapped character, normal and mirrored
     - the fox stays home when idle or with Reduce Motion
     - settings saved by older versions still load
+  - one-eye patch-state verification, blink tolerance, removal debounce and re-verification
 - Manual checks on the iPad Pro 11-inch simulator:
   - patching setup, including the same-eye warning
   - play and hit animation

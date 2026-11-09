@@ -15,6 +15,7 @@ final class GazeInputController {
     private(set) var cameraStatus = "ARKit input pending"
     private(set) var cameraStarted = false
     private(set) var isPreparingCalibration = false
+    private(set) var patchWearState: PatchWearState = .checking
 
     let cameraPreview: UIView
 
@@ -25,6 +26,7 @@ final class GazeInputController {
     @ObservationIgnored private var transitionPending = false
     @ObservationIgnored private var calibrationTask: Task<Void, Never>?
     @ObservationIgnored private var wasPausedByScene = false
+    @ObservationIgnored private var patchWearMonitor = PatchWearMonitor()
 
     init() {
         let host = GazeTrackerFactory.makeTrackerWithVolatilePreview()
@@ -43,17 +45,21 @@ final class GazeInputController {
         )
         tracker.setSampleHandler { [weak self] value in
             Task { @MainActor in
-                self?.sample = value
-                self?.processCalibrationState()
+                self?.consume(value)
             }
         }
     }
 
     var isReadyToCalibrate: Bool {
-        cameraStarted && sample.setupState == .ready && sample.eyeAvailability == .rightOnly
+        cameraStarted &&
+            sample.setupState == .ready &&
+            sample.eyeAvailability == .rightOnly &&
+            patchWearState == .verified
     }
 
     var isCalibrated: Bool { sample.calibrationState == .calibrated }
+
+    var isPatchVerified: Bool { patchWearState == .verified }
 
     var hasUsableGaze: Bool {
         isCalibrated &&
@@ -116,6 +122,8 @@ final class GazeInputController {
         transitionPending = false
         isPreparingCalibration = false
         activeCalibrationTarget = nil
+        patchWearMonitor.reset()
+        patchWearState = .checking
         status = "Stopped; volatile gaze and calibration data discarded"
         cameraStatus = "ARKit input stopped; camera restored to 1.0×"
     }
@@ -164,8 +172,11 @@ final class GazeInputController {
             status = switch (sample.setupState, sample.eyeAvailability) {
             case (.tooClose, _): "Move farther from the front camera"
             case (.tooFar, _): "Move closer to the front camera"
-            case (.ready, .rightOnly): "Ready — start calibration"
-            case (.ready, _): "Keep the selected right eye open and visible"
+            case (.ready, .both): "Put on the prescribed eye patch and keep your face still"
+            case (.ready, .rightOnly) where patchWearState == .verified: "One-eye check passed — start calibration"
+            case (.ready, .rightOnly): "Checking the patch — keep still"
+            case (.ready, .leftOnly): "Keep the right eye uncovered and visible"
+            case (.ready, .none): "Keep the right eye open and visible"
             default: "Centre your face 40–60 cm from the landscape camera"
             }
         }
@@ -200,5 +211,25 @@ final class GazeInputController {
         } else {
             cameraStatus = "Custom ARKit camera input unavailable"
         }
+    }
+
+    private func consume(_ value: GazeSample) {
+        sample = value
+        let observation: PatchEyeObservation
+        if value.setupState != .ready {
+            observation = .unavailable
+        } else {
+            observation = switch value.eyeAvailability {
+            case .both: .bothEyes
+            case .rightOnly: .expectedEyeOnly
+            case .leftOnly: .otherEyeOnly
+            case .none: .unavailable
+            }
+        }
+        patchWearState = patchWearMonitor.consume(
+            observation,
+            timestampNanoseconds: value.timestamp.uptimeNanoseconds
+        )
+        processCalibrationState()
     }
 }
