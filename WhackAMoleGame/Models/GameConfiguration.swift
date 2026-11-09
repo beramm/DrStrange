@@ -145,6 +145,8 @@ struct GameConfiguration: Codable, Equatable {
     var spawnRules = SpawnRules()
     var foxAttack = FoxAttackTiming()
     var patching = PatchingConfiguration()
+    /// Engineering switch for testing gaze control without a patch. Production behavior defaults on.
+    var oneEyeEnforcerEnabled = true
     var soundEnabled: Bool = true
     var hapticsEnabled: Bool = true
     /// Fixed seed for reproducible sessions (research / QA). `nil` picks a fresh seed each session.
@@ -172,6 +174,7 @@ extension GameConfiguration {
         // Timing saved by an older version has different fields; fall back to the defaults.
         foxAttack = (try? container.decodeIfPresent(FoxAttackTiming.self, forKey: .foxAttack)) ?? defaults.foxAttack
         patching = try container.decodeIfPresent(PatchingConfiguration.self, forKey: .patching) ?? defaults.patching
+        oneEyeEnforcerEnabled = try container.decodeIfPresent(Bool.self, forKey: .oneEyeEnforcerEnabled) ?? defaults.oneEyeEnforcerEnabled
         soundEnabled = try container.decodeIfPresent(Bool.self, forKey: .soundEnabled) ?? defaults.soundEnabled
         hapticsEnabled = try container.decodeIfPresent(Bool.self, forKey: .hapticsEnabled) ?? defaults.hapticsEnabled
         randomSeed = try container.decodeIfPresent(UInt64.self, forKey: .randomSeed)

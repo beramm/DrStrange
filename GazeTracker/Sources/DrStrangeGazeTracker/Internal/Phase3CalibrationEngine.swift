@@ -75,11 +75,15 @@ struct Phase3CalibrationEngine {
         timestampNanoseconds: UInt64,
         ray: SelectedEyeRayObservation?,
         setupState: SetupState,
-        eyeAvailability: EyeAvailability
+        eyeAvailability: EyeAvailability,
+        oneEyeEnforcementEnabled: Bool = true
     ) -> Output {
         let rawPoint = ray.flatMap { model?.predict(RaySample($0)) }
         let publicPoint = rawPoint.flatMap { NormalizedGazePoint(x: $0.x, y: $0.y) }
-        let liveUsable = publicPoint != nil && setupState == .ready && eyeAvailability == .rightOnly
+        let selectedEyeAvailable = eyeAvailability.isSelectedRightEyeAvailable(
+            oneEyeEnforcementEnabled: oneEyeEnforcementEnabled
+        )
+        let liveUsable = publicPoint != nil && setupState == .ready && selectedEyeAvailable
         let liveQuality = liveUsable
             ? GazeQuality(confidence: 0.85, level: .usable)
             : .unavailable
@@ -92,7 +96,7 @@ struct Phase3CalibrationEngine {
             timestampNanoseconds: timestampNanoseconds,
             ray: ray.map(RaySample.init),
             setupReady: setupState == .ready,
-            selectedEyeAvailable: eyeAvailability == .rightOnly
+            selectedEyeAvailable: selectedEyeAvailable
         )
         switch result {
         case .collecting:

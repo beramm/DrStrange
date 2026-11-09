@@ -157,6 +157,13 @@ struct WhackAMoleGameView: View {
     }
 
     private func respondToPatchState(_ state: PatchWearState?) {
+        if gazeController?.oneEyeEnforcerEnabled == false {
+            if isPausedForMissingPatch {
+                isPausedForMissingPatch = false
+                viewModel.resume()
+            }
+            return
+        }
         guard state == .missing, viewModel.phase != .finished else { return }
         isPausedForMissingPatch = true
         viewModel.pause()

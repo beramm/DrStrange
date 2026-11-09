@@ -295,6 +295,7 @@ final class FoxAttackTests: XCTestCase {
         XCTAssertEqual(configuration.patching.patchedEye, .left)
         XCTAssertFalse(configuration.soundEnabled)
         XCTAssertEqual(configuration.foxAttack, FoxAttackTiming())
+        XCTAssertTrue(configuration.oneEyeEnforcerEnabled)
     }
 
     func testSettingsWithOlderFoxTimingStillLoad() throws {

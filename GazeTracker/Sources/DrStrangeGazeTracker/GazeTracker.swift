@@ -19,6 +19,7 @@ public final class GazeTracker: GazeTracking, @unchecked Sendable {
     private var validationSession = Phase3ValidationSession()
     private var lastEyeOrigin: SIMD3<Double>?
     private var faceWasLost = false
+    private var oneEyeEnforcementEnabled = true
 
     @_spi(Platform)
     public convenience init(runtime: ObservationRuntime) {
@@ -128,7 +129,10 @@ public final class GazeTracker: GazeTracking, @unchecked Sendable {
         lock.lock()
         do {
             try machine.beginCalibration()
-            guard sample.setupState == .ready, sample.eyeAvailability == .rightOnly else {
+            guard sample.setupState == .ready,
+                  sample.eyeAvailability.isSelectedRightEyeAvailable(
+                    oneEyeEnforcementEnabled: oneEyeEnforcementEnabled
+                  ) else {
                 machine.cancelCalibration()
                 throw CalibrationContractError.setupNotReady
             }
@@ -184,6 +188,13 @@ public final class GazeTracker: GazeTracking, @unchecked Sendable {
             throw error
         }
         publishState()
+    }
+
+    @_spi(Engineering)
+    public func setOneEyeEnforcementEnabled(_ enabled: Bool) {
+        lock.lock()
+        oneEyeEnforcementEnabled = enabled
+        lock.unlock()
     }
 
     @_spi(Engineering)
@@ -322,7 +333,8 @@ public final class GazeTracker: GazeTracking, @unchecked Sendable {
             timestampNanoseconds: state.sourceTimestampNanoseconds,
             ray: state.selectedEyeRay,
             setupState: state.setupState,
-            eyeAvailability: state.eyeAvailability
+            eyeAvailability: state.eyeAvailability,
+            oneEyeEnforcementEnabled: oneEyeEnforcementEnabled
         )
         let currentEngine = calibrationEngine
         validationSession.ingest(
@@ -330,6 +342,7 @@ public final class GazeTracker: GazeTracking, @unchecked Sendable {
             ray: state.selectedEyeRay,
             setupState: state.setupState,
             eyeAvailability: state.eyeAvailability,
+            oneEyeEnforcementEnabled: oneEyeEnforcementEnabled,
             predict: currentEngine.predictRaw
         )
         switch engineOutput.event {

@@ -95,14 +95,18 @@ struct Phase3ValidationSession {
         ray: SelectedEyeRayObservation?,
         setupState: SetupState,
         eyeAvailability: EyeAvailability,
+        oneEyeEnforcementEnabled: Bool = true,
         predict: (RaySample) -> SIMD2<Double>?
     ) {
+        let selectedEyeAvailable = eyeAvailability.isSelectedRightEyeAvailable(
+            oneEyeEnforcementEnabled: oneEyeEnforcementEnabled
+        )
         guard condition != nil, state != .idle, state != .completed, state != .failed else { return }
         if setupState == .ready {
             eligibleFrames += 1
             if let ray {
                 let sample = RaySample(ray)
-                if eyeAvailability == .rightOnly, predict(sample) != nil {
+                if selectedEyeAvailable, predict(sample) != nil {
                     validFrames += 1
                     validTimestamps.append(timestampNanoseconds)
                     latencies.append(sample.publicationLatencyMilliseconds)
@@ -114,7 +118,7 @@ struct Phase3ValidationSession {
             timestampNanoseconds: timestampNanoseconds,
             ray: ray.map(RaySample.init),
             setupReady: setupState == .ready,
-            selectedEyeAvailable: eyeAvailability == .rightOnly
+            selectedEyeAvailable: selectedEyeAvailable
         )
         switch result {
         case .collecting:

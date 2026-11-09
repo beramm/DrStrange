@@ -16,6 +16,7 @@ final class GazeInputController {
     private(set) var cameraStarted = false
     private(set) var isPreparingCalibration = false
     private(set) var patchWearState: PatchWearState = .checking
+    private(set) var oneEyeEnforcerEnabled = true
 
     let cameraPreview: UIView
 
@@ -53,21 +54,35 @@ final class GazeInputController {
     var isReadyToCalibrate: Bool {
         cameraStarted &&
             sample.setupState == .ready &&
-            sample.eyeAvailability == .rightOnly &&
-            patchWearState == .verified
+            selectedRightEyeIsAvailable &&
+            isPatchVerified
     }
 
     var isCalibrated: Bool { sample.calibrationState == .calibrated }
 
-    var isPatchVerified: Bool { patchWearState == .verified }
+    var isPatchVerified: Bool { !oneEyeEnforcerEnabled || patchWearState == .verified }
 
     var hasUsableGaze: Bool {
         isCalibrated &&
             sample.trackingState == .tracking &&
             sample.setupState == .ready &&
-            sample.eyeAvailability == .rightOnly &&
+            selectedRightEyeIsAvailable &&
             sample.quality.level == .usable &&
             sample.pointNormalized != nil
+    }
+
+    private var selectedRightEyeIsAvailable: Bool {
+        sample.eyeAvailability == .rightOnly ||
+            (!oneEyeEnforcerEnabled && sample.eyeAvailability == .both)
+    }
+
+    func setOneEyeEnforcerEnabled(_ enabled: Bool) {
+        guard oneEyeEnforcerEnabled != enabled else { return }
+        oneEyeEnforcerEnabled = enabled
+        tracker.setOneEyeEnforcementEnabled(enabled)
+        patchWearMonitor.reset()
+        patchWearState = enabled ? .checking : .verified
+        processCalibrationState()
     }
 
     func startCamera() {
@@ -78,7 +93,9 @@ final class GazeInputController {
                 try await tracker.start()
                 cameraStarted = true
                 updateCameraStatus()
-                status = "Centre your face 40–60 cm away and keep the right eye visible"
+                status = oneEyeEnforcerEnabled
+                    ? "Centre your face 40–60 cm away and keep the right eye visible"
+                    : "Testing mode — centre your face with the right eye visible"
             } catch {
                 updateCameraStatus()
                 status = "Camera start failed: \(error)"
@@ -123,7 +140,7 @@ final class GazeInputController {
         isPreparingCalibration = false
         activeCalibrationTarget = nil
         patchWearMonitor.reset()
-        patchWearState = .checking
+        patchWearState = oneEyeEnforcerEnabled ? .checking : .verified
         status = "Stopped; volatile gaze and calibration data discarded"
         cameraStatus = "ARKit input stopped; camera restored to 1.0×"
     }
@@ -169,14 +186,15 @@ final class GazeInputController {
 
     private func processCalibrationState() {
         if cameraStarted, activeCalibrationTarget == nil, !isPreparingCalibration, !isCalibrated {
-            status = switch (sample.setupState, sample.eyeAvailability) {
-            case (.tooClose, _): "Move farther from the front camera"
-            case (.tooFar, _): "Move closer to the front camera"
-            case (.ready, .both): "Put on the prescribed eye patch and keep your face still"
-            case (.ready, .rightOnly) where patchWearState == .verified: "One-eye check passed — start calibration"
-            case (.ready, .rightOnly): "Checking the patch — keep still"
-            case (.ready, .leftOnly): "Keep the right eye uncovered and visible"
-            case (.ready, .none): "Keep the right eye open and visible"
+            status = switch (sample.setupState, sample.eyeAvailability, oneEyeEnforcerEnabled) {
+            case (.tooClose, _, _): "Move farther from the front camera"
+            case (.tooFar, _, _): "Move closer to the front camera"
+            case (.ready, .both, false), (.ready, .rightOnly, false): "Testing mode — start calibration"
+            case (.ready, .both, true): "Put on the prescribed eye patch and keep your face still"
+            case (.ready, .rightOnly, true) where patchWearState == .verified: "One-eye check passed — start calibration"
+            case (.ready, .rightOnly, true): "Checking the patch — keep still"
+            case (.ready, .leftOnly, _): "Keep the right eye uncovered and visible"
+            case (.ready, .none, _): "Keep the right eye open and visible"
             default: "Centre your face 40–60 cm from the landscape camera"
             }
         }
@@ -215,6 +233,11 @@ final class GazeInputController {
 
     private func consume(_ value: GazeSample) {
         sample = value
+        guard oneEyeEnforcerEnabled else {
+            patchWearState = .verified
+            processCalibrationState()
+            return
+        }
         let observation: PatchEyeObservation
         if value.setupState != .ready {
             observation = .unavailable

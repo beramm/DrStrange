@@ -1,5 +1,5 @@
 import XCTest
-@_spi(Platform) @testable import DrStrangeGazeTracker
+@_spi(Platform) @_spi(Engineering) @testable import DrStrangeGazeTracker
 
 final class CalibrationStateTests: XCTestCase {
     func testCalibrationContractRequiresReadySetupAndStartsExpectedTarget() async throws {
@@ -27,6 +27,34 @@ final class CalibrationStateTests: XCTestCase {
 
         XCTAssertThrowsError(try tracker.beginCalibration()) { error in
             XCTAssertEqual(error as? CalibrationContractError, .trackingNotRunning)
+        }
+    }
+
+    func testEngineeringOverrideAllowsCalibrationWithBothEyesVisible() async throws {
+        let (tracker, runtime, _, recorder) = makeTracker()
+
+        try await tracker.start()
+        runtime.emit(timestamp: 10, setupState: .ready, eyeAvailability: .both)
+        XCTAssertThrowsError(try tracker.beginCalibration()) { error in
+            XCTAssertEqual(error as? CalibrationContractError, .setupNotReady)
+        }
+
+        tracker.setOneEyeEnforcementEnabled(false)
+        try tracker.beginCalibration()
+
+        XCTAssertEqual(recorder.last?.calibrationState, .readyForTarget)
+        XCTAssertEqual(recorder.last?.eyeAvailability, .both)
+    }
+
+    func testEngineeringOverrideStillRequiresTheSelectedRightEye() async throws {
+        let (tracker, runtime, _, _) = makeTracker()
+
+        try await tracker.start()
+        tracker.setOneEyeEnforcementEnabled(false)
+        runtime.emit(timestamp: 10, setupState: .ready, eyeAvailability: .leftOnly)
+
+        XCTAssertThrowsError(try tracker.beginCalibration()) { error in
+            XCTAssertEqual(error as? CalibrationContractError, .setupNotReady)
         }
     }
 

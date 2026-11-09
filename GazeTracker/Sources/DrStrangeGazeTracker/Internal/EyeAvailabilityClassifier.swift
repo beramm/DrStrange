@@ -22,3 +22,16 @@ public enum EyeAvailabilityClassifier {
         }
     }
 }
+
+extension EyeAvailability {
+    func isSelectedRightEyeAvailable(oneEyeEnforcementEnabled: Bool) -> Bool {
+        switch self {
+        case .rightOnly:
+            true
+        case .both:
+            !oneEyeEnforcementEnabled
+        case .leftOnly, .none:
+            false
+        }
+    }
+}
