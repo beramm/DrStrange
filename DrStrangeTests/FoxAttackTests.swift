@@ -321,36 +321,34 @@ final class FoxAttackTests: XCTestCase {
         XCTAssertEqual(last, MoleVisual.frameCount)
     }
 
-    func testPunchedMoleReactsThenPlaysFramesBackwards() throws {
+    func testPunchedMolePlaysHitFramesBackDownTheHole() throws {
         var engine = makeEngine()
         let target = try XCTUnwrap(advanceToSpawn(&engine))
         _ = run(&engine, for: 0.7)
         engine.tapHole(target.holeIndex)
         func visual() -> MoleVisual? { engine.targets.first { $0.id == target.id }.map { engine.moleVisual(for: $0) } }
 
-        // Waiting for the hammer: fully up, no reaction yet.
+        // Waiting for the hammer: fully up, no hit frames yet.
         _ = run(&engine, for: timing.impactOffset - 0.05)
         XCTAssertEqual(visual()?.frame, MoleVisual.frameCount)
-        XCTAssertNil(visual()?.hitProgress)
+        XCTAssertNil(visual()?.hitFrame)
 
-        // Reacting: still fully up, with reaction progress.
-        _ = run(&engine, for: 0.05 + timing.hitReaction / 2)
-        XCTAssertEqual(visual()?.frame, MoleVisual.frameCount)
-        XCTAssertEqual(visual()?.hitProgress ?? 0, 0.5, accuracy: 0.1)
+        // The hammer lands on the first hit frame.
+        _ = run(&engine, for: 0.06)
+        var last = try XCTUnwrap(visual()?.hitFrame)
+        XCTAssertLessThanOrEqual(last, 4)
 
-        // Then the rise plays backwards until it is gone.
-        _ = run(&engine, for: timing.hitReaction / 2 + 0.02)
-        var last = visual()?.frame ?? 0
-        XCTAssertNil(visual()?.hitProgress)
-        var frames = 0
-        while let frame = visual()?.frame {
-            XCTAssertLessThanOrEqual(frame, last)
+        // The hit frames then play forwards once until the mole has gone.
+        var shown = Set<Int>()
+        while let current = visual() {
+            let frame = try XCTUnwrap(current.hitFrame)
+            XCTAssertGreaterThanOrEqual(frame, last)
             last = frame
-            frames += 1
+            shown.insert(frame)
             engine.advance(by: 0.01)
         }
-        XCTAssertLessThanOrEqual(last, 2, "back down to the helmet tip before disappearing")
-        XCTAssertGreaterThan(frames, 10)
+        XCTAssertGreaterThanOrEqual(last, MoleVisual.frameCount - 1, "back down to the helmet tip before disappearing")
+        XCTAssertGreaterThan(shown.count, 20)
     }
 
     func testUntappedMoleAlsoGoesBackDown() throws {

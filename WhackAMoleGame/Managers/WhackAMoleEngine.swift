@@ -89,11 +89,8 @@ struct WhackAMoleEngine {
             return MoleVisual(frame: sinkFrame(from: at))
         case let .hit(at):
             guard target.role == .target else { return MoleVisual(frame: sinkFrame(from: at)) }
-            let reaction = configuration.foxAttack.hitReaction
-            if clock < at + reaction {
-                return MoleVisual(frame: riseFrame(at: clock), hitProgress: min(max((clock - at) / max(reaction, 0.001), 0), 1))
-            }
-            return MoleVisual(frame: sinkFrame(from: at + reaction))
+            let duration = configuration.foxAttack.hitReaction + rules.exitAnimationDuration
+            return MoleVisual(frame: count, hitProgress: min(max((clock - at) / max(duration, 0.001), 0), 1))
         }
     }
 
@@ -308,7 +305,7 @@ struct WhackAMoleEngine {
             case .up, .targeted:
                 false
             case let .hit(at):
-                // A struck mole reacts first, then plays its rise backwards into the hole.
+                // A struck mole plays its hit animation, which ends with it back down the hole.
                 clock - at >= (target.role == .target ? hitReaction + linger : linger)
             case let .leaving(at):
                 clock - at >= linger

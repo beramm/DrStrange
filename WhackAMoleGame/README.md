@@ -68,9 +68,10 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 3. The fox's yellow card opens beside that mole: it grows from its centre as a rounded square with
    a slight spring, and a square ring ripples out. Meanwhile the fox fades out of its corner.
 4. The fox rises up from the bottom of the card and swings. Its hammer slides out from behind the
-   card and lands on the mole's helmet. The mole squashes, its head wobbles, a few stars circle its
-   helmet and "+10" floats up. There is no flashing and the motion is short.
-5. The mole's climb plays backwards, taking it down into the hole. The hammer slides back behind
+   card and lands on the mole's helmet. The mole screws up its face, plays its 24-frame hit
+   animation sinking back down the hole, and "+10" floats up. There is no flashing and the motion
+   is short.
+5. The hammer slides back behind
    the card, the fox sinks down out of its bottom, the empty card shrinks away and the fox is back
    in its corner.
 6. The hole closes. After a short pause another hole opens somewhere else.
@@ -104,7 +105,7 @@ The sequence always runs in this order:
 | `frameAppearing` | After a valid tap, the yellow card opens beside the character: the whole card, border included, grows from its centre as a rounded square with a slight spring, and a square ring ripples out. The corner fox fades away. | 0.34 s |
 | `foxEmerging` | The fox rises up from the bottom of the card, clipped to the inside of the card, with its hammer hidden. | 0.36 s |
 | `foxAttacking` | The fox leans in and swings (frames 1→21, speeding up) while the hammer slides out from behind the card. It ends at impact. | 0.36 s |
-| `targetHit` | The hammer is on the helmet (frame 21). The mole squashes, its head wobbles, stars circle the helmet and "+10" floats up. | 0.45 s |
+| `targetHit` | The hammer is on the helmet (frame 21). The mole's hit animation starts and "+10" floats up. | 0.45 s |
 | `foxRetracting` | The mole's climb plays backwards (0.45 s, carrying on into the next step). The hammer slides back behind the card, then the fox sinks down out of the card's bottom. | 0.36 s |
 | `frameDisappearing` | The empty card shrinks back to its centre; the fox fades back in at its corner. | 0.28 s |
 | `nextTarget` | A short pause before the next character may appear. | 0.3 s |
@@ -158,7 +159,7 @@ WhackAMoleGame/
 ├── App/            WhackAMoleGameApp (@main, standalone only), GameEntryView
 ├── Views/          GameHomeView, PatchingSetupView, WhackAMoleGameView, GameBoardView,
 │                   GameHUDView, GameResultView
-├── Components/     CharacterView (target), MoleHoleView, ScoreView, FeedbackView (stars),
+├── Components/     CharacterView (target), MoleHoleView, ScoreView, FeedbackView (+10),
 │                   FoxCharacterView, FoxWindowView, AttackAnimationView
 ├── ViewModels/     WhackAMoleGameViewModel
 ├── Models/         GameConfiguration, PatchingConfiguration, GameCharacter, GameSession,
@@ -298,6 +299,10 @@ clinical improvement.
     the moles can sit in the three separate hole images, and each frame still ends along the hole's
     front edge. All 24 frames share one crop.
   - `MoleArt` in `MoleHoleView.swift` records where the frames sit relative to the hole's front edge.
+- **Provided (Google Drive, mole hit folder):** 24 frames (`1`–`24`) of the mole being punched and
+  sinking into its hole, stored in `Resources/Assets.xcassets/Characters/MoleHit/Frame01…24`. They
+  were cut out from the painted dirt the same way as the rise frames, keeping the small "ouch" ticks
+  beside the helmet, and play over `hitReaction` + `exitAnimationDuration` (0.9 s).
   - Awake moles are drawn in full colour; sleeping moles (decoys) in grey with a "z z" bubble.
 - **Provided (Google Drive, background folder):** `Background whackamole.png`, a 4:3 painted meadow
   with sky, grass and a fence. It is stored as a JPEG in
@@ -315,7 +320,7 @@ clinical improvement.
 - **Missing:**
   - **More mole art.** There is a single mole animation, so the per-level "character looks" all
     show the same mole. A sleeping mole (eyes closed) would make decoys clearer than the grey
-    version with a bubble. A hit or dizzy pose would also help.
+    version with a bubble.
   - Gentle sound effects (built-in system sounds stand in), optional background music,
     and an app icon.
 
