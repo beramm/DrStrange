@@ -1,29 +1,78 @@
 //
 //  FixationGameView.swift
-//  Fixation game prototype: guard the vegetable stall.
-//  A finger on the screen stands in for the eye tracker for now.
+//  Veggie Keeper (fixation game) prototype: guard the vegetable stall.
+//  Styled like the Whack-a-Mole game (meadow background, top bar, pause and end screens).
+//
+//  For now a finger on the screen stands in for the eye tracker:
+//  holding = watching the stall, lifting = looking away, so a thief comes.
 //
 
 import SwiftUI
 
 struct FixationGameView: View {
-    private enum Phase { case waiting, playing, won, lost }
+    private enum Phase: Equatable {
+        case waiting                          // before the first hold
+        case playing
+        case paused
+        case finished(stoppedEarly: Bool)
+    }
 
-    private let startingLives = 3
-    private let guardSeconds = 30
-    private let thiefSeconds = 2.0
-    private let vegetables = ["🥕", "🥦", "🍅"]
+    /// What `.task(id:)` watches: the game logic runs again whenever one of these changes.
+    private struct GameState: Equatable {
+        let isWatching: Bool
+        let phase: Phase
+    }
+
+    private let totalVeggies = 3
+    /// How long the stall must be guarded to finish.
+    private let guardSeconds: Double = 30
+    /// How long the thief needs to take one veggie.
+    private let thiefSeconds: Double = 2
 
     /// True while the child is guarding the stall.
-    /// TODO: replace the finger with the real gaze check from ARKit.
+    /// TODO: replace the finger with the real gaze check from the gaze tracker.
     @GestureState private var isWatching = false
 
     @State private var phase = Phase.waiting
-    @State private var lives = 3
-    @State private var secondsLeft = 30
+    @State private var veggiesLeft = 3
+    @State private var guardedSeconds: Double = 0
     @State private var thiefIsHere = false
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var secondsLeft: Int {
+        Int((guardSeconds - guardedSeconds).rounded(.up))
+    }
 
     var body: some View {
+        ZStack {
+            if case let .finished(stoppedEarly) = phase {
+                GameResultView(
+                    veggiesSaved: veggiesLeft,
+                    totalVeggies: totalVeggies,
+                    stoppedEarly: stoppedEarly,
+                    onPlayAgain: restart
+                )
+                .transition(.opacity)
+            } else {
+                gameplay
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: phase)
+        .statusBarHidden()
+        .persistentSystemOverlays(.hidden)
+        // Runs again each time the finger goes down or up, or the phase changes.
+        .task(id: GameState(isWatching: isWatching, phase: phase)) {
+            await updateGame()
+        }
+        // Pause when the app goes to the background.
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase != .active && phase == .playing { phase = .paused }
+        }
+    }
+
+    // MARK: - Gameplay screen
+
+    private var gameplay: some View {
         ZStack {
             GameBackground()
 
@@ -35,114 +84,102 @@ struct FixationGameView: View {
                         .updating($isWatching) { _, state, _ in state = true }
                 )
 
-            VStack(spacing: 32) {
-                statusBar
-                stall
-                hint
+            VStack(spacing: 0) {
+                topBar
+                Spacer()
+                VeggieStallView(veggiesLeft: veggiesLeft, thiefIsHere: thiefIsHere)
+                    .allowsHitTesting(false)
+                Spacer()
             }
-            .padding(48)
-            .allowsHitTesting(false)
 
-            if phase == .won || phase == .lost {
-                endScreen
+            prompt
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, 96)
+                .allowsHitTesting(false)
+
+            if phase == .paused {
+                PauseOverlay(
+                    onResume: { phase = .playing },
+                    onRest: { phase = .finished(stoppedEarly: true) }
+                )
             }
-        }
-        // Runs again each time the finger goes down or lifts up.
-        .task(id: isWatching) {
-            try? await updateGame()
         }
     }
 
-    private var statusBar: some View {
-        HStack {
-            HStack(spacing: 12) {
-                ForEach(0..<startingLives, id: \.self) { index in
-                    Image(systemName: index < lives ? "heart.fill" : "heart")
-                        .foregroundStyle(.red)
-                }
+    /// Exit, veggies left, time bar and pause, like Whack-a-Mole's top bar.
+    private var topBar: some View {
+        HStack(spacing: 20) {
+            HUDButton(systemImage: "xmark", label: "Stop the game") {
+                phase = .finished(stoppedEarly: true)
             }
-            Spacer()
-            Label("\(secondsLeft)", systemImage: "clock.fill")
+
+            VeggiesLeftView(left: veggiesLeft, total: totalVeggies)
+
+            GuardProgressView(progress: guardedSeconds / guardSeconds, secondsLeft: secondsLeft)
+                .frame(maxWidth: .infinity)
+
+            HUDButton(systemImage: "pause.fill", label: "Pause") {
+                phase = .paused
+            }
+            .disabled(phase != .playing)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+    }
+
+    /// Reminder to hold the screen: before the game starts, and whenever the finger is lifted.
+    @ViewBuilder
+    private var prompt: some View {
+        if phase == .waiting || (phase == .playing && !isWatching) {
+            Label(phase == .waiting ? "Hold the screen to guard the stall" : "Keep holding!",
+                  systemImage: "hand.point.up.left.fill")
+                .font(.system(.title, design: .rounded).weight(.heavy))
                 .foregroundStyle(Color.ink)
-                .monospacedDigit()
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .background(Capsule().fill(.white.opacity(0.85)))
+                .transition(.move(edge: .top).combined(with: .opacity))
         }
-        .font(.system(size: 44, weight: .bold, design: .rounded))
     }
 
-    private var stall: some View {
-        HStack(spacing: 24) {
-            ForEach(0..<lives, id: \.self) { index in
-                Text(vegetables[index])
-                    .font(.system(size: 90))
-            }
-        }
-        .frame(width: 420, height: 180)
-        .background(RoundedRectangle(cornerRadius: 24).fill(Color.cardFill))
-        // An overlay, so the stall stays still when the thief shows up.
-        .overlay(alignment: .leading) {
-            if thiefIsHere {
-                Text("🦝")
-                    .font(.system(size: 120))
-                    .offset(x: -180)
-            }
-        }
-        .frame(maxHeight: .infinity)
-    }
+    // MARK: - Game logic
 
-    private var hint: some View {
-        Image(systemName: isWatching ? "hand.point.up.left.fill" : "hand.point.up.left")
-            .font(.system(size: 60))
-            .foregroundStyle(Color.ink)
-    }
-
-    private var endScreen: some View {
-        VStack(spacing: 32) {
-            Text(phase == .won ? "🎉" : "🦝")
-                .font(.system(size: 120))
-
-            Button(action: restart) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 60, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 200, height: 120)
-                    .background(RoundedRectangle(cornerRadius: 32).fill(Color.playGreen))
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.skyBottom)
-    }
-
-    /// Finger down: count down to a win. Finger up: send the thief.
-    /// Sleeping throws an error when the finger changes, which stops this run.
-    private func updateGame() async throws {
+    /// Finger down: the guard time fills up until the stall is safe.
+    /// Finger up: the thief comes and takes a veggie every few seconds.
+    /// Sleeping throws when the finger or the phase changes, which stops this run.
+    private func updateGame() async {
         thiefIsHere = false
 
         if isWatching && phase == .waiting {
-            phase = .playing
+            phase = .playing      // this changes the task id, so the game logic runs again
+            return
         }
         guard phase == .playing else { return }
 
-        if isWatching {
-            while secondsLeft > 0 {
-                try await Task.sleep(for: .seconds(1))
-                secondsLeft -= 1
+        do {
+            if isWatching {
+                while guardedSeconds < guardSeconds {
+                    try await Task.sleep(for: .milliseconds(100))
+                    guardedSeconds = min(guardedSeconds + 0.1, guardSeconds)
+                }
+                phase = .finished(stoppedEarly: false)
+            } else {
+                while veggiesLeft > 0 {
+                    thiefIsHere = true
+                    try await Task.sleep(for: .seconds(thiefSeconds))
+                    veggiesLeft -= 1
+                }
+                thiefIsHere = false
+                phase = .finished(stoppedEarly: false)
             }
-            phase = .won
-        } else {
-            while lives > 0 {
-                thiefIsHere = true
-                try await Task.sleep(for: .seconds(thiefSeconds))
-                lives -= 1
-            }
-            thiefIsHere = false
-            phase = .lost
+        } catch {
+            // The finger changed or the game was paused; this run stops here.
         }
     }
 
     private func restart() {
-        lives = startingLives
-        secondsLeft = guardSeconds
+        veggiesLeft = totalVeggies
+        guardedSeconds = 0
         thiefIsHere = false
         phase = .waiting
     }

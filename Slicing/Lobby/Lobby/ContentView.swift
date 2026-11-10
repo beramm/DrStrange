@@ -15,7 +15,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            GeometryReader { geo in
+            GeometryReader { geo in 
                 HStack(spacing: geo.size.width * 0.06) {
                     // Left: character + editable name
                     CharacterCard(name: $buddyName, imageName: Buddy.imageName)
