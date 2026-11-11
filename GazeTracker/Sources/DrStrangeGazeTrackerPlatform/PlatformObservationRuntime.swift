@@ -4,12 +4,18 @@ import Foundation
 #if canImport(ARKit) && canImport(AVFoundation) && os(iOS)
 import ARKit
 import AVFoundation
+import ImageIO
+import UIKit
 import simd
 
 final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionDelegate {
     weak var delegate: ObservationRuntimeDelegate?
-    private weak var previewView: ARSCNView?
+    private weak var previewHostView: UIView?
+    private let cameraFramePreviewProcessor: CameraFramePreviewProcessor?
     private let cameraInput: GazeCameraInputConfiguration?
+    private let ambientLight: GazeAmbientLightConfiguration?
+    private let faceIsolationProcessor: FaceIsolationProcessor?
+    private let blazeGazeProcessor: BlazeGazeShadowProcessor?
 
     private let sessionLock = NSLock()
     private var session: ARSession?
@@ -19,11 +25,39 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
     )
 
     init(
-        previewView: ARSCNView? = nil,
-        cameraInput: GazeCameraInputConfiguration? = nil
+        previewHostView: UIView? = nil,
+        cameraFramePreview: VolatileCameraFramePreview? = nil,
+        cameraInput: GazeCameraInputConfiguration? = nil,
+        ambientLight: GazeAmbientLightConfiguration? = nil,
+        faceIsolation: GazeFaceIsolationConfiguration? = nil,
+        faceIsolationPreview: VolatileFaceIsolationPreview? = nil,
+        blazeGaze: GazeBlazeGazeConfiguration? = nil,
+        blazeGazePreview: VolatileBlazeGazePreview? = nil
     ) {
-        self.previewView = previewView
+        self.previewHostView = previewHostView
+        if let cameraFramePreview {
+            cameraFramePreviewProcessor = CameraFramePreviewProcessor(preview: cameraFramePreview)
+        } else {
+            cameraFramePreviewProcessor = nil
+        }
         self.cameraInput = cameraInput
+        self.ambientLight = ambientLight
+        if let faceIsolation, let faceIsolationPreview {
+            faceIsolationProcessor = FaceIsolationProcessor(
+                configuration: faceIsolation,
+                preview: faceIsolationPreview
+            )
+        } else {
+            faceIsolationProcessor = nil
+        }
+        if let blazeGaze, let blazeGazePreview {
+            blazeGazeProcessor = BlazeGazeShadowProcessor(
+                configuration: blazeGaze,
+                preview: blazeGazePreview
+            )
+        } else {
+            blazeGazeProcessor = nil
+        }
         super.init()
     }
 
@@ -52,9 +86,30 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         let configuration = ARFaceTrackingConfiguration()
         configuration.isLightEstimationEnabled = true
         try configureCaptureZoom()
+        let preview = previewHostView
+        let faceImageOrientation = await MainActor.run {
+            let activeSceneOrientation = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first { $0.activationState == .foregroundActive }?
+                .interfaceOrientation
+            return Self.faceImageOrientation(
+                for: preview?.window?.windowScene?.interfaceOrientation
+                    ?? activeSceneOrientation
+                    ?? .landscapeRight
+            )
+        }
+        faceIsolationProcessor?.start(orientation: faceImageOrientation)
+        cameraFramePreviewProcessor?.start(orientation: faceImageOrientation)
         let options: ARSession.RunOptions = reset ? [.resetTracking, .removeExistingAnchors] : []
         let session = makeSession()
         session.run(configuration, options: options)
+        // MediaPipe creates a GPU/GL context while its graph is initialized.
+        // Let ARKit acquire and warm the TrueDepth session first so the shadow
+        // candidate can never race the control path for camera startup.
+        delegateQueue.asyncAfter(deadline: .now() + 0.75) { [weak self, weak session] in
+            guard let self, let session, self.isCurrentSession(session) else { return }
+            self.blazeGazeProcessor?.start(orientation: faceImageOrientation)
+        }
     }
 
     func pause() {
@@ -69,11 +124,10 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         sessionLock.lock()
         defer { sessionLock.unlock() }
         if let session { return session }
-        // When the engineering preview is present, use the renderer's own
-        // session. ARSCNView wires its camera background when it owns the
-        // session from the beginning; assigning a separately-created running
-        // session later can leave the preview black even while frames arrive.
-        let created = previewSession() ?? ARSession()
+        // The runtime exclusively owns this session. Keeping ARSCNView out of
+        // the path prevents a renderer from replacing the delegate and starving
+        // the direct preview of frame callbacks on physical devices.
+        let created = ARSession()
         created.delegate = self
         created.delegateQueue = delegateQueue
         session = created
@@ -88,9 +142,18 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         sessionLock.unlock()
 
         resetCaptureZoom()
+        ambientLight?.reset()
+        faceIsolationProcessor?.stop()
+        cameraFramePreviewProcessor?.stop()
+        blazeGazeProcessor?.stop()
         released?.pause()
         released?.delegate = nil
-        if let released { detachPreview(from: released) }
+    }
+
+    private func isCurrentSession(_ candidate: ARSession) -> Bool {
+        sessionLock.lock()
+        defer { sessionLock.unlock() }
+        return session === candidate
     }
 
     private func configureCaptureZoom() throws {
@@ -109,6 +172,20 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
 
         let minimum = Double(device.minAvailableVideoZoomFactor)
         let maximum = Double(device.maxAvailableVideoZoomFactor)
+        // Leave ARKit's primary TrueDepth device completely untouched for the
+        // default path. Re-locking the capture device only to assign 1.0 can
+        // leave some iPadOS/device combinations delivering video-range black
+        // frames even though the ARSession continues at 60 Hz.
+        if abs(requested - 1.0) <= 0.01 {
+            cameraInput?.record(GazeCameraInputStatus(
+                captureDeviceAvailable: true,
+                requestedZoomFactor: requested,
+                appliedZoomFactor: 1.0,
+                minimumZoomFactor: minimum,
+                maximumZoomFactor: maximum
+            ))
+            return
+        }
         guard requested >= minimum, requested <= maximum else {
             cameraInput?.record(GazeCameraInputStatus(
                 captureDeviceAvailable: true,
@@ -148,6 +225,9 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
     }
 
     private func resetCaptureZoom() {
+        guard let cameraInput else { return }
+        let status = cameraInput.status()
+        guard let applied = status.appliedZoomFactor, abs(applied - 1.0) > 0.01 else { return }
         guard let device = ARFaceTrackingConfiguration.configurableCaptureDeviceForPrimaryCamera else { return }
         let minimum = Double(device.minAvailableVideoZoomFactor)
         let maximum = Double(device.maxAvailableVideoZoomFactor)
@@ -156,38 +236,61 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
             try device.lockForConfiguration()
             device.videoZoomFactor = 1.0
             device.unlockForConfiguration()
+            cameraInput.record(GazeCameraInputStatus(
+                captureDeviceAvailable: true,
+                requestedZoomFactor: status.requestedZoomFactor,
+                appliedZoomFactor: 1.0,
+                minimumZoomFactor: minimum,
+                maximumZoomFactor: maximum
+            ))
         } catch {
             // Session shutdown must continue even if the camera rejects reset.
         }
     }
 
-    private func previewSession() -> ARSession? {
-        guard let previewView else { return nil }
-        if Thread.isMainThread { return previewView.session }
-        return DispatchQueue.main.sync { [weak previewView] in previewView?.session }
-    }
-
-    private func detachPreview(from session: ARSession) {
-        let previewView = previewView
-        DispatchQueue.main.async { [weak previewView, weak session] in
-            guard let previewView, let session, previewView.session === session else { return }
-            // ARSCNView retains its session. Replacing it with an idle session
-            // ensures pause/stop releases the camera-owning session completely.
-            previewView.session = ARSession()
-        }
-    }
-
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        ambientLight?.record(
+            ambientIntensity: frame.lightEstimate.map { Double($0.ambientIntensity) }
+        )
+        cameraFramePreviewProcessor?.process(
+            pixelBuffer: frame.capturedImage,
+            timestamp: frame.timestamp
+        )
+        faceIsolationProcessor?.process(
+            pixelBuffer: frame.capturedImage,
+            timestamp: frame.timestamp
+        )
+        blazeGazeProcessor?.process(
+            pixelBuffer: frame.capturedImage,
+            timestamp: frame.timestamp
+        )
         guard let face = frame.anchors.compactMap({ $0 as? ARFaceAnchor }).first, face.isTracked else {
             publish(frameTimestamp: frame.timestamp, tracking: .lost, setup: .unknown, eyes: .none)
             return
         }
 
-        // Compose the accepted anatomical right-eye transform into camera space.
-        // Only the resulting volatile ray crosses the platform SPI; ARKit objects
-        // and biometric geometry never cross the public tracker boundary.
+        // Select the single visible anatomical eye. When both eyes are allowed,
+        // keep the right eye as the deterministic default. Only the resulting
+        // volatile ray crosses the platform SPI; ARKit objects and biometric
+        // geometry never cross the public tracker boundary.
+        let anatomicalRightBlink = Double(face.blendShapes[.eyeBlinkLeft]?.floatValue ?? 0)
+        let anatomicalLeftBlink = Double(face.blendShapes[.eyeBlinkRight]?.floatValue ?? 0)
+        let eyeAvailability = EyeAvailabilityClassifier.classify(
+            eyeBlinkLeft: anatomicalRightBlink,
+            eyeBlinkRight: anatomicalLeftBlink
+        )
+        let selectedEyeTransform: simd_float4x4
+        let selectedEyeBlink: Double
+        if eyeAvailability == .leftOnly {
+            selectedEyeTransform = face.leftEyeTransform
+            selectedEyeBlink = anatomicalLeftBlink
+        } else {
+            selectedEyeTransform = face.rightEyeTransform
+            selectedEyeBlink = anatomicalRightBlink
+        }
+
         let cameraFromWorld = simd_inverse(frame.camera.transform)
-        let eyeInCamera = cameraFromWorld * face.transform * face.rightEyeTransform
+        let eyeInCamera = cameraFromWorld * face.transform * selectedEyeTransform
         let faceInCamera = cameraFromWorld * face.transform
         let origin = SIMD3<Double>(
             Double(eyeInCamera.columns.3.x),
@@ -200,8 +303,8 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
             -Double(eyeInCamera.columns.2.z)
         )
         let baselineDirection = SIMD2<Double>(
-            -Double(face.rightEyeTransform.columns.2.x),
-            -Double(face.rightEyeTransform.columns.2.y)
+            -Double(selectedEyeTransform.columns.2.x),
+            -Double(selectedEyeTransform.columns.2.y)
         )
         let faceTranslation = SIMD3<Double>(
             Double(faceInCamera.columns.3.x),
@@ -214,12 +317,6 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
             -Double(faceInCamera.columns.2.z)
         )
         let distance = simd_length(faceTranslation)
-        let selectedEyeBlink = Double(face.blendShapes[.eyeBlinkLeft]?.floatValue ?? 0)
-        let otherEyeBlink = Double(face.blendShapes[.eyeBlinkRight]?.floatValue ?? 0)
-        let eyeAvailability = EyeAvailabilityClassifier.classify(
-            eyeBlinkLeft: selectedEyeBlink,
-            eyeBlinkRight: otherEyeBlink
-        )
         let finite = (0..<4).allSatisfy { column in
             let value = eyeInCamera[column]
             return value.x.isFinite && value.y.isFinite && value.z.isFinite && value.w.isFinite
@@ -236,7 +333,7 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         } else {
             .ready
         }
-        let selectedEyeOpen = eyeAvailability == .both || eyeAvailability == .rightOnly
+        let selectedEyeOpen = eyeAvailability != .none
         let ray = finite ? SelectedEyeRayObservation(
             originX: origin.x,
             originY: origin.y,
@@ -314,6 +411,19 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         case .restricted: .restricted
         @unknown default: .denied
         }
+    }
+
+    private static func faceImageOrientation(
+        for interfaceOrientation: UIInterfaceOrientation
+    ) -> CGImagePropertyOrientation {
+        let displayOrientation: FaceIsolationDisplayOrientation = switch interfaceOrientation {
+        case .landscapeLeft: .landscapeLeft
+        case .landscapeRight: .landscapeRight
+        case .portrait: .portrait
+        case .portraitUpsideDown: .portraitUpsideDown
+        default: .landscapeRight
+        }
+        return displayOrientation.imagePropertyOrientation
     }
 }
 #else

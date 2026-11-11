@@ -180,6 +180,12 @@ final class SpawnManagerTests: XCTestCase {
             XCTAssertEqual(duration, settings.visibleDuration, accuracy: settings.visibleDuration * settings.visibleDurationJitter + 1e-9)
         }
     }
+
+    func testMoleVisibleDurationsAreTwiceTheOriginalValues() {
+        XCTAssertEqual(DifficultySettings.defaults(for: .beginner).visibleDuration, 6.4)
+        XCTAssertEqual(DifficultySettings.defaults(for: .intermediate).visibleDuration, 5.2)
+        XCTAssertEqual(DifficultySettings.defaults(for: .advanced).visibleDuration, 4.4)
+    }
 }
 
 final class ShuffleBagTests: XCTestCase {

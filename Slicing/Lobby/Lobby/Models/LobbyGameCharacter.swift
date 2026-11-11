@@ -1,5 +1,5 @@
 //
-//  GameCharacter.swift
+//  LobbyGameCharacter.swift
 //  Characters the child can choose on the character select screen.
 //
 

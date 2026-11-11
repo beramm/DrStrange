@@ -2,7 +2,7 @@ import Foundation
 import simd
 
 struct Phase3CalibrationEngine {
-    static let algorithmVersion = "phase3-selected-right-ray-v1"
+    static let algorithmVersion = "phase3-visible-eye-ray-v2"
 
     enum MappingKind: String, Equatable, Sendable {
         case fiveTermQuadratic
@@ -80,7 +80,7 @@ struct Phase3CalibrationEngine {
     ) -> Output {
         let rawPoint = ray.flatMap { model?.predict(RaySample($0)) }
         let publicPoint = rawPoint.flatMap { NormalizedGazePoint(x: $0.x, y: $0.y) }
-        let selectedEyeAvailable = eyeAvailability.isSelectedRightEyeAvailable(
+        let selectedEyeAvailable = eyeAvailability.hasUsableEye(
             oneEyeEnforcementEnabled: oneEyeEnforcementEnabled
         )
         let liveUsable = publicPoint != nil && setupState == .ready && selectedEyeAvailable

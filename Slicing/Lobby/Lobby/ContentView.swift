@@ -29,7 +29,7 @@ struct ContentView: View {
                         onChosen: { game in path.append(.game(game)) },
                         onSettings: { path.append(.settings) }
                     )
-                case .game(let game):  GamePlaceholder(game: game)
+                case .game(let game):  SelectedGameView(game: game)
                 case .settings:        SettingsPlaceholder()
                 }
             }

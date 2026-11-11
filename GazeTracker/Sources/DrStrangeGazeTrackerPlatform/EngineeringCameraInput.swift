@@ -88,3 +88,51 @@ public final class GazeCameraInputConfiguration: @unchecked Sendable {
         lock.unlock()
     }
 }
+
+@_spi(Engineering)
+public enum GazeAmbientLightState: Equatable, Sendable {
+    case unknown
+    case adequate
+    case tooDark
+}
+
+/// Volatile, coarse lighting guidance derived from ARKit's light estimate.
+/// Hysteresis prevents the UI from flickering when the room is near the limit.
+@_spi(Engineering)
+public final class GazeAmbientLightConfiguration: @unchecked Sendable {
+    static let darkThreshold = 250.0
+    static let recoveryThreshold = 400.0
+
+    private let lock = NSLock()
+    private var latestState: GazeAmbientLightState = .unknown
+
+    public func state() -> GazeAmbientLightState {
+        lock.lock()
+        defer { lock.unlock() }
+        return latestState
+    }
+
+    func record(ambientIntensity: Double?) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let ambientIntensity, ambientIntensity.isFinite, ambientIntensity >= 0 else {
+            latestState = .unknown
+            return
+        }
+
+        switch latestState {
+        case .unknown:
+            latestState = ambientIntensity < Self.darkThreshold ? .tooDark : .adequate
+        case .adequate:
+            if ambientIntensity < Self.darkThreshold { latestState = .tooDark }
+        case .tooDark:
+            if ambientIntensity >= Self.recoveryThreshold { latestState = .adequate }
+        }
+    }
+
+    func reset() {
+        lock.lock()
+        latestState = .unknown
+        lock.unlock()
+    }
+}

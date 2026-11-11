@@ -104,6 +104,15 @@ an end-to-end camera measurement, target-iPad benchmark, or accuracy result.
 
 ## Recommended isolated spike
 
+**Implementation status (2026-11-10):** the gaze-owned demo now implements
+steps 5–6 as a shadow path using Google's official iOS MediaPipe Swift package,
+the exact `512×128` WebEyeTrack homography, the pinned MacGaze Core ML artifact,
+metric face origin, and a volatile Gaussian RBF correction. The current target
+iPad runs iPadOS 27, so the artifact's iOS 18 minimum is satisfied for this
+internal spike. ARKit remains the control. Steps 7–8 and the pass/stop gate are
+not yet satisfied; a successful build or visible cursor is not accuracy
+evidence.
+
 Keep the current ARKit path as the control and add BlazeGaze only as an
 engineering-only shadow candidate. Do not expose a new public sample category
 or allow the candidate to drive gameplay until it passes the gate.
@@ -155,6 +164,30 @@ either patched-eye condition is out of distribution, or if held-out accuracy
 does not beat the current p90 6.26 cm result. Do not compensate for a failed
 raw model with a larger hit radius, smoothing, snapping, or dwell and report it
 as model accuracy.
+
+## 2026-11-10 face-isolation preprocessing assessment
+
+The gaze-owned demo host now includes an engineering-only face-isolation
+feasibility path. It uses Vision on a queue separate from the ARKit observation
+delegate, limits work to 10 Hz, selects the largest face, adds 35% square
+padding, and normalizes the volatile crop to `224×224`. The full camera preview
+and square crop are displayed side by side. Whack-a-Mole, the production
+seven-field output, calibration, and gaze mapping are unchanged.
+
+The host records rolling, non-persisted aggregates for face-detection success,
+crop-processing latency, source-pixel fraction retained, and gaze publication
+latency/rate with isolation enabled versus disabled. This evaluates whether
+face isolation is stable and whether its sidecar cost preserves the existing
+latency/rate gates. It does not evaluate gaze accuracy and does not yet satisfy
+BlazeGaze's required `512×128` two-eye input contract.
+
+The initial square preview applied an additional EXIF mirror even though the
+shared ARKit front-camera presentation was already mirrored. That made the
+full preview and isolated crop show opposite screen sides. The crop now applies
+rotation only for the active interface orientation, so the actual `224×224`
+candidate input and ARKit preview have matching left/right presentation. This
+display correction does not change the separately verified anatomical
+`EyeAvailability` conversion or selected-right-eye gaze ray.
 
 ## Primary references
 

@@ -23,7 +23,7 @@ struct GameHomeView: View {
                 .frame(width: 440)
         }
         .background(WhackAMolePalette.meadow.ignoresSafeArea())
-        .navigationTitle("Whack-a-Mole")
+        .navigationTitle("Paddy")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: configuration) { _, newValue in
             ConfigurationStore.standard.save(newValue)

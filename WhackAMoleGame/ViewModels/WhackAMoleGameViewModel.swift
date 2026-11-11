@@ -132,13 +132,6 @@ final class WhackAMoleGameViewModel {
 
     // MARK: - Input
 
-    func tapHole(_ hole: Int) {
-        guard phase == .playing else { return }
-        // Bring the engine clock up to the moment of the tap for an accurate response time.
-        tick()
-        apply(engine.tapHole(hole))
-    }
-
     func activateGazeTarget(_ activation: GazeActivation) {
         guard phase == .playing else { return }
         // Advance first, then verify identity so a dwell cannot land on a replacement character

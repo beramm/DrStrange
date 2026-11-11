@@ -21,14 +21,14 @@ struct GameBoardView: View {
             ZStack {
                 Color.clear
                     .contentShape(Rectangle())
+                    // Board touches are recorded as off-target activity but can never hit a mole.
                     .onTapGesture { viewModel.tapBoard() }
 
                 ForEach(viewModel.holes) { hole in
                     MoleHoleView(
                         hole: hole,
                         target: viewModel.target(inHole: hole.holeIndex),
-                        visual: viewModel.moleVisuals[hole.holeIndex],
-                        onTap: { viewModel.tapHole(hole.holeIndex) }
+                        visual: viewModel.moleVisuals[hole.holeIndex]
                     )
                     .frame(width: cell.width, height: cell.height)
                     .position(Self.center(of: hole.position, board: proxy.size, cell: cell, ground: ground))

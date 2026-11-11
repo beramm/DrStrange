@@ -2,12 +2,11 @@ import SwiftUI
 
 /// One hole, open only while its mole is around. The hole opens, the mole climbs out (frame by
 /// frame), reacts when hit and goes back down, then the hole closes.
-/// The whole cell is the touch target so small hands do not need to be precise.
+/// Gameplay activation is gaze-only; the cell deliberately ignores direct touch input.
 struct MoleHoleView: View {
     let hole: HoleVisual
     let target: ActiveTarget?
     let visual: MoleVisual?
-    let onTap: () -> Void
 
     var body: some View {
         GeometryReader { proxy in
@@ -34,26 +33,13 @@ struct MoleHoleView: View {
                         .id(target.id)
                 }
 
-                if let target, let visual, let progress = visual.hitProgress {
-                    let mole = Self.characterRect(artIndex: hole.artIndex, in: proxy.size)
-                    HitFeedbackView(
-                        progress: progress,
-                        points: target.pointsAwarded ?? GameSessionRecord.defaultPointsPerHit
-                    )
-                        .frame(width: mole.width, height: mole.height)
-                        .position(x: mole.midX, y: mole.midY)
-                        .allowsHitTesting(false)
-                }
             }
             .frame(width: width, height: height)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onTap)
         }
         .anchorPreference(key: FoxAnchorKey.self, value: .bounds) { [.hole(hole.holeIndex): $0] }
+        .allowsHitTesting(false)
         .accessibilityElement()
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction(.default, onTap)
     }
 
     /// Height of the hole's dark opening for a cell of `width` (the provided hole art's openings are

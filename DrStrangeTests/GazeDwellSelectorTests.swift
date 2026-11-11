@@ -71,7 +71,7 @@ final class GazeDwellSelectorTests: XCTestCase {
         let update = selector.consume(candidate: candidate(distance: 0.95), timestampNanoseconds: 2_000, isUsable: true)
 
         XCTAssertEqual(update.activation?.tier, .inner, "one noisy sample must not decide the score")
-        XCTAssertEqual(update.activation?.tier.points, 30)
+        XCTAssertEqual(update.activation?.tier.points, 60)
     }
 
     func testProximityTierBoundaries() {
@@ -79,5 +79,22 @@ final class GazeDwellSelectorTests: XCTestCase {
         XCTAssertEqual(GazeProximityTier(normalizedDistance: 0.36), .middle)
         XCTAssertEqual(GazeProximityTier(normalizedDistance: 0.70), .middle)
         XCTAssertEqual(GazeProximityTier(normalizedDistance: 0.71), .outer)
+        XCTAssertEqual(GazeProximityTier.inner.points, 60)
+        XCTAssertEqual(GazeProximityTier.middle.points, 30)
+        XCTAssertEqual(GazeProximityTier.outer.points, 20)
+    }
+
+    func testProximityScoresSelectMatchingFeedbackAssets() {
+        XCTAssertEqual(ProximityHitFeedback(rawValue: 60)?.assetName, "FeedbackBubbles/Perfect")
+        XCTAssertEqual(ProximityHitFeedback(rawValue: 30)?.assetName, "FeedbackBubbles/Good")
+        XCTAssertEqual(ProximityHitFeedback(rawValue: 20)?.assetName, "FeedbackBubbles/OK")
+        XCTAssertNil(ProximityHitFeedback(rawValue: GameSessionRecord.defaultPointsPerHit))
+    }
+
+    func testEveryProximityBoundaryIsTwentyPercentLarger() {
+        XCTAssertEqual(GazeTargetGeometry.radiusScale, 1.2)
+        XCTAssertEqual(0.35 * GazeTargetGeometry.radiusScale, 0.42, accuracy: 0.0001)
+        XCTAssertEqual(0.70 * GazeTargetGeometry.radiusScale, 0.84, accuracy: 0.0001)
+        XCTAssertEqual(1.00 * GazeTargetGeometry.radiusScale, 1.20, accuracy: 0.0001)
     }
 }

@@ -130,7 +130,7 @@ public final class GazeTracker: GazeTracking, @unchecked Sendable {
         do {
             try machine.beginCalibration()
             guard sample.setupState == .ready,
-                  sample.eyeAvailability.isSelectedRightEyeAvailable(
+                  sample.eyeAvailability.hasUsableEye(
                     oneEyeEnforcementEnabled: oneEyeEnforcementEnabled
                   ) else {
                 machine.cancelCalibration()

@@ -2,7 +2,6 @@
 
 #if canImport(ARKit) && canImport(UIKit) && os(iOS)
 import ARKit
-import SceneKit
 import UIKit
 #endif
 
@@ -14,27 +13,51 @@ public enum GazeTrackerFactory {
     }
 
     #if canImport(ARKit) && canImport(UIKit) && os(iOS)
-    /// Demo-only framing aid. The renderer shares the tracker's ARSession, so it
-    /// does not open a second camera capture path or expose camera frames.
-    /// Nothing displayed by this view is persisted, logged, or transmitted.
+    /// Volatile framing aid with optional preprocessing sidecars. A single
+    /// tracker-owned ARSession supplies both observations and preview frames,
+    /// so there is no competing renderer or second camera capture path.
+    /// Nothing displayed or processed here is persisted, logged, or transmitted.
     @_spi(Engineering)
-    public static func makeTrackerWithVolatilePreview() -> (
+    public static func makeTrackerWithVolatilePreview(
+        faceIsolationEnabled: Bool = true,
+        blazeGazeEnabled: Bool = true
+    ) -> (
         tracker: GazeTracker,
         preview: UIView,
-        cameraInput: GazeCameraInputConfiguration
+        cameraInput: GazeCameraInputConfiguration,
+        ambientLight: GazeAmbientLightConfiguration,
+        faceIsolationPreview: UIView,
+        faceIsolation: GazeFaceIsolationConfiguration,
+        blazeGazePreview: UIView,
+        blazeGaze: GazeBlazeGazeConfiguration
     ) {
-        let preview = ARSCNView(frame: .zero)
-        preview.scene = SCNScene()
-        preview.preferredFramesPerSecond = 30
-        preview.isPlaying = true
-        preview.automaticallyUpdatesLighting = false
-        preview.backgroundColor = .black
+        let cameraFramePreview = VolatileCameraFramePreview(frame: .zero)
         let cameraInput = GazeCameraInputConfiguration()
+        let ambientLight = GazeAmbientLightConfiguration()
+        let faceIsolation = GazeFaceIsolationConfiguration()
+        let faceIsolationPreview = VolatileFaceIsolationPreview(frame: .zero)
+        let blazeGaze = GazeBlazeGazeConfiguration()
+        let blazeGazePreview = VolatileBlazeGazePreview(frame: .zero)
         let runtime = PlatformObservationRuntime(
-            previewView: preview,
-            cameraInput: cameraInput
+            previewHostView: cameraFramePreview,
+            cameraFramePreview: cameraFramePreview,
+            cameraInput: cameraInput,
+            ambientLight: ambientLight,
+            faceIsolation: faceIsolationEnabled ? faceIsolation : nil,
+            faceIsolationPreview: faceIsolationEnabled ? faceIsolationPreview : nil,
+            blazeGaze: blazeGazeEnabled ? blazeGaze : nil,
+            blazeGazePreview: blazeGazeEnabled ? blazeGazePreview : nil
         )
-        return (GazeTracker(runtime: runtime), preview, cameraInput)
+        return (
+            GazeTracker(runtime: runtime),
+            cameraFramePreview,
+            cameraInput,
+            ambientLight,
+            faceIsolationPreview,
+            faceIsolation,
+            blazeGazePreview,
+            blazeGaze
+        )
     }
     #endif
 }

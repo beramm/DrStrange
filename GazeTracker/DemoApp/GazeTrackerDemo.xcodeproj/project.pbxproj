@@ -7,10 +7,15 @@
 
 		A10000000000000000000001 /* GazeTrackerDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* GazeTrackerDemoApp.swift */; };
 		A10000000000000000000002 /* DrStrangeGazeTracker in Frameworks */ = {isa = PBXBuildFile; productRef = A11000000000000000000001 /* DrStrangeGazeTracker */; };
+		A10000000000000000000003 /* face_landmarker.task in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* face_landmarker.task */; };
+		A10000000000000000000004 /* blazegaze.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* blazegaze.mlmodelc */; };
 
 		A20000000000000000000001 /* GazeTrackerDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GazeTrackerDemoApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000003 /* GazeTrackerDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GazeTrackerDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000004 /* face_landmarker.task */ = {isa = PBXFileReference; lastKnownFileType = file; path = face_landmarker.task; sourceTree = "<group>"; };
+		A20000000000000000000005 /* blazegaze.mlmodelc */ = {isa = PBXFileReference; lastKnownFileType = folder.mlmodelc; path = blazegaze.mlmodelc; sourceTree = "<group>"; };
+		A20000000000000000000006 /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
 
 		A30000000000000000000001 = {
 			isa = PBXGroup;
@@ -25,8 +30,19 @@
 			children = (
 				A20000000000000000000001 /* GazeTrackerDemoApp.swift */,
 				A20000000000000000000002 /* Info.plist */,
+				A30000000000000000000004 /* Models */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000005 /* blazegaze.mlmodelc */,
+				A20000000000000000000004 /* face_landmarker.task */,
+				A20000000000000000000006 /* THIRD_PARTY_NOTICES.md */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 		A30000000000000000000003 /* Products */ = {
@@ -76,7 +92,7 @@
 
 		A60000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001 /* GazeTrackerDemoApp.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
 		A60000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000002 /* DrStrangeGazeTracker in Frameworks */); runOnlyForDeploymentPostprocessing = 0; };
-		A60000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A60000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000003 /* face_landmarker.task in Resources */, A10000000000000000000004 /* blazegaze.mlmodelc in Resources */); runOnlyForDeploymentPostprocessing = 0; };
 
 		A70000000000000000000001 /* Project Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; ENABLE_TESTABILITY = YES; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
 		A70000000000000000000002 /* Project Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; }; name = Release; };

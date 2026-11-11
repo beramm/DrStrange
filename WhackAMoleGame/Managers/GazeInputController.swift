@@ -19,11 +19,13 @@ final class GazeInputController {
     private(set) var isPreparingCalibration = false
     private(set) var patchWearState: PatchWearState = .checking
     private(set) var oneEyeEnforcerEnabled = true
+    private(set) var isSceneTooDark = false
 
     let cameraPreview: UIView
 
     @ObservationIgnored private let tracker: GazeTracker
     @ObservationIgnored private let cameraInput: GazeCameraInputConfiguration
+    @ObservationIgnored private let ambientLight: GazeAmbientLightConfiguration
     @ObservationIgnored private var calibrationTargets: [NormalizedGazePoint] = []
     @ObservationIgnored private var targetIndex = 0
     @ObservationIgnored private var transitionPending = false
@@ -32,11 +34,18 @@ final class GazeInputController {
     @ObservationIgnored private var patchWearMonitor = PatchWearMonitor()
 
     init() {
-        let host = GazeTrackerFactory.makeTrackerWithVolatilePreview()
+        // Keep production on the native full-sensor ARKit path. ARKit cannot
+        // consume the isolated face crop, so both experimental sidecars stay
+        // disabled and cannot compete for processing time.
+        let host = GazeTrackerFactory.makeTrackerWithVolatilePreview(
+            faceIsolationEnabled: false,
+            blazeGazeEnabled: false
+        )
         tracker = host.tracker
         cameraPreview = host.preview
         cameraInput = host.cameraInput
-        cameraInput.mode = .zoomedOnePointFive
+        ambientLight = host.ambientLight
+        cameraInput.mode = .fullSensor
         sample = GazeSample(
             pointNormalized: nil,
             timestamp: MonotonicTimestamp(uptimeNanoseconds: 0),
@@ -56,7 +65,7 @@ final class GazeInputController {
     var isReadyToCalibrate: Bool {
         cameraStarted &&
             sample.setupState == .ready &&
-            selectedRightEyeIsAvailable &&
+            visibleEyeIsAvailable &&
             isPatchVerified
     }
 
@@ -68,13 +77,14 @@ final class GazeInputController {
         isCalibrated &&
             sample.trackingState == .tracking &&
             sample.setupState == .ready &&
-            selectedRightEyeIsAvailable &&
+            visibleEyeIsAvailable &&
             sample.quality.level == .usable &&
             sample.pointNormalized != nil
     }
 
-    private var selectedRightEyeIsAvailable: Bool {
-        sample.eyeAvailability == .rightOnly ||
+    private var visibleEyeIsAvailable: Bool {
+        sample.eyeAvailability == .leftOnly ||
+            sample.eyeAvailability == .rightOnly ||
             (!oneEyeEnforcerEnabled && sample.eyeAvailability == .both)
     }
 
@@ -89,15 +99,15 @@ final class GazeInputController {
 
     func startCamera() {
         guard !cameraStarted else { return }
-        cameraInput.mode = .zoomedOnePointFive
+        cameraInput.mode = .fullSensor
         Task {
             do {
                 try await tracker.start()
                 cameraStarted = true
                 updateCameraStatus()
                 status = oneEyeEnforcerEnabled
-                    ? "Centre your face 40–60 cm away and keep the right eye visible"
-                    : "Testing mode — centre your face with the right eye visible"
+                    ? "Centre your face 40–60 cm away and keep the uncovered eye visible"
+                    : "Testing mode — centre your face and keep your eyes visible"
             } catch {
                 updateCameraStatus()
                 status = "Camera start failed: \(error)"
@@ -143,6 +153,7 @@ final class GazeInputController {
         activeCalibrationTarget = nil
         patchWearMonitor.reset()
         patchWearState = oneEyeEnforcerEnabled ? .checking : .verified
+        isSceneTooDark = false
         status = "Stopped; volatile gaze and calibration data discarded"
         cameraStatus = "ARKit input stopped; camera restored to 1.0×"
     }
@@ -191,12 +202,14 @@ final class GazeInputController {
             status = switch (sample.setupState, sample.eyeAvailability, oneEyeEnforcerEnabled) {
             case (.tooClose, _, _): "Move farther from the front camera"
             case (.tooFar, _, _): "Move closer to the front camera"
-            case (.ready, .both, false), (.ready, .rightOnly, false): "Testing mode — start calibration"
+            case (.ready, .both, false): "Testing mode — start calibration"
             case (.ready, .both, true): "Put on the prescribed eye patch and keep your face still"
-            case (.ready, .rightOnly, true) where patchWearState == .verified: "One-eye check passed — start calibration"
-            case (.ready, .rightOnly, true): "Checking the patch — keep still"
-            case (.ready, .leftOnly, _): "Keep the right eye uncovered and visible"
-            case (.ready, .none, _): "Keep the right eye open and visible"
+            case (.ready, .leftOnly, true), (.ready, .rightOnly, true):
+                patchWearState == .verified
+                    ? "One-eye check passed — start calibration"
+                    : "Checking the patch — keep still"
+            case (.ready, .leftOnly, false), (.ready, .rightOnly, false): "Testing mode — start calibration"
+            case (.ready, .none, _): "Keep the uncovered eye open and visible"
             default: "Centre your face 40–60 cm from the landscape camera"
             }
         }
@@ -235,6 +248,7 @@ final class GazeInputController {
 
     private func consume(_ value: GazeSample) {
         sample = value
+        isSceneTooDark = ambientLight.state() == .tooDark
         guard oneEyeEnforcerEnabled else {
             patchWearState = .verified
             processCalibrationState()
@@ -246,8 +260,7 @@ final class GazeInputController {
         } else {
             observation = switch value.eyeAvailability {
             case .both: .bothEyes
-            case .rightOnly: .expectedEyeOnly
-            case .leftOnly: .otherEyeOnly
+            case .leftOnly, .rightOnly: .singleEye
             case .none: .unavailable
             }
         }

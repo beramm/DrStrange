@@ -98,7 +98,7 @@ struct Phase3ValidationSession {
         oneEyeEnforcementEnabled: Bool = true,
         predict: (RaySample) -> SIMD2<Double>?
     ) {
-        let selectedEyeAvailable = eyeAvailability.isSelectedRightEyeAvailable(
+        let selectedEyeAvailable = eyeAvailability.hasUsableEye(
             oneEyeEnforcementEnabled: oneEyeEnforcementEnabled
         )
         guard condition != nil, state != .idle, state != .completed, state != .failed else { return }

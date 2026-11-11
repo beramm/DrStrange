@@ -8,8 +8,7 @@ enum PatchWearState: Equatable {
 
 enum PatchEyeObservation: Equatable {
     case bothEyes
-    case expectedEyeOnly
-    case otherEyeOnly
+    case singleEye
     case unavailable
 }
 
@@ -20,7 +19,7 @@ struct PatchWearMonitor {
 
     private let verificationDuration: UInt64
     private let removalDuration: UInt64
-    private var expectedEyeSince: UInt64?
+    private var singleEyeSince: UInt64?
     private var bothEyesSince: UInt64?
     private var lastTimestamp: UInt64?
 
@@ -40,29 +39,29 @@ struct PatchWearMonitor {
         timestampNanoseconds timestamp: UInt64
     ) -> PatchWearState {
         if let lastTimestamp, timestamp < lastTimestamp {
-            expectedEyeSince = nil
+            singleEyeSince = nil
             bothEyesSince = nil
         }
         lastTimestamp = timestamp
 
         switch observation {
-        case .expectedEyeOnly:
+        case .singleEye:
             bothEyesSince = nil
             if state == .missing { state = .checking }
-            if expectedEyeSince == nil { expectedEyeSince = timestamp }
-            if elapsed(since: expectedEyeSince, at: timestamp) >= verificationDuration {
+            if singleEyeSince == nil { singleEyeSince = timestamp }
+            if elapsed(since: singleEyeSince, at: timestamp) >= verificationDuration {
                 state = .verified
             }
 
         case .bothEyes:
-            expectedEyeSince = nil
+            singleEyeSince = nil
             if bothEyesSince == nil { bothEyesSince = timestamp }
             if elapsed(since: bothEyesSince, at: timestamp) >= removalDuration {
                 state = .missing
             }
 
-        case .otherEyeOnly, .unavailable:
-            expectedEyeSince = nil
+        case .unavailable:
+            singleEyeSince = nil
             bothEyesSince = nil
         }
 
@@ -70,7 +69,7 @@ struct PatchWearMonitor {
     }
 
     mutating func reset() {
-        expectedEyeSince = nil
+        singleEyeSince = nil
         bothEyesSince = nil
         lastTimestamp = nil
         state = .checking

@@ -2,9 +2,9 @@ import Foundation
 
 /// The score earned from a confirmed gaze hit, based on distance from the character's centre.
 enum GazeProximityTier: Int, Equatable {
-    case outer = 10
-    case middle = 20
-    case inner = 30
+    case outer = 20
+    case middle = 30
+    case inner = 60
 
     var points: Int { rawValue }
 

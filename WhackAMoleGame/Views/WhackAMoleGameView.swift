@@ -45,7 +45,12 @@ struct WhackAMoleGameView: View {
         .onAppear { viewModel.start() }
         .onDisappear { viewModel.stop() }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase != .active { viewModel.pause() }
+            if newPhase == .active {
+                gazeController?.resumeForActiveScene()
+            } else {
+                viewModel.pause()
+                gazeController?.pauseForInactiveScene()
+            }
         }
         .onChange(of: gazeController?.patchWearState, initial: true) { _, state in
             respondToPatchState(state)
@@ -58,6 +63,7 @@ struct WhackAMoleGameView: View {
                 .overlayPreferenceValue(FoxAnchorKey.self) { anchors in
                     ZStack {
                         AttackAnimationView(pose: viewModel.foxPose, anchors: anchors)
+                        HitFeedbackOverlay(viewModel: viewModel, anchors: anchors)
                         if let gazeController {
                             GazeInteractionView(
                                 controller: gazeController,

@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum GazeTargetGeometry {
+    /// Expands every proximity boundary by 20% without changing the tier proportions.
+    static let radiusScale: CGFloat = 1.2
+}
+
 /// Smooths the custom-tracker point for interaction and converts a continuous one-second dwell
 /// near an active character into a proximity-scored game action.
 struct GazeInteractionView: View {
@@ -91,10 +96,11 @@ struct GazeInteractionView: View {
                 let distance = hypot(point.x - characterCenter.x, point.y - characterCenter.y)
                 // Use a circular area at least as large as the visible character, while retaining
                 // the forgiving target size of the existing hole-cell interaction.
-                let outerRadius = max(
+                let baseOuterRadius = max(
                     localCharacterRect.width / 2,
                     min(holeRect.width, holeRect.height) / 2
                 )
+                let outerRadius = baseOuterRadius * GazeTargetGeometry.radiusScale
                 let normalizedDistance = distance / max(outerRadius, 1)
                 guard normalizedDistance <= 1 else { return nil }
                 return GazeFocusCandidate(
