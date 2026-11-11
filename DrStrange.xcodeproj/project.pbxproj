@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		A1D500000000000000000105 /* DrStrangeGazeTracker in Frameworks */ = {isa = PBXBuildFile; productRef = A1D500000000000000000103 /* DrStrangeGazeTracker */; };
 		A1D500000000000000000106 /* DrStrangeGazeTracker in Frameworks */ = {isa = PBXBuildFile; productRef = A1D500000000000000000104 /* DrStrangeGazeTracker */; };
+		A1D500000000000000000108 /* DrStrangeGazeTracker in Frameworks */ = {isa = PBXBuildFile; productRef = A1D500000000000000000107 /* DrStrangeGazeTracker */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,6 +26,7 @@
 		A1D500000000000000000020 /* DrStrange.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DrStrange.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1D500000000000000000021 /* DrStrangeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DrStrangeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1D500000000000000000022 /* WhackAMoleGame.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WhackAMoleGame.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1D500000000000000000023 /* FoxPathGame.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FoxPathGame.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -42,6 +44,29 @@
 				README.md,
 			);
 			target = A1D500000000000000000012 /* WhackAMoleGame */;
+		};
+		A1D5000000000000000000E3 /* Exceptions for "FoxPathGame" folder in "DrStrange" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				App/FoxPathGameApp.swift,
+				README.md,
+			);
+			target = A1D500000000000000000010 /* DrStrange */;
+		};
+		A1D5000000000000000000E4 /* Exceptions for "FoxPathGame" folder in "FoxPathGame" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				README.md,
+			);
+			target = A1D500000000000000000013 /* FoxPathGame */;
+		};
+		A1D5000000000000000000E5 /* Exceptions for "WhackAMoleGame" folder in "FoxPathGame" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				App/WhackAMoleGameApp.swift,
+				README.md,
+			);
+			target = A1D500000000000000000013 /* FoxPathGame */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -61,8 +86,18 @@
 			exceptions = (
 				A1D5000000000000000000E1 /* Exceptions for "WhackAMoleGame" folder in "DrStrange" target */,
 				A1D5000000000000000000E2 /* Exceptions for "WhackAMoleGame" folder in "WhackAMoleGame" target */,
+				A1D5000000000000000000E5 /* Exceptions for "WhackAMoleGame" folder in "FoxPathGame" target */,
 			);
 			path = WhackAMoleGame;
+			sourceTree = "<group>";
+		};
+		A1D500000000000000000033 /* FoxPathGame */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A1D5000000000000000000E3 /* Exceptions for "FoxPathGame" folder in "DrStrange" target */,
+				A1D5000000000000000000E4 /* Exceptions for "FoxPathGame" folder in "FoxPathGame" target */,
+			);
+			path = FoxPathGame;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -91,6 +126,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1D500000000000000000043 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1D500000000000000000108 /* DrStrangeGazeTracker in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -99,6 +142,7 @@
 			children = (
 				A1D500000000000000000030 /* DrStrange */,
 				A1D500000000000000000032 /* WhackAMoleGame */,
+				A1D500000000000000000033 /* FoxPathGame */,
 				A1D500000000000000000031 /* DrStrangeTests */,
 				A1D500000000000000000003 /* Products */,
 			);
@@ -110,6 +154,7 @@
 				A1D500000000000000000020 /* DrStrange.app */,
 				A1D500000000000000000021 /* DrStrangeTests.xctest */,
 				A1D500000000000000000022 /* WhackAMoleGame.app */,
+				A1D500000000000000000023 /* FoxPathGame.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -132,6 +177,7 @@
 			fileSystemSynchronizedGroups = (
 				A1D500000000000000000030 /* DrStrange */,
 				A1D500000000000000000032 /* WhackAMoleGame */,
+				A1D500000000000000000033 /* FoxPathGame */,
 			);
 			name = DrStrange;
 			packageProductDependencies = (
@@ -185,6 +231,30 @@
 			productReference = A1D500000000000000000022 /* WhackAMoleGame.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A1D500000000000000000013 /* FoxPathGame */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1D50000000000000000006C /* Build configuration list for PBXNativeTarget "FoxPathGame" */;
+			buildPhases = (
+				A1D500000000000000000056 /* Sources */,
+				A1D500000000000000000043 /* Frameworks */,
+				A1D500000000000000000057 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A1D500000000000000000032 /* WhackAMoleGame */,
+				A1D500000000000000000033 /* FoxPathGame */,
+			);
+			name = FoxPathGame;
+			packageProductDependencies = (
+				A1D500000000000000000107 /* DrStrangeGazeTracker */,
+			);
+			productName = FoxPathGame;
+			productReference = A1D500000000000000000023 /* FoxPathGame.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -205,6 +275,9 @@
 					A1D500000000000000000012 = {
 						CreatedOnToolsVersion = 27.2;
 					};
+					A1D500000000000000000013 = {
+						CreatedOnToolsVersion = 27.2;
+					};
 				};
 			};
 			buildConfigurationList = A1D500000000000000000066 /* Build configuration list for PBXProject "DrStrange" */;
@@ -216,17 +289,18 @@
 			);
 			mainGroup = A1D500000000000000000002;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = A1D500000000000000000003 /* Products */;
 			packageReferences = (
 				A1D500000000000000000102 /* XCLocalSwiftPackageReference "GazeTracker" */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A1D500000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				A1D500000000000000000010 /* DrStrange */,
 				A1D500000000000000000011 /* DrStrangeTests */,
 				A1D500000000000000000012 /* WhackAMoleGame */,
+				A1D500000000000000000013 /* FoxPathGame */,
 			);
 		};
 /* End PBXProject section */
@@ -247,6 +321,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A1D500000000000000000055 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1D500000000000000000057 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -277,6 +358,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1D500000000000000000056 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -288,65 +376,6 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		A1D500000000000000000067 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"DEBUG=1",
-					"$(inherited)",
-				);
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_FAST_MATH = YES;
-				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-			};
-			name = Debug;
-		};
-		A1D500000000000000000068 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_NO_COMMON_BLOCKS = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				SDKROOT = iphoneos;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
 		A1D500000000000000000061 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -439,6 +468,65 @@
 			};
 			name = Release;
 		};
+		A1D500000000000000000067 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A1D500000000000000000068 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		A1D50000000000000000006A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -497,6 +585,64 @@
 			};
 			name = Release;
 		};
+		A1D50000000000000000006D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = FoxPathAppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = FoxPathAccent;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Follow the Fox";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Follow the Fox uses the front camera for its custom on-device gaze tracker.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.drstrange.foxpath;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		A1D50000000000000000006E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = FoxPathAppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = FoxPathAccent;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Follow the Fox";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Follow the Fox uses the front camera for its custom on-device gaze tracker.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.drstrange.foxpath;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -536,6 +682,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A1D50000000000000000006C /* Build configuration list for PBXNativeTarget "FoxPathGame" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1D50000000000000000006D /* Debug */,
+				A1D50000000000000000006E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -552,6 +707,11 @@
 			productName = DrStrangeGazeTracker;
 		};
 		A1D500000000000000000104 /* DrStrangeGazeTracker */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1D500000000000000000102 /* XCLocalSwiftPackageReference "GazeTracker" */;
+			productName = DrStrangeGazeTracker;
+		};
+		A1D500000000000000000107 /* DrStrangeGazeTracker */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A1D500000000000000000102 /* XCLocalSwiftPackageReference "GazeTracker" */;
 			productName = DrStrangeGazeTracker;

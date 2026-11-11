@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Minimal game list. The Lobby feature can replace this and push `GameHomeView`.
+/// Minimal game list. The Lobby feature can replace this and push each game's home view.
 struct HomeView: View {
     var body: some View {
         NavigationStack {
@@ -12,26 +12,22 @@ struct HomeView: View {
                 NavigationLink {
                     GameHomeView()
                 } label: {
-                    HStack(spacing: 24) {
-                        Image(FoxCharacterView.assetName(1))
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 140, height: 140)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Whack-a-Mole")
-                                .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                            Text("Tap the friends with a star")
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.title.weight(.bold))
-                    }
-                    .foregroundStyle(WhackAMolePalette.ink)
-                    .padding(28)
-                    .frame(maxWidth: 640)
-                    .background(RoundedRectangle(cornerRadius: 32).fill(WhackAMolePalette.cream))
+                    GameCard(
+                        imageName: FoxCharacterView.assetName(1),
+                        title: "Whack-a-Mole",
+                        subtitle: "Tap the friends with a star"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    FoxPathHomeView()
+                } label: {
+                    GameCard(
+                        imageName: FoxWalkAnimation.standingAsset,
+                        title: "Follow the Fox",
+                        subtitle: "Keep your eyes on the fox all the way home"
+                    )
                 }
                 .buttonStyle(.plain)
 
@@ -45,5 +41,34 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(WhackAMolePalette.meadow.ignoresSafeArea())
         }
+    }
+}
+
+private struct GameCard: View {
+    let imageName: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: 24) {
+            Image(imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 140, height: 140)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title)
+                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
+                Text(subtitle)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.title.weight(.bold))
+        }
+        .foregroundStyle(WhackAMolePalette.ink)
+        .padding(28)
+        .frame(maxWidth: 640)
+        .background(RoundedRectangle(cornerRadius: 32).fill(WhackAMolePalette.cream))
     }
 }
