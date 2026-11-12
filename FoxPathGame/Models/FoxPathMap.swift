@@ -37,8 +37,13 @@ enum FoxPathMetrics {
     static let pathRows = 2...6
     /// Map units for one pixel of the source art (tiles are 576 px wide).
     static let unitsPerArtPixel = cellSize.width / 576
-    /// The fox starts and stops this far inside the first and last tile.
+    /// The fox starts this far inside the first tile.
     static let routeInset: CGFloat = 70
+    /// The fox stops this far before the right edge, in front of the middle of the finish stall.
+    static let routeEndInset: CGFloat = 150
+    /// Tiles at the right end of the path that are always straight, so the finish stall fits
+    /// above them without standing on a bend.
+    static let finalStraightColumns = 3
 
     static func rect(of cell: GridCell) -> CGRect {
         CGRect(
@@ -92,13 +97,13 @@ enum MapSpriteKind: String, CaseIterable {
     case mushroomHouseFront, mushroomHouseBack
     case onionHouseFront, onionHouseBack
     case lamp
-    case finishFlag
+    case finishStall
     case steppingStone
     case grassTuft1, grassTuft2
     case soilSpeck
 
-    /// Asset in the `FoxPath` namespace. The finish flag is drawn in code.
-    var assetName: String? {
+    /// Asset in the `FoxPath` namespace.
+    var assetName: String {
         switch self {
         case .carrotHouseFront: "FoxPath/HouseCarrotFront"
         case .carrotHouseBack: "FoxPath/HouseCarrotBack"
@@ -107,7 +112,7 @@ enum MapSpriteKind: String, CaseIterable {
         case .onionHouseFront: "FoxPath/HouseOnionFront"
         case .onionHouseBack: "FoxPath/HouseOnionBack"
         case .lamp: "FoxPath/Lamp"
-        case .finishFlag: nil
+        case .finishStall: "FoxPath/FinishStall"
         case .steppingStone: "FoxPath/SteppingStone"
         case .grassTuft1: "FoxPath/GrassTuft1"
         case .grassTuft2: "FoxPath/GrassTuft2"
@@ -122,7 +127,7 @@ enum MapSpriteKind: String, CaseIterable {
         case .mushroomHouseFront, .mushroomHouseBack: CGSize(width: 322, height: 273)
         case .onionHouseFront, .onionHouseBack: CGSize(width: 259, height: 291)
         case .lamp: CGSize(width: 37, height: 192)
-        case .finishFlag: CGSize(width: 64, height: 150)
+        case .finishStall: CGSize(width: 300, height: 250)
         case .steppingStone: CGSize(width: 85, height: 28)
         case .grassTuft1: CGSize(width: 16.5, height: 22)
         case .grassTuft2: CGSize(width: 16, height: 17.5)
@@ -144,7 +149,8 @@ enum MapSpriteKind: String, CaseIterable {
         case .carrotHouseFront, .carrotHouseBack: 0.15...0.89
         case .mushroomHouseFront, .mushroomHouseBack: 0.23...0.86
         case .onionHouseFront, .onionHouseBack: 0.18...0.81
-        case .lamp, .finishFlag: 0.2...0.8
+        case .lamp: 0.2...0.8
+        case .finishStall: 0.04...0.95
         default: 0...1
         }
     }
@@ -202,9 +208,10 @@ struct FoxPathMap: Equatable {
     let grassPatches: [GrassPatch]
     /// Flat details that lie on the grass: stepping stones, tufts and soil specks.
     let groundSprites: [MapSprite]
-    /// Things that stand up and can overlap the fox: houses, lamps and the finish flag.
+    /// Things that stand up and can overlap the fox: houses, lamps and the finish stall.
     let standingSprites: [MapSprite]
 
     var size: CGSize { FoxPathMetrics.mapSize }
     var houses: [MapSprite] { standingSprites.filter(\.kind.isHouse) }
+    var lamps: [MapSprite] { standingSprites.filter { $0.kind == .lamp } }
 }

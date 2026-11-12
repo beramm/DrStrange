@@ -16,7 +16,7 @@ final class FoxPathGameViewModel {
 
     /// Upper bound on one frame step, so a hitch cannot make the fox jump.
     private static let maxFrameStep = 0.1
-    /// Seconds the fox stands at the flag before the result shows.
+    /// Seconds the fox stands at the stall before the result shows.
     private static let finishPause = 1.4
     /// Time constant that takes the jitter out of pointer readings without adding visible lag.
     private static let pointerSmoothing = 0.08
@@ -121,7 +121,7 @@ final class FoxPathGameViewModel {
         phase = .playing
     }
 
-    /// Ends the walk before the flag (exit button, or a rest break when the child has
+    /// Ends the walk before the stall (exit button, or a rest break when the child has
     /// discomfort, a headache or tired eyes) and shows the summary.
     func finishEarly() {
         guard result == nil else { return }

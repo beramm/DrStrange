@@ -1,7 +1,7 @@
 # Follow the Fox (smooth pursuit game)
 
 A calm, child-friendly iPad game. A fox walks along a winding path through a small village, and the
-child keeps their eyes on it all the way to the flag. If the child looks away for too long, the fox
+child keeps their eyes on it all the way to the veggie stall. If the child looks away for too long, the fox
 stops and waits, a gentle warning shows where to look, and the walk goes on once the child has
 found the fox again.
 
@@ -54,7 +54,8 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
    - a dashed ring breathes around the fox, a "!" bubble bobs above it, and a hint tells the child
      to look at the fox again
    - the ring fills while the child looks at the fox, and the fox walks on when it is full
-5. **Finish.** The fox reaches the flag at the right end of the path and the result screen shows.
+5. **Finish.** The fox reaches the veggie stall at the right end of the path, stops in front of its
+   counter, and the result screen shows.
 
 The warning never flashes: it fades in and moves slowly. With **Reduce Motion** switched on, the
 ring, the bubble and the vignette stay still.
@@ -125,9 +126,12 @@ Every game draws a new map from a fresh seed (`FoxPathGenerator.makeMap(seed:set
 - **Path.** It runs from the left edge to the right edge of a 12 × 9 grid and only goes right, up
   or down, never back. The length of each straight stretch and the height of each turn are drawn
   from the level's ranges, and the path stays in the middle rows so houses fit above and below it.
+  The last three tiles are always straight so the finish stall fits above them.
 - **Houses.** Carrot, mushroom and onion houses are shuffled and placed along the path. A house
   above the path shows its front with the door, and stepping stones lead from the door towards the
   path. A house below the path shows its back and may be partly cut by the bottom edge.
+- **Finish stall.** The veggie stall stands just above the end of the path, near the right edge,
+  and the fox stops in front of the middle of its counter.
 - **Lamps, grass tufts, soil specks and grass patches** are scattered around the path.
 - **Clearance.** Nothing stands on the path, and nothing that is drawn in front of the fox may
   cover it anywhere along the route.
@@ -197,16 +201,19 @@ transparency kept.
 - **The Path** (`Tiles/`, `Decorations/`): horizontal, vertical and curved path tiles (the curve is
   rotated and mirrored for all four corners), grass patches, the lamp, stepping stones, grass tufts
   and soil specks.
-- **Drawn in code:** the finish flag, the warning overlay, the focus ring and the HUD.
+- **Finish stall** (`Decorations/FinishStall`): the "Veggies" market stall, supplied as a separate
+  file (`FINISH.png`).
+- **Drawn in code:** the warning overlay, the focus ring and the HUD.
 - **Missing:** dedicated sound effects (built-in system sounds stand in), optional background
   music, and an app icon.
 
 ## Testing
 
-- `DrStrangeTests` adds 21 unit tests for this game:
+- `DrStrangeTests` adds 22 unit tests for this game:
   - `FoxPathGeneratorTests`: seed reproducibility and variety, the path only goes right, up or
     down and never crosses itself, the route stays on the path tiles, scenery never stands on the
-    path or covers the fox, houses do not overlap, every map has houses, lamps and one flag, every
+    path or covers the fox, houses do not overlap, every map has houses, lamps and one finish
+    stall, the stall stands on the map behind the end of the route, every
     picture exists in the asset catalog, and the walk cycle follows the distance walked
   - `FoxPathEngineTests`: nothing counts before the first look at the fox, the start dwell, walking
     speed, a short look away is forgiven, a long one stops the fox once, a glance does not refocus,

@@ -33,7 +33,9 @@ final class FoxPathGeneratorTests: XCTestCase {
                 XCTAssertEqual(cells.first?.cell.column, 0)
                 XCTAssertEqual(cells.last?.cell.column, FoxPathMetrics.columns - 1)
                 XCTAssertEqual(cells.first?.tile, .horizontal)
-                XCTAssertEqual(cells.last?.tile, .horizontal)
+                for cell in cells.suffix(FoxPathMetrics.finalStraightColumns) {
+                    XCTAssertEqual(cell.tile, .horizontal, "seed \(seed): the last tiles are straight")
+                }
                 XCTAssertEqual(Set(cells.map(\.cell)).count, cells.count, "the path never crosses itself")
 
                 for cell in cells {
@@ -55,7 +57,7 @@ final class FoxPathGeneratorTests: XCTestCase {
             let map = FoxPathGenerator.makeMap(seed: seed, settings: settings(.advanced))
             let route = map.route
             XCTAssertEqual(route.points.first?.x ?? 0, FoxPathMetrics.routeInset, accuracy: 0.01)
-            XCTAssertEqual(route.points.last?.x ?? 0, map.size.width - FoxPathMetrics.routeInset, accuracy: 0.01)
+            XCTAssertEqual(route.points.last?.x ?? 0, map.size.width - FoxPathMetrics.routeEndInset, accuracy: 0.01)
             for (previous, next) in zip(route.points, route.points.dropFirst()) {
                 XCTAssertGreaterThanOrEqual(next.x, previous.x - 0.001, "the fox never walks left")
             }
@@ -81,7 +83,7 @@ final class FoxPathGeneratorTests: XCTestCase {
             for seed in seeds {
                 let map = FoxPathGenerator.makeMap(seed: seed, settings: settings(level))
                 let pathPoints = FoxPathGenerator.pathLine(for: map.route).samples(spacing: 6)
-                for sprite in map.standingSprites where sprite.kind != .finishFlag {
+                for sprite in map.standingSprites {
                     XCTAssertTrue(
                         FoxPathGenerator.isClear(sprite, of: pathPoints),
                         "seed \(seed) \(level): \(sprite.kind) at \(sprite.frame)"
@@ -97,7 +99,23 @@ final class FoxPathGeneratorTests: XCTestCase {
                 let map = FoxPathGenerator.makeMap(seed: seed, settings: settings(level))
                 XCTAssertGreaterThanOrEqual(map.houses.count, 2, "seed \(seed) \(level)")
                 XCTAssertGreaterThanOrEqual(map.standingSprites.filter { $0.kind == .lamp }.count, 2, "seed \(seed) \(level)")
-                XCTAssertEqual(map.standingSprites.filter { $0.kind == .finishFlag }.count, 1)
+                XCTAssertEqual(map.standingSprites.filter { $0.kind == .finishStall }.count, 1)
+            }
+        }
+    }
+
+    func testFinishStallStandsOnTheMapBehindTheEndOfTheRoute() {
+        for level in DifficultyLevel.allCases {
+            for seed in seeds {
+                let map = FoxPathGenerator.makeMap(seed: seed, settings: settings(level))
+                guard let stall = map.standingSprites.first(where: { $0.kind == .finishStall }),
+                      let end = map.route.points.last else {
+                    return XCTFail("seed \(seed) \(level): no stall")
+                }
+                XCTAssertTrue(CGRect(origin: .zero, size: map.size).contains(stall.frame), "seed \(seed) \(level): \(stall.frame)")
+                XCTAssertLessThan(stall.baseline, end.y, "the fox stands in front of the stall")
+                XCTAssertGreaterThan(end.x, stall.frame.minX + stall.frame.width / 3)
+                XCTAssertLessThan(end.x, stall.frame.maxX - stall.frame.width / 3)
             }
         }
     }
@@ -114,7 +132,7 @@ final class FoxPathGeneratorTests: XCTestCase {
     }
 
     func testEveryPictureIsInTheAssetCatalog() {
-        var names = MapSpriteKind.allCases.compactMap(\.assetName)
+        var names = MapSpriteKind.allCases.map(\.assetName)
         names += ["FoxPath/PathHorizontal", "FoxPath/PathVertical", "FoxPath/PathCurve", "FoxPath/GrassPatch1", "FoxPath/GrassPatch2"]
         names += stride(from: CGFloat(0), to: FoxWalkAnimation.sideCycleLength, by: 1).map {
             FoxWalkAnimation.assetName(facing: .side, distance: $0)

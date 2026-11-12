@@ -7,17 +7,21 @@ import Foundation
 /// The same seed and settings always give the same map. Scenery is placed so that nothing
 /// stands on the path and nothing is ever drawn over the fox.
 enum FoxPathGenerator {
-    /// Fewer houses than this and the generator tries again with a derived seed.
+    /// Fewer houses or lamps than this and the generator tries again with a derived seed.
     private static let wantedHouses = 3
+    private static let wantedLamps = 3
     private static let maximumAttempts = 8
 
     static func makeMap(seed: UInt64, settings: FoxPathSettings) -> FoxPathMap {
         var best: FoxPathMap?
+        func score(_ map: FoxPathMap) -> Int {
+            min(map.houses.count, wantedHouses) * 10 + min(map.lamps.count, wantedLamps)
+        }
         for attempt in 0..<maximumAttempts {
             var generator = SeededGenerator(seed: seed &+ UInt64(attempt) &* 0xD6E8_FEB8_6659_FD93)
             let map = makeMap(seed: seed, settings: settings, using: &generator)
-            if map.houses.count >= wantedHouses { return map }
-            if map.houses.count > (best?.houses.count ?? -1) { best = map }
+            if map.houses.count >= wantedHouses, map.lamps.count >= wantedLamps { return map }
+            if score(map) > best.map(score) ?? -1 { best = map }
         }
         return best!
     }
@@ -30,7 +34,7 @@ enum FoxPathGenerator {
         let pathCells = makePath(settings: settings, using: &generator)
         let route = makeRoute(for: pathCells)
         var scenery = SceneryBuilder(route: route, generator: generator)
-        scenery.placeFinishFlag()
+        scenery.placeFinishStall()
         scenery.placeHouses()
         scenery.placeLamps()
         let grassPatches = scenery.makeGrassPatches(avoiding: Set(pathCells.map(\.cell)))
@@ -49,7 +53,7 @@ enum FoxPathGenerator {
     // MARK: - Path
 
     /// A staircase from column 0 to the last column that only ever goes right, up or down,
-    /// like the provided reference maps. The first and last tiles are always straight.
+    /// like the provided reference maps. The first tile and the last few tiles are always straight.
     static func makePath(settings: FoxPathSettings, using generator: inout SeededGenerator) -> [PathCell] {
         let columns = FoxPathMetrics.columns
         let rows = FoxPathMetrics.pathRows
@@ -58,8 +62,9 @@ enum FoxPathGenerator {
         var cells: [PathCell] = []
 
         for column in 0..<columns {
-            // The last column stays straight so the path leaves through the right edge.
-            if straightLeft > 0 || column >= columns - 1 {
+            // The last columns stay straight so the path leaves through the right edge and the
+            // finish stall has room above it.
+            if straightLeft > 0 || column >= columns - FoxPathMetrics.finalStraightColumns {
                 cells.append(PathCell(cell: GridCell(column: column, row: row), tile: .horizontal))
                 straightLeft -= 1
                 continue
@@ -103,10 +108,11 @@ enum FoxPathGenerator {
             let rect = FoxPathMetrics.rect(of: pathCell.cell)
             switch pathCell.tile {
             case .horizontal:
+                // The fox stops in front of the stall, which can be a tile or two before the edge.
+                let stopX = FoxPathMetrics.mapSize.width - FoxPathMetrics.routeEndInset
                 let startX = rect.minX + (index == 0 ? FoxPathMetrics.routeInset : 0)
-                let endX = rect.maxX - (index == cells.count - 1 ? FoxPathMetrics.routeInset : 0)
-                append(CGPoint(x: startX, y: rect.midY))
-                append(CGPoint(x: endX, y: rect.midY))
+                append(CGPoint(x: min(startX, stopX), y: rect.midY))
+                append(CGPoint(x: min(rect.maxX, stopX), y: rect.midY))
             case .vertical:
                 let goesDown = index > 0 && cells[index - 1].cell.row < pathCell.cell.row
                 append(CGPoint(x: rect.midX, y: goesDown ? rect.minY : rect.maxY))
@@ -201,19 +207,20 @@ private struct SceneryBuilder {
         standing.contains { $0.frame.intersects(rect) }
     }
 
-    // MARK: Finish flag
+    // MARK: Finish stall
 
-    /// The flag stands just behind the end of the route, so the fox stops in front of it.
-    mutating func placeFinishFlag() {
+    /// The veggie stall stands just behind the end of the route, so the fox stops in front of
+    /// its counter.
+    mutating func placeFinishStall() {
         let end = route.points[route.points.count - 1]
-        let size = MapSpriteKind.finishFlag.size
+        let size = MapSpriteKind.finishStall.size
         let frame = CGRect(
-            x: end.x + 4,
-            y: end.y - pathHalfWidth - 10 - size.height,
+            x: min(end.x - size.width / 2, mapSize.width - size.width),
+            y: end.y - pathHalfWidth - 8 - size.height,
             width: size.width,
             height: size.height
         )
-        standing.append(makeSprite(.finishFlag, frame: frame))
+        standing.append(makeSprite(.finishStall, frame: frame))
     }
 
     // MARK: Houses

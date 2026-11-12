@@ -62,7 +62,7 @@ struct FoxPathHomeView: View {
                 .frame(height: 210)
                 .accessibilityHidden(true)
 
-            Text("Keep your eyes on the fox all the way to the flag")
+            Text("Keep your eyes on the fox all the way to the veggie stall")
                 .font(.system(.title2, design: .rounded).weight(.bold))
                 .foregroundStyle(FoxPathPalette.ink)
                 .multilineTextAlignment(.center)

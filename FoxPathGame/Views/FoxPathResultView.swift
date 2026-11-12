@@ -34,7 +34,7 @@ struct FoxPathResultView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(result.reachedEnd ? "You made it!" : "Time to rest!")
                     .font(.system(size: 56, weight: .heavy, design: .rounded))
-                Text(result.reachedEnd ? "The fox got to the flag with your help." : "Resting your eyes was a good choice.")
+                Text(result.reachedEnd ? "The fox got to the veggie stall with your help." : "Resting your eyes was a good choice.")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.secondary)
                 if result.reachedEnd {

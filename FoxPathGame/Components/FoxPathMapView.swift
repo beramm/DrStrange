@@ -103,7 +103,7 @@ private struct FoxPathGroundView: View, Equatable {
     }
 }
 
-/// Houses, lamps, the finish flag and the fox, drawn back to front by where they touch the
+/// Houses, lamps, the finish stall and the fox, drawn back to front by where they touch the
 /// ground so the fox walks in front of things behind the path.
 private struct FoxPathStandingView: View {
     let sprites: [MapSprite]
@@ -125,17 +125,11 @@ private struct MapSpriteView: View {
     let sprite: MapSprite
 
     var body: some View {
-        Group {
-            if let assetName = sprite.kind.assetName {
-                Image(assetName)
-                    .resizable()
-                    .scaleEffect(x: sprite.isMirrored ? -1 : 1, y: 1)
-            } else {
-                FinishFlagView()
-            }
-        }
-        .frame(width: sprite.frame.width, height: sprite.frame.height)
-        .position(x: sprite.frame.midX, y: sprite.frame.midY)
+        Image(sprite.kind.assetName)
+            .resizable()
+            .scaleEffect(x: sprite.isMirrored ? -1 : 1, y: 1)
+            .frame(width: sprite.frame.width, height: sprite.frame.height)
+            .position(x: sprite.frame.midX, y: sprite.frame.midY)
     }
 }
 
@@ -148,41 +142,5 @@ struct FoxSpriteView: View {
             .resizable()
             .frame(width: frame.width, height: frame.height)
             .position(x: frame.midX, y: frame.midY)
-    }
-}
-
-/// Checkered flag on a white pole that marks the end of the path. Drawn in code because no
-/// flag art was provided.
-private struct FinishFlagView: View {
-    var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let poleWidth = size.width * 0.12
-            ZStack(alignment: .topLeading) {
-                Capsule()
-                    .fill(.white)
-                    .frame(width: poleWidth, height: size.height)
-                    .offset(x: size.width * 0.14)
-                Canvas { context, canvasSize in
-                    let columns = 4
-                    let rows = 3
-                    let cell = CGSize(width: canvasSize.width / CGFloat(columns), height: canvasSize.height / CGFloat(rows))
-                    context.fill(Path(CGRect(origin: .zero, size: canvasSize)), with: .color(.white))
-                    for row in 0..<rows {
-                        for column in 0..<columns where (row + column).isMultiple(of: 2) {
-                            let rect = CGRect(x: CGFloat(column) * cell.width, y: CGFloat(row) * cell.height, width: cell.width, height: cell.height)
-                            context.fill(Path(rect), with: .color(FoxPathPalette.ink))
-                        }
-                    }
-                }
-                .frame(width: size.width * 0.72, height: size.height * 0.34)
-                .clipShape(RoundedRectangle(cornerRadius: 3))
-                .offset(x: size.width * 0.14 + poleWidth, y: size.height * 0.04)
-                Ellipse()
-                    .fill(.black.opacity(0.18))
-                    .frame(width: size.width * 0.4, height: size.height * 0.05)
-                    .offset(x: 0, y: size.height * 0.975)
-            }
-        }
     }
 }

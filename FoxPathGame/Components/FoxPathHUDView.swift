@@ -41,7 +41,7 @@ struct FoxPathHUDView: View {
     }
 }
 
-/// How much of the path is behind the fox, with the finish flag at the end of the bar.
+/// How much of the path is behind the fox, with the finish stall at the end of the bar.
 private struct PathProgressView: View {
     let progress: Double
     let ink: Color
@@ -58,7 +58,7 @@ private struct PathProgressView: View {
                 }
             }
             .frame(height: 18)
-            Image(systemName: "flag.checkered")
+            Image(systemName: "storefront")
                 .font(.title2.weight(.bold))
                 .foregroundStyle(ink)
         }

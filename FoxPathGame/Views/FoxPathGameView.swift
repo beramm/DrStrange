@@ -14,7 +14,7 @@ enum FoxPathInput {
 }
 
 /// Full-screen gameplay. Shows the result screen in place when the walk ends, whether the fox
-/// reached the flag or the game was stopped early.
+/// reached the stall or the game was stopped early.
 struct FoxPathGameView: View {
     /// Seconds without a gaze sample before the pointer counts as lost.
     private static let gazeTimeout: TimeInterval = 0.5
