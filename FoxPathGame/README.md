@@ -73,7 +73,8 @@ to recalibrate.
 
 ### Comfort and stopping
 
-- **Pause** freezes the game clock. Leaving the app pauses automatically.
+- **Pause** freezes the game clock. Leaving the app pauses the game and the gaze camera
+  automatically; the camera starts again on return and the game waits for **Resume**.
 - The pause screen has **Rest my eyes**, which ends the game straight away and shows the result.
   It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
 - **✕** asks "Stop the game?" first.

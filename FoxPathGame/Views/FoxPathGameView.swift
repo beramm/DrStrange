@@ -59,7 +59,14 @@ struct FoxPathGameView: View {
         .onAppear { viewModel.start() }
         .onDisappear { viewModel.stop() }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase != .active { viewModel.pause() }
+            // Leaving the app pauses the game and the camera too, so no gaze is tracked in the
+            // background. The game stays paused until the child taps Resume.
+            if newPhase == .active {
+                if case let .gaze(controller) = input { controller.resumeForActiveScene() }
+            } else {
+                viewModel.pause()
+                if case let .gaze(controller) = input { controller.pauseForInactiveScene() }
+            }
         }
     }
 
