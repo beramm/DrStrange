@@ -1,0 +1,98 @@
+# Risks and Decisions
+
+Status: living planning record
+Last updated: 2026-11-03
+
+## Risk register
+
+| ID | Risk | Impact | Early mitigation / evidence needed |
+| --- | --- | --- | --- |
+| R1 | Target iPad does not expose stable eye transforms | Architecture blocked | Run capability spike on the exact model before production design |
+| R2 | Calibrated accuracy is inadequate near edges/corners | Game misinterprets gaze | Validate on held-out targets; compare target size to measured error |
+| R3 | Head movement causes calibration drift | Frequent false gaze points | Include head pose/distance features; define allowed setup; detect invalid calibration |
+| R4 | Amblyopia, strabismus, or an eye patch changes behavior from internal testing | Target users cannot calibrate or results are biased | Confirm eye-use requirements; test ethically with representative users after internal protocol stabilizes |
+| R5 | Glasses, lighting, blink, or occlusion create dropouts | Poor availability | Publish quality/state; reject invalid data; test representative conditions |
+| R6 | Smoothing improves appearance but adds harmful latency | Game feels slow or measures the wrong time | Measure accuracy and latency together; tune against numeric limits |
+| R7 | UI and tracker use different coordinate spaces/orientations | Systematic offset or mirrored points | Freeze coordinate convention and add known-point integration tests |
+| R8 | Calibration flow is built independently by both teams | Integration churn | Use the handshake in the module-boundary document and assign ownership |
+| R9 | Facial/gaze data is accidentally retained despite gameplay-only scope | Privacy/compliance failure | On-device, in-memory processing; persist only non-identifying aggregates; inspect logs, analytics, crash reports, caches, and backups for camera/gaze leakage |
+| R10 | Prototype performance is mistaken for clinical validity | Unsafe or misleading product claim | Separate engineering validation from clinical validation and regulatory review |
+| R11 | Thermal load or camera interruption degrades long sessions | Late-session failures | Run duration, backgrounding, interruption, and thermal tests |
+| R12 | Simulator-led development hides device-only behavior | Schedule delay | Treat physical target hardware as required equipment from day one |
+| R13 | The selected Swift Package boundary does not match the eventual native host integration | Rework at integration time | Preserve the framework-neutral contract/platform split and verify the final production integration during the handoff phase |
+| R14 | Teams edit each other's folders without a stable contract | Merge conflicts and tight coupling | Keep tracker work in `GazeTracker/`; agree on a public integration boundary first |
+| R15 | One-eye patching reduces or biases ARKit eye estimates | Missed/false hits for the intended users | Make patched-eye testing a Phase 1 gate on the target iPad; compare patch sides if variable |
+| R16 | A 1-second dwell completes during low-confidence tracking | False mole hit | Reset dwell immediately whenever tracking becomes limited/lost |
+| R17 | Launch-time calibration drifts during play | Cursor and hit area diverge | Run calibration-reuse experiment and invalidate on material geometry/user changes |
+| R18 | Immediate dwell reset is too strict for natural gaze jitter in young children | Frequent missed hits | Keep reset semantics but size the hit area/margin from measured cursor error; validate with representative users |
+| R19 | Unsupervised child cannot correct distance, lighting, or face-position problems | Session cannot start or silently performs poorly | Gate calibration/dwell and show simple visual closer/farther/environment guidance |
+| R20 | Mole hit radius is too small or too generous | Repeated missed hits or hits that do not feel earned | Select the smallest circular radius meeting measured missed/undeserved-hit thresholds on target hardware/users |
+| R21 | ARKit blink coefficients report a covered eye as open | Public eye availability is false during the intended patched session | Do not treat blink coefficients as occlusion evidence; verify with a real patch, then validate either a volatile-memory occlusion detector or an explicitly declared-and-verified patch-side setup contract |
+| R22 | Selected-eye absolute gaze radius changes across immediate validations using one calibration | A calibration-derived hit radius may under-cover later gaze even while direction remains correct | Measure consecutive held-out validations per eye; reject reuse or require renewed product acceptance for a conservative envelope; do not treat one best run as stable |
+
+## Decision log
+
+| Date | Decision | Status | Rationale / condition |
+| --- | --- | --- | --- |
+| 2026-11-02 | Keep current work at planning/documentation only | Accepted | Requested explicitly; no tracker source code will be added yet |
+| 2026-11-02 | Prefer an ARKit capability spike as the first technical experiment | Proposed | First-party eye/head observations offer the shortest evidence path; quality must be tested on the confirmed iPad Air (M2) |
+| 2026-11-02 | Never persist or transmit camera frames or gaze samples | Accepted | Gameplay needs only live, on-device tracking; sample-level logs, analytics, crash reports, caches, uploads, and backups are prohibited |
+| 2026-11-02 | Use normalized top-left screen coordinates in the conceptual contract | Proposed | Engine-neutral; final viewport definition needs UI-team agreement |
+| 2026-11-02 | Do not treat iPadOS accessibility Eye Tracking as a readable gaze API | Proposed | No applicable public developer API has been identified |
+| 2026-11-02 | Keep gaze-team artifacts under `GazeTracker/` | Accepted | Matches the repository separation introduced by the project owner |
+| 2026-11-02 | Do not create a code scaffold until the runtime is confirmed | Satisfied | Native Swift/iPadOS is now confirmed; scaffolding still waits for the capability-spike and module phase |
+| 2026-11-02 | Model a mole hit as a game event, not a synthetic touch injected by the tracker | Accepted | Tracker supplies gaze/state; game logic owns hit testing, intentional dwell, score, and feedback |
+| 2026-11-02 | Use native Swift/iPadOS on a mounted 13-inch iPad Air (M2) in landscape | Accepted | Confirmed target stack, hardware, and setup |
+| 2026-11-02 | Register a mole hit after 1 second of valid continuous gaze dwell | Accepted | Any target exit or invalid tracking resets dwell immediately |
+| 2026-11-02 | Show a visible gaze cursor | Accepted | Confirmed player feedback requirement |
+| 2026-11-02 | Present one mole at a time and keep it active until hit | Accepted | Confirmed spawn/lifetime rule; mole size remains open |
+| 2026-11-02 | Target children aged 5–7 playing with one eye patched | Accepted | Confirmed intended player condition; requires representative validation and consent planning |
+| 2026-11-02 | Use gaze for gameplay only | Accepted | No assessment or clinical measurement purpose is currently in scope |
+| 2026-11-02 | Aim for one calibration per app launch | Proposed | Acceptable UX target; reuse duration and invalidation triggers must be proven |
+| 2026-11-02 | Use iPadOS 17 as the minimum deployment target | Accepted | Covers the 2024 M2 iPad Air generation while using the actual installed OS for physical testing |
+| 2026-11-02 | Use a provisional 45 cm nominal distance and 40–60 cm valid band | Proposed | Apple recommends about 18 inches for camera-based iPad eye control; exact band requires target-device validation |
+| 2026-11-02 | Provide live closer/farther guidance and disable calibration/dwell outside the valid setup band | Accepted | Supports mounted, unsupervised use and prevents known-bad samples from becoming hits |
+| 2026-11-02 | Reset the 1-second dwell immediately on target exit or invalid tracking | Accepted | Confirmed interaction rule; hit-area tolerance must absorb measured tracker jitter |
+| 2026-11-02 | Support variable patch side, glasses, and reasonable lighting variation | Accepted | Confirmed target conditions; patch-side changes invalidate calibration |
+| 2026-11-02 | Do not persist camera frames or gaze samples | Accepted | Gameplay does not require stored gaze data |
+| 2026-11-02 | Treat `Slicing/` as the UI/game team's area | Accepted | Confirmed repository ownership boundary |
+| 2026-11-02 | Use a circular gaze hit area centered on each mole | Accepted | Simple distance-based hit testing; invisible hit radius can exceed visible artwork radius to tolerate measured gaze error |
+| 2026-11-02 | Derive the final hit-radius margin from validation data | Accepted | Exact radius remains open until physical-device cursor error and child gameplay behavior are measured |
+| 2026-11-02 | Limit gaze-team implementation to tracker technology under `GazeTracker/` | Accepted | UI, mole, dwell, hit, scoring, animation, prompts, and all `Slicing/` source belong to the UI/game team |
+| 2026-11-02 | Report radial gaze error instead of selecting the mole hit radius | Accepted | Gaze team supplies evidence; UI/game team owns geometry and gameplay tuning |
+| 2026-11-02 | Use the provisional numeric performance targets in `04-validation-plan.md` | Accepted | Phase 0 needs measurable pass/fail criteria; physical-device evidence may support a documented change-control decision but cannot silently relax them |
+| 2026-11-02 | Limit live public output to normalized gaze point, monotonic timestamp, confidence/quality, tracking state, setup/distance state, calibration state, and eye availability | Accepted | Keeps face geometry, framework types, diagnostics, gaze history, duplicate coordinates, sequence IDs, and game logic out of the cross-team contract |
+| 2026-11-02 | Use the drafted camera explanation and mandatory face-data privacy controls in `01-discovery-and-requirements.md` | Accepted for engineering; final copy approval pending | Locks on-device ephemeral processing and no persistence/transmission; product/privacy owns final distribution review |
+| 2026-11-02 | Move distance-band proof, mount variability, calibration reuse, and drift to Phase 1 | Accepted | These require evidence from the physical target iPad and should not block the Phase 0 requirements lock |
+| 2026-11-02 | Mark Phase 0 complete and make Phase 1 the next permitted phase | Accepted | Architecture-blocking requirements now have provisional answers, owners, numeric targets, privacy rules, and an output allowlist |
+| 2026-11-03 | Reject the ARKit-only calibrated mapping as the production route | Accepted | On the exact 13-inch iPad Air (M2), three disposable mappings all failed nominal held-out accuracy; the best reached 5.796° median and 7.632° p90 versus 2.0°/4.0° targets, while head-compensated v3 regressed to 10.004°/13.707° |
+| 2026-11-03 | Use a Vision pupil/eye-landmark probe as the next fallback experiment | Accepted for next Phase 1 session | Phase 2 remains blocked. The fallback must use the same target device, volatile-memory processing, aggregate-only retention, public-output allowlist, and Phase 0 thresholds; if it fails nominal accuracy or patching, escalate external hardware versus explicit requirement revision |
+| 2026-11-03 | Preserve ARKit as a future reconsideration option | Accepted | ARKit is a no-go under the current accuracy targets, not a permanent platform ban. Its heuristic capability score is 55/100 overall and about 35/100 for current production readiness: support, rate, availability, latency, and calibration were strong, while core accuracy failed and the robustness matrix was stopped. Reconsider only with a materially better mapping method, new relevant ARKit/device capability, explicitly revised evidence-based accuracy requirements, or a product use case tolerant of the measured error; rerun the full exact-device Phase 1 gate before selection. |
+| 2026-11-03 | Reject the Vision pupil/eye-landmark fallback under the current production targets | Accepted | On the exact target iPad, the nominal run improved over ARKit but still failed at 2.672° median / 5.012° p90 accuracy, 1.750° median / 7.988° p90 precision, and 61.130 ms p90 latency. The broader matrix was stopped under the pre-recorded nominal-failure rule. |
+| 2026-11-03 | Escalate built-in-camera feasibility to external hardware versus explicit requirement revision | Decision required | Both authorized built-in-camera candidates failed Phase 1. Phase 2 remains blocked; do not start custom ML or silently weaken thresholds. Any selected route must return to Phase 1 and pass on the exact device/setup before production architecture. |
+| 2026-11-03 | Reconsider ARKit under a revised interaction-fit requirement | Accepted for Phase 1 validation | Product accepts that exact point accuracy is not the sole goal and proposes a UI-owned adaptive radius from held-out calibration error. Restore the best v2 `lookAtPoint` quadratic, compare 40/45 cm, and test both patch sides. This does not retroactively pass the old accuracy gate or authorize Phase 2. |
+| 2026-11-03 | Keep therapeutic claims outside the tracker decision | Accepted | Patching/gameplay engagement may motivate the interaction, but tracker-observed eye movement is not proof of treatment efficacy. Clinical claims require separate clinical validation and approval. |
+| 2026-11-03 | Consider an on-device Core ML sidecar for patch presence/side | Decision required | Technically feasible from volatile ARKit camera frames and preferable to misusing blink coefficients as occlusion evidence. Implementation requires explicit reversal/change control of the earlier no-custom-ML fallback, a lawful representative dataset, privacy review, and target-device accuracy/performance validation. |
+| 2026-11-03 | Test an ARKit mapping using only the declared uncovered eye before adding custom ML | Accepted for Phase 1 experiment | ARKit exposes separate eye transforms, while `lookAtPoint` abstracts over both. Exploratory exact-device runs retained 100% directional agreement and reduced p90 radius to 4.726 cm for the selected right eye and 2.695 cm for the selected left eye. Patch presence was not verified; real-patch repeats and the remaining matrix are still required. |
+| 2026-11-03 | Make original point accuracy/precision diagnostic for the revised directional interaction | Accepted by product | Reliable eye-driven direction plus a calibration-specific UI-owned radius is the selected product requirement. The original ≤2° median accuracy and ≤2° p90 precision results remain reported and are not relabeled as passes, but no longer reject ARKit by themselves. Current exploratory selected-eye radii of 4.726 cm/right and 2.695 cm/left are accepted for continued Phase 1 testing. |
+| 2026-11-03 | Reopen selected-left adaptive-radius acceptance after immediate reuse test | Required by evidence | The same calibration produced 5.267 cm then 7.726 cm p90 radius across consecutive validations, while direction remained 100%. The earlier 2.695 cm result is not a stable universal envelope; absolute-radius reuse needs more evidence or a revised product decision. |
+| 2026-11-03 | Reject 15 calibration positions as a repeatability fix | Accepted from Phase 1 evidence | A 15-position selected-left calibration completed in 26.766 s but consecutive validations produced 7.317 cm and 10.213 cm p90 radii. Direction/availability/rate/latency remained strong, so insufficient point count is not the root cause. Return to the smaller 9-position harness and stop calibration-count tuning. |
+| 2026-11-03 | Make real-patch repeats, representative glasses, bright/dim lighting, the 40–60 cm setup matrix, and representative-session drift/reuse non-blocking backlog | Accepted by product | Missing evidence is not relabeled as a pass and no support claim may be made for those conditions. Phase 1 may pass after directional/performance evidence reconciliation, radius acceptance, privacy confirmation, and the final recommendation are complete. Resolve the deferred conditions before claiming production support for them. |
+| 2026-11-03 | Unconditionally invalidate calibration after remount/orientation/camera-position change | Accepted by product | Calibration survival across a remount is not supported and therefore does not need a Phase 1 survival test. Production code must discard the mapping and require recalibration after these triggers. |
+| 2026-11-03 | Select selected-right ARKit and pass the revised Phase 1 capability gate | Accepted by product | Use nine-position calibration plus distinct held-out validation; accept only a finite calibration-specific p90 radius ≤8.0 cm, otherwise recalibrate. Face loss/repositioning and setup changes invalidate calibration. Intermittent p90 latency misses up to 56.374 ms remain an explicit Phase 2 risk; no production or therapeutic claim is implied. |
+| 2026-11-03 | Treat the supplied Apple Eye Tracking recording as effective-interaction evidence, not raw-gaze evidence | Accepted | The 88.43-second iPhone portrait recording visibly shows face guidance, a five-second countdown, an observed 13-target automatic calibration, semantic focus, snapping, and dwell. These are reference ideas for our own tracker; the recording does not expose coordinates or prove exact-iPad, patched-eye, child-user, or clinical performance. |
+| 2026-11-03 | Use iPadOS accessibility Eye Tracking as an activation-only production route | Rejected by product | DrStrange must build and use its own tracker. Apple system Eye Tracking is reference material only and does not replace the custom continuous gaze contract. |
+| 2026-11-03 | Insert a system-activation spike before custom Phase 3 | Superseded before implementation | The documentation-only hypothesis was rejected before code was written. Custom Phase 3 remains the next phase. |
+| 2026-11-03 | Continue the selected-right ARKit geometric mapping plan as the primary route | Accepted by product | Implement fixation-gated robust calibration and 3D eye-ray/screen-plane mapping without repeating rejected point-count or arbitrary head-pose experiments. |
+| 2026-11-03 | Replace the historical 8.0 cm threshold with a stricter custom Phase 3 gate | Accepted by product | Phase 3 requires p90 radial error ≤4.0 cm in both consecutive same-calibration held-out validations and the modest-head-movement validation. The stretch objective is 2–3 cm. Smoothing, snapping, restricted spawning, and hit-radius expansion do not count as tracker improvement. |
+
+## Decisions waiting on the team
+
+| Decision | Owner | Needed before |
+| --- | --- | --- |
+| ~~Swift package/framework/app-local module placement~~ | Resolved: production-oriented custom boundary is a Swift Package with a separate platform adapter | Completed in Phase 2 |
+| How patch side is identified in the UX | Product/UI | Calibration flow |
+| Final validated viewing-distance and lighting bands | Engineering | Phase 1/validation |
+| Final camera-permission and privacy-copy approval | Product/privacy owner | External distribution; engineering requirements and draft copy are already locked |
+| Product/UI acceptance if later real-patch or representative-user radius is materially different from the current calibration-specific envelopes | Product/UI owners | Production support claim for patched/representative users; non-blocking for Phase 2 under the accepted deferral |
+| Whether eye availability must be sensed or may be a declared, independently verified patch-side setup value | Product/engineering/privacy | Production patch-support completion; non-blocking for Phase 2 under the accepted deferral |

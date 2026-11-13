@@ -1,17 +1,26 @@
 //
 //  FixationGameView.swift
-//  Veggie Keeper (fixation game) prototype: guard the vegetable stall.
-//  Styled like the Whack-a-Mole game (meadow background, top bar, pause and end screens).
+//  Veggie Keeper (fixation game): guard the vegetable stall.
+//  The picture comes from MarketSceneView; the top bar, pause and end screens
+//  are styled like the Whack-a-Mole game.
 //
-//  For now a finger on the screen stands in for the eye tracker:
-//  holding = watching the stall, lifting = looking away, so a thief comes.
+//  "Watching the stall" comes from one of two inputs:
+//  - Eye control: the gaze tracker's point is on the stall (after calibration).
+//  - Finger (testing only, e.g. in the simulator): a finger is held on the screen.
+//  Looking away (or lifting the finger) lets a thief come and take a veggie.
 //
 
+import DrStrangeGazeTracker
 import SwiftUI
 
 struct FixationGameView: View {
+    /// The gaze tracker, already calibrated. nil = finger mode.
+    let gaze: GazeInputController?
+    /// Back to the start screen.
+    let onExit: () -> Void
+
     private enum Phase: Equatable {
-        case waiting                          // before the first hold
+        case waiting                          // before the child first watches the stall
         case playing
         case paused
         case finished(stoppedEarly: Bool)
@@ -28,16 +37,41 @@ struct FixationGameView: View {
     private let guardSeconds: Double = 30
     /// How long the thief needs to take one veggie.
     private let thiefSeconds: Double = 2
+    /// Extra space around the stall that still counts as "looking at it".
+    /// The tracker is accurate to roughly 1–1.5°, so the edge needs some slack.
+    private let gazeMargin: CGFloat = 60
+    /// Show where the tracker thinks the eye is looking (helpful while testing).
+    private let showsGazeDot = true
 
-    /// True while the child is guarding the stall.
-    /// TODO: replace the finger with the real gaze check from the gaze tracker.
-    @GestureState private var isWatching = false
+    /// Finger mode: true while a finger is on the screen.
+    @GestureState private var fingerIsDown = false
+    /// Eye-control mode: true while the gaze point is on the stall.
+    @State private var gazeIsOnStall = false
+    /// Steadies the gaze point; the dot and the stall check both use its point.
+    @State private var smoother = GazeSmoother()
+    /// The stall's position on screen, used to check the gaze point.
+    @State private var stallFrame: CGRect = .zero
+    /// The full screen size, used to turn the 0–1 gaze point into screen points.
+    @State private var screenSize: CGSize = .zero
 
     @State private var phase = Phase.waiting
     @State private var veggiesLeft = 3
     @State private var guardedSeconds: Double = 0
     @State private var thiefIsHere = false
     @Environment(\.scenePhase) private var scenePhase
+
+    private var usesGaze: Bool { gaze != nil }
+
+    /// True while the child is guarding the stall.
+    private var isWatching: Bool {
+        usesGaze ? gazeIsOnStall : fingerIsDown
+    }
+
+    /// The fox sleeps while nobody watches the stall (also before the game starts).
+    /// On the pause screen it stays awake.
+    private var foxIsAwake: Bool {
+        (phase == .waiting || phase == .playing) ? isWatching : true
+    }
 
     private var secondsLeft: Int {
         Int((guardSeconds - guardedSeconds).rounded(.up))
@@ -50,7 +84,8 @@ struct FixationGameView: View {
                     veggiesSaved: veggiesLeft,
                     totalVeggies: totalVeggies,
                     stoppedEarly: stoppedEarly,
-                    onPlayAgain: restart
+                    onPlayAgain: restart,
+                    onDone: onExit
                 )
                 .transition(.opacity)
             } else {
@@ -60,13 +95,22 @@ struct FixationGameView: View {
         .animation(.easeInOut(duration: 0.3), value: phase)
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
-        // Runs again each time the finger goes down or up, or the phase changes.
+        // Runs again each time "watching" changes or the phase changes.
         .task(id: GameState(isWatching: isWatching, phase: phase)) {
             await updateGame()
         }
-        // Pause when the app goes to the background.
+        // Check every new gaze sample against the stall.
+        .onChange(of: gaze?.sample.timestamp) { _, _ in
+            updateGazeOnStall()
+        }
+        // Pause the game (and the camera) when the app goes to the background.
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase != .active && phase == .playing { phase = .paused }
+            if newPhase == .active {
+                gaze?.resumeForActiveScene()
+            } else {
+                gaze?.pauseForInactiveScene()
+                if phase == .playing { phase = .paused }
+            }
         }
     }
 
@@ -74,28 +118,37 @@ struct FixationGameView: View {
 
     private var gameplay: some View {
         ZStack {
-            GameBackground()
+            MarketSceneView(
+                veggiesLeft: veggiesLeft,
+                foxIsAwake: foxIsAwake,
+                thiefIsHere: thiefIsHere,
+                molesCanAppear: phase == .playing,
+                onStallFrameChange: { stallFrame = $0 }
+            )
+            // The full screen, to place the gaze point.
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { screenSize = $0 }
 
-            // Invisible layer that fills the screen and feels the finger.
-            Color.clear
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .updating($isWatching) { _, state, _ in state = true }
-                )
-
-            VStack(spacing: 0) {
-                topBar
-                Spacer()
-                VeggieStallView(veggiesLeft: veggiesLeft, thiefIsHere: thiefIsHere)
-                    .allowsHitTesting(false)
-                Spacer()
+            // Finger mode only: an invisible layer that fills the screen and feels the finger.
+            if !usesGaze {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .updating($fingerIsDown) { _, state, _ in state = true }
+                    )
             }
+
+            topBar
+                .frame(maxHeight: .infinity, alignment: .top)
 
             prompt
                 .frame(maxHeight: .infinity, alignment: .top)
                 .padding(.top, 96)
                 .allowsHitTesting(false)
+
+            if let gaze {
+                gazeOverlay(gaze)
+            }
 
             if phase == .paused {
                 PauseOverlay(
@@ -127,12 +180,11 @@ struct FixationGameView: View {
         .padding(.vertical, 12)
     }
 
-    /// Reminder to hold the screen: before the game starts, and whenever the finger is lifted.
+    /// Reminder to watch the stall: before the game starts, and whenever the child looks away.
     @ViewBuilder
     private var prompt: some View {
         if phase == .waiting || (phase == .playing && !isWatching) {
-            Label(phase == .waiting ? "Hold the screen to guard the stall" : "Keep holding!",
-                  systemImage: "hand.point.up.left.fill")
+            Label(promptText, systemImage: usesGaze ? "eye.fill" : "hand.point.up.left.fill")
                 .font(.system(.title, design: .rounded).weight(.heavy))
                 .foregroundStyle(Color.ink)
                 .padding(.horizontal, 28)
@@ -142,11 +194,69 @@ struct FixationGameView: View {
         }
     }
 
+    private var promptText: LocalizedStringKey {
+        switch (usesGaze, phase == .waiting) {
+        case (true, true):   "Look at the stall to guard it"
+        case (true, false):  "Look at the stall!"
+        case (false, true):  "Hold the screen to guard the stall"
+        case (false, false): "Keep holding!"
+        }
+    }
+
+    /// The gaze dot (while testing) and a warning when eye control is lost.
+    private func gazeOverlay(_ gaze: GazeInputController) -> some View {
+        ZStack {
+            if showsGazeDot, gaze.hasUsableGaze, let point = smoother.point {
+                Circle()
+                    .strokeBorder(.white, lineWidth: 3)
+                    .background(Circle().fill(Color.accent.opacity(0.65)))
+                    .frame(width: 30, height: 30)
+                    .position(point)
+                    .shadow(radius: 3)
+            }
+
+            if !gaze.isCalibrated {
+                Text("Eye control needs recalibration")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(.black.opacity(0.75), in: Capsule())
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 18)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    // MARK: - Gaze
+
+    /// The gaze point in screen points. The tracker gives 0–1 values across the screen:
+    /// (0, 0) is the top-left corner and (1, 1) the bottom-right.
+    private func gazePoint(_ gaze: GazeInputController) -> CGPoint? {
+        guard let point = gaze.sample.pointNormalized else { return nil }
+        return CGPoint(x: point.x * screenSize.width, y: point.y * screenSize.height)
+    }
+
+    /// Is the eye looking at the stall right now? Lost tracking counts as looking away.
+    private func updateGazeOnStall() {
+        guard let gaze, gaze.hasUsableGaze, let rawPoint = gazePoint(gaze) else {
+            smoother.reset()
+            gazeIsOnStall = false
+            return
+        }
+        smoother.add(rawPoint)
+        guard let point = smoother.point else { return }
+        gazeIsOnStall = stallFrame.insetBy(dx: -gazeMargin, dy: -gazeMargin).contains(point)
+    }
+
     // MARK: - Game logic
 
-    /// Finger down: the guard time fills up until the stall is safe.
-    /// Finger up: the thief comes and takes a veggie every few seconds.
-    /// Sleeping throws when the finger or the phase changes, which stops this run.
+    /// Watching: the guard time fills up until the stall is safe.
+    /// Looking away: the thief comes and takes a veggie every few seconds.
+    /// Sleeping throws when "watching" or the phase changes, which stops this run.
     private func updateGame() async {
         thiefIsHere = false
 
@@ -173,7 +283,7 @@ struct FixationGameView: View {
                 phase = .finished(stoppedEarly: false)
             }
         } catch {
-            // The finger changed or the game was paused; this run stops here.
+            // "Watching" changed or the game was paused; this run stops here.
         }
     }
 
@@ -185,6 +295,6 @@ struct FixationGameView: View {
     }
 }
 
-#Preview("Fixation game", traits: .landscapeLeft) {
-    FixationGameView()
+#Preview("Fixation game (finger)", traits: .landscapeLeft) {
+    FixationGameView(gaze: nil, onExit: {})
 }

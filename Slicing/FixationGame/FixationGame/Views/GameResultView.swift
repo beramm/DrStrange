@@ -13,6 +13,8 @@ struct GameResultView: View {
     /// True when the child stopped early to rest (pause → Rest my eyes, or ✕).
     let stoppedEarly: Bool
     let onPlayAgain: () -> Void
+    /// Back to the start screen (also turns the camera off).
+    let onDone: () -> Void
 
     var body: some View {
         ZStack {
@@ -39,14 +41,26 @@ struct GameResultView: View {
                     .foregroundStyle(Color.ink)
                 }
 
-                Button(action: onPlayAgain) {
-                    Label("Play again", systemImage: "arrow.clockwise")
-                        .font(.system(size: 32, weight: .heavy, design: .rounded))
-                        .frame(minWidth: 280, minHeight: 80)
+                // Same pair of buttons as the Whack-a-Mole end screen.
+                HStack(spacing: 20) {
+                    Button(action: onDone) {
+                        Label("Done", systemImage: "house.fill")
+                            .font(.system(size: 28, weight: .heavy, design: .rounded))
+                            .frame(minWidth: 200, minHeight: 80)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.accent)
+                    .clipShape(Capsule())
+
+                    Button(action: onPlayAgain) {
+                        Label("Play again", systemImage: "arrow.clockwise")
+                            .font(.system(size: 32, weight: .heavy, design: .rounded))
+                            .frame(minWidth: 280, minHeight: 80)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.accent)
+                    .clipShape(Capsule())
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.accent)
-                .clipShape(Capsule())
             }
             .padding(40)
         }
@@ -69,5 +83,5 @@ struct GameResultView: View {
 }
 
 #Preview(traits: .landscapeLeft) {
-    GameResultView(veggiesSaved: 2, totalVeggies: 3, stoppedEarly: false, onPlayAgain: {})
+    GameResultView(veggiesSaved: 2, totalVeggies: 3, stoppedEarly: false, onPlayAgain: {}, onDone: {})
 }
