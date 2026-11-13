@@ -12,6 +12,8 @@ enum ParameterProvenance: String, Codable {
 }
 
 /// Game difficulty. This is a gameplay setting only and must not be read as therapeutic intensity.
+/// Whack-a-Mole has a single board setup and does not use levels; the type is shared with other
+/// games that offer a level choice.
 enum DifficultyLevel: Int, CaseIterable, Codable, Identifiable, Comparable {
     case beginner = 1
     case intermediate = 2
@@ -33,7 +35,7 @@ enum DifficultyLevel: Int, CaseIterable, Codable, Identifiable, Comparable {
     static func < (lhs: DifficultyLevel, rhs: DifficultyLevel) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
-/// Per-level gameplay parameters. All values are `.gameDesign` placeholders unless noted.
+/// How the board plays. All values are `.gameDesign` placeholders.
 struct DifficultySettings: Codable, Equatable {
     /// Zones of the board (a hidden 3 x 3 grid, 0 = top-left, 8 = bottom-right) where holes may open.
     /// No hole is shown until a mole is about to appear, at a random spot inside its zone.
@@ -50,50 +52,62 @@ struct DifficultySettings: Codable, Equatable {
     var visibleDurationJitter: Double
     /// Maximum characters up at the same time. Kept low to avoid overwhelming the child.
     var maxSimultaneousTargets: Int
-    /// How many of the available character looks are mixed in at this level.
+    /// How many of the available character looks are mixed in.
     var characterVariantCount: Int
     /// Chance that a spawn is a sleeping mole (decoy) that should be left alone (no penalty if tapped).
     var decoyProbability: Double
 
-    static func defaults(for level: DifficultyLevel) -> DifficultySettings {
-        switch level {
-        case .beginner:
-            DifficultySettings(
-                activeHoleIndices: [3, 4, 5],
-                boardSpread: 0.75,
-                targetScale: 0.95,
-                spawnIntervalRange: 2.6...3.6,
-                visibleDuration: 3.2,
-                visibleDurationJitter: 0.1,
-                maxSimultaneousTargets: 1,
-                characterVariantCount: 1,
-                decoyProbability: 0
-            )
-        case .intermediate:
-            DifficultySettings(
-                activeHoleIndices: [0, 1, 2, 3, 4, 5],
-                boardSpread: 0.9,
-                targetScale: 0.8,
-                spawnIntervalRange: 1.9...2.9,
-                visibleDuration: 2.6,
-                visibleDurationJitter: 0.1,
-                maxSimultaneousTargets: 2,
-                characterVariantCount: 3,
-                decoyProbability: 0
-            )
-        case .advanced:
-            DifficultySettings(
-                activeHoleIndices: Array(0..<9),
-                boardSpread: 1,
-                targetScale: 0.68,
-                spawnIntervalRange: 1.5...2.5,
-                visibleDuration: 2.2,
-                visibleDurationJitter: 0.15,
-                maxSimultaneousTargets: 2,
-                characterVariantCount: 4,
-                decoyProbability: 0.25
-            )
+    /// The one board every game uses: holes open in two rows of zones, at most two moles up at a
+    /// time, three character looks and no sleeping moles.
+    static let standard = DifficultySettings(
+        activeHoleIndices: [0, 1, 2, 3, 4, 5],
+        boardSpread: 0.9,
+        targetScale: 0.8,
+        spawnIntervalRange: 1.9...2.9,
+        visibleDuration: 2.6,
+        visibleDurationJitter: 0.1,
+        maxSimultaneousTargets: 2,
+        characterVariantCount: 3,
+        decoyProbability: 0
+    )
+}
+
+/// How fast a hit was, from the moment the character starts to rise until it is tapped (or
+/// selected by gaze). A gameplay rating only; it is not a measure of vision or reaction time.
+enum HitRating: String, Codable, CaseIterable, Identifiable {
+    case perfect
+    case great
+    case good
+
+    var id: String { rawValue }
+
+    var points: Int {
+        switch self {
+        case .perfect: 30
+        case .great: 20
+        case .good: 10
         }
+    }
+
+    var title: String {
+        switch self {
+        case .perfect: "Perfect"
+        case .great: "Great"
+        case .good: "Good"
+        }
+    }
+}
+
+/// Response-time limits for each rating. `.gameDesign` placeholders, chosen so a gaze selection
+/// (the mole climbing out for 0.55 s plus a 0.6 s dwell) can still earn Perfect.
+struct ScoringRules: Codable, Equatable {
+    var perfectWithin: TimeInterval = 1.4
+    var greatWithin: TimeInterval = 2.0
+
+    func rating(forResponseTime responseTime: TimeInterval) -> HitRating {
+        if responseTime <= perfectWithin { return .perfect }
+        if responseTime <= greatWithin { return .great }
+        return .good
     }
 }
 
@@ -123,25 +137,14 @@ struct SpawnRules: Codable, Equatable {
     var exitAnimationDuration: Double = 0.45
 }
 
-/// Performance-based level changes. Thresholds are `.gameDesign` placeholders.
-struct AdaptiveDifficultyRules: Codable, Equatable {
-    var isEnabled: Bool = true
-    /// Number of recent real targets used to compute accuracy.
-    var evaluationWindow: Int = 10
-    /// Move up a level when recent accuracy is at or above this.
-    var promoteAccuracy: Double = 0.85
-    /// Move down a level when recent accuracy is at or below this.
-    var demoteAccuracy: Double = 0.5
-}
-
-/// Everything needed to start one Whack-a-Mole session.
+/// Everything needed to start one Whack-a-Mole game.
 struct GameConfiguration: Codable, Equatable {
-    var startingLevel: DifficultyLevel = .beginner
-    /// Length of one game session in seconds, entered by a parent or caregiver to match the play
-    /// time the child's eye doctor advised (`.caregiverEntered`). The default only makes the game
-    /// playable out of the box; it is not a recommendation.
-    var sessionDuration: TimeInterval = 120
-    var adaptiveDifficulty = AdaptiveDifficultyRules()
+    /// Every game lasts 2 minutes of play (pauses excluded). This is the length of one round,
+    /// a gameplay choice. It is not a recommended patching or play time.
+    static let sessionDuration: TimeInterval = 120
+
+    var board = DifficultySettings.standard
+    var scoring = ScoringRules()
     var spawnRules = SpawnRules()
     var foxAttack = FoxAttackTiming()
     var patching = PatchingConfiguration()
@@ -149,25 +152,17 @@ struct GameConfiguration: Codable, Equatable {
     var hapticsEnabled: Bool = true
     /// Fixed seed for reproducible sessions (research / QA). `nil` picks a fresh seed each session.
     var randomSeed: UInt64?
-
-    func settings(for level: DifficultyLevel) -> DifficultySettings {
-        DifficultySettings.defaults(for: level)
-    }
-
-    static let sessionDurationProvenance = ParameterProvenance.caregiverEntered
-    /// Allowed session lengths in minutes for the caregiver stepper.
-    static let sessionMinutesRange = 1...60
 }
 
 extension GameConfiguration {
     /// Missing keys fall back to defaults, so settings saved by an older version of the game
-    /// (for example before `foxAttack` existed) still load instead of being reset.
+    /// (for example before `foxAttack` existed) still load instead of being reset. Keys from
+    /// older versions (level, session length, adaptive difficulty) are ignored.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = GameConfiguration()
-        startingLevel = try container.decodeIfPresent(DifficultyLevel.self, forKey: .startingLevel) ?? defaults.startingLevel
-        sessionDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .sessionDuration) ?? defaults.sessionDuration
-        adaptiveDifficulty = try container.decodeIfPresent(AdaptiveDifficultyRules.self, forKey: .adaptiveDifficulty) ?? defaults.adaptiveDifficulty
+        board = (try? container.decodeIfPresent(DifficultySettings.self, forKey: .board)) ?? defaults.board
+        scoring = (try? container.decodeIfPresent(ScoringRules.self, forKey: .scoring)) ?? defaults.scoring
         spawnRules = (try? container.decodeIfPresent(SpawnRules.self, forKey: .spawnRules)) ?? defaults.spawnRules
         // Timing saved by an older version has different fields; fall back to the defaults.
         foxAttack = (try? container.decodeIfPresent(FoxAttackTiming.self, forKey: .foxAttack)) ?? defaults.foxAttack

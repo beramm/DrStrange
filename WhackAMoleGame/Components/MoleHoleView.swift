@@ -36,9 +36,9 @@ struct MoleHoleView: View {
                         .id(target.id)
                 }
 
-                if let visual, let progress = visual.hitProgress {
+                if let visual, let progress = visual.hitProgress, let rating = target?.rating {
                     let mole = Self.characterRect(artIndex: hole.artIndex, in: proxy.size)
-                    HitFeedbackView(progress: progress)
+                    HitFeedbackView(progress: progress, rating: rating)
                         .frame(width: mole.width, height: mole.height)
                         .position(x: mole.midX, y: mole.midY)
                         .allowsHitTesting(false)

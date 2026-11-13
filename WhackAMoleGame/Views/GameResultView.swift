@@ -4,6 +4,9 @@ import SwiftUI
 struct GameResultView: View {
     let session: GameSessionRecord
     let score: Int
+    /// Best score on this device before this game.
+    let previousHighScore: Int
+    let isNewHighScore: Bool
     let onPlayAgain: () -> Void
     let onDone: () -> Void
 
@@ -38,12 +41,30 @@ struct GameResultView: View {
                 Text(encouragement)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Label("\(score)", systemImage: "star.fill")
-                    .font(.system(size: 44, weight: .heavy, design: .rounded))
-                    .foregroundStyle(WhackAMolePalette.accent)
-                    .accessibilityLabel("Score \(score)")
+                HStack(spacing: 20) {
+                    Label("\(score)", systemImage: "star.fill")
+                        .font(.system(size: 44, weight: .heavy, design: .rounded))
+                        .foregroundStyle(WhackAMolePalette.accent)
+                        .accessibilityLabel("Score \(score)")
+                    highScoreBadge
+                }
             }
             .foregroundStyle(WhackAMolePalette.ink)
+        }
+    }
+
+    @ViewBuilder
+    private var highScoreBadge: some View {
+        if isNewHighScore {
+            Label("New high score!", systemImage: "trophy.fill")
+                .font(.title2.weight(.heavy))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(Capsule().fill(WhackAMolePalette.star))
+        } else if previousHighScore > 0 {
+            Label("High score \(previousHighScore)", systemImage: "trophy")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -63,24 +84,18 @@ struct GameResultView: View {
 
     private var metrics: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
-            MetricTile(title: "Characters", value: "\(session.targetsSpawned)")
-            MetricTile(title: "Hits", value: "\(session.hits)")
+            ForEach(HitRating.allCases) { rating in
+                MetricTile(title: "\(rating.title) (+\(rating.points))", value: "\(session.count(of: rating))")
+            }
             MetricTile(title: "Missed", value: "\(session.misses)")
+            MetricTile(title: "Characters", value: "\(session.targetsSpawned)")
             MetricTile(title: "Accuracy", value: session.accuracy.map { $0.formatted(.percent.precision(.fractionLength(0))) } ?? "–")
             MetricTile(title: "Avg. response", value: session.averageResponseTime.map { String(format: "%.2f s", $0) } ?? "–")
             MetricTile(title: "Play time", value: SessionProgressView.format(Int(session.activePlayDuration.rounded())))
-            MetricTile(title: "Level", value: levelText)
-            MetricTile(title: "Session length", value: SessionProgressView.format(Int(session.configuration.sessionDuration)))
             if session.decoysShown > 0 {
                 MetricTile(title: "Sleepy left alone", value: "\(session.decoysShown - session.decoyTaps) / \(session.decoysShown)")
             }
         }
-    }
-
-    private var levelText: String {
-        let start = session.configuration.startingLevel.rawValue
-        let end = session.finalLevel.rawValue
-        return start == end ? "\(end)" : "\(start) → \(end)"
     }
 
     /// Patching details for the caregiver's records. Shown only as entered; never inferred.

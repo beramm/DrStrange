@@ -30,6 +30,8 @@ struct WhackAMoleGameView: View {
                 GameResultView(
                     session: session,
                     score: viewModel.score,
+                    previousHighScore: viewModel.highScore,
+                    isNewHighScore: viewModel.isNewHighScore,
                     onPlayAgain: restart,
                     onDone: onClose
                 )
@@ -123,12 +125,7 @@ struct WhackAMoleGameView: View {
                 onRest: { viewModel.finishEarly(reason: .restBreak) }
             )
         default:
-            if let level = viewModel.levelBanner {
-                LevelBanner(level: level)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 96)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
+            EmptyView()
         }
     }
 
@@ -183,18 +180,5 @@ private struct PauseOverlay: View {
             .padding(48)
             .background(RoundedRectangle(cornerRadius: 36).fill(WhackAMolePalette.cream))
         }
-    }
-}
-
-private struct LevelBanner: View {
-    let level: DifficultyLevel
-
-    var body: some View {
-        Label("Level \(level.rawValue)", systemImage: "sparkles")
-            .font(.system(.title, design: .rounded).weight(.heavy))
-            .foregroundStyle(WhackAMolePalette.ink)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 14)
-            .background(Capsule().fill(.white.opacity(0.85)))
     }
 }

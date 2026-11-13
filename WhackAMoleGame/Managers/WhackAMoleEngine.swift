@@ -2,7 +2,7 @@ import Foundation
 
 enum EngineEvent: Equatable {
     case spawned(ActiveTarget)
-    case hit(ActiveTarget, responseTime: TimeInterval)
+    case hit(ActiveTarget, responseTime: TimeInterval, rating: HitRating)
     case missed(ActiveTarget)
     case decoyTapped(ActiveTarget)
     /// The fox leaves its window towards the tapped character.
@@ -11,7 +11,6 @@ enum EngineEvent: Equatable {
     case attackImpact(ActiveTarget)
     /// The fox is back in its window.
     case attackFinished
-    case levelChanged(from: DifficultyLevel, to: DifficultyLevel)
     case finished
 }
 
@@ -23,7 +22,6 @@ struct WhackAMoleEngine {
     private(set) var targets: [ActiveTarget] = []
     private(set) var session: GameSessionRecord
     private(set) var spawnManager: SpawnManager
-    private var progression: DifficultyProgression
     private var nextSpawnAt: TimeInterval
     private var nextTargetID = 0
     /// The attack in progress. While set, no new character spawns and further taps are ignored.
@@ -57,11 +55,10 @@ struct WhackAMoleEngine {
         }
     }
 
-    var level: DifficultyLevel { progression.level }
     var settings: DifficultySettings { spawnManager.settings }
     private(set) var isFinished = false
-    var remainingTime: TimeInterval { max(configuration.sessionDuration - clock, 0) }
-    var progress: Double { min(clock / max(configuration.sessionDuration, 1), 1) }
+    var remainingTime: TimeInterval { max(GameConfiguration.sessionDuration - clock, 0) }
+    var progress: Double { min(clock / GameConfiguration.sessionDuration, 1) }
 
     /// Phase and progress of the current attack, if any.
     var attackState: (phase: FoxAttackPhase, progress: Double)? {
@@ -118,12 +115,7 @@ struct WhackAMoleEngine {
         var recordedConfiguration = configuration
         recordedConfiguration.randomSeed = seed
         self.session = GameSessionRecord(configuration: recordedConfiguration, startedAt: startedAt)
-        self.spawnManager = SpawnManager(
-            settings: configuration.settings(for: configuration.startingLevel),
-            rules: configuration.spawnRules,
-            seed: seed
-        )
-        self.progression = DifficultyProgression(rules: configuration.adaptiveDifficulty, startingLevel: configuration.startingLevel)
+        self.spawnManager = SpawnManager(settings: configuration.board, rules: configuration.spawnRules, seed: seed)
         self.nextSpawnAt = configuration.spawnRules.leadInDelay
     }
 
@@ -139,7 +131,7 @@ struct WhackAMoleEngine {
         removeFinishedAnimations()
         advanceHoles(into: &events)
 
-        if clock >= configuration.sessionDuration {
+        if clock >= GameConfiguration.sessionDuration {
             finish(reason: .timeUp, now: now)
             events.append(.finished)
             return events
@@ -163,8 +155,9 @@ struct WhackAMoleEngine {
 
     /// Tap on a hole.
     ///
-    /// - An awake character starts the fox's attack on that character. The hit (and response
-    ///   time) is recorded at the tap; the character reacts when the hammer lands.
+    /// - An awake character starts the fox's attack on that character. The hit, its response
+    ///   time and its rating are recorded at the tap; the character reacts and the points are
+    ///   shown when the hammer lands.
     /// - A sleeping mole (decoy) reacts by itself; the fox does not attack it.
     /// - Taps on empty holes are counted but never penalised.
     /// - While an attack is running, every tap is ignored, so rapid or repeated taps can never
@@ -180,14 +173,14 @@ struct WhackAMoleEngine {
 
         switch target.role {
         case .target:
+            let responseTime = clock - target.spawnedAt
+            let rating = configuration.scoring.rating(forResponseTime: responseTime)
             targets[index].phase = .targeted
+            targets[index].rating = rating
             let artIndex = holes.first { $0.request.holeIndex == target.holeIndex }?.request.artIndex ?? 0
             attack = FoxAttack(targetID: target.id, holeIndex: target.holeIndex, artIndex: artIndex, startedAt: clock)
-            let responseTime = clock - target.spawnedAt
             record(target, outcome: .hit(responseTime: responseTime))
-            var events: [EngineEvent] = [.hit(target, responseTime: responseTime), .attackStarted(targets[index])]
-            if let change = recordProgression(hit: true) { events.append(change) }
-            return events
+            return [.hit(targets[index], responseTime: responseTime, rating: rating), .attackStarted(targets[index])]
         case .decoy:
             targets[index].phase = .hit(at: clock)
             record(target, outcome: .decoyTapped)
@@ -226,7 +219,7 @@ struct WhackAMoleEngine {
         }
     }
 
-    /// Opens a new hole at a random spot, if the level allows another mole. Its mole follows once
+    /// Opens a new hole at a random spot, if the board allows another mole. Its mole follows once
     /// the hole is open.
     private mutating func openHole() -> Bool {
         let molesOnTheWay = holes.filter { !$0.moleArrived }.count
@@ -275,7 +268,6 @@ struct WhackAMoleEngine {
             holeIndex: target.holeIndex,
             variant: target.variant,
             role: target.role,
-            level: level,
             spawnedAt: clock,
             position: request.position
         ))
@@ -290,7 +282,6 @@ struct WhackAMoleEngine {
             case .target:
                 record(target, outcome: .missed)
                 events.append(.missed(target))
-                if let change = recordProgression(hit: false) { events.append(change) }
             case .decoy:
                 record(target, outcome: .decoyIgnored)
             }
@@ -318,15 +309,6 @@ struct WhackAMoleEngine {
         session.trials[index].outcome = outcome
     }
 
-    private mutating func recordProgression(hit: Bool) -> EngineEvent? {
-        let previous = progression.level
-        guard let newLevel = progression.record(hit: hit) else { return nil }
-        spawnManager.update(settings: configuration.settings(for: newLevel))
-        session.levelChanges.append(LevelChange(at: clock, from: previous, to: newLevel))
-        session.finalLevel = newLevel
-        return .levelChanged(from: previous, to: newLevel)
-    }
-
     private mutating func finish(reason: SessionEndReason, now: Date) {
         targets.removeAll()
         holes.removeAll()
@@ -334,7 +316,6 @@ struct WhackAMoleEngine {
         session.completed = reason == .timeUp
         session.endReason = reason
         session.endedAt = now
-        session.finalLevel = level
         isFinished = true
     }
 }

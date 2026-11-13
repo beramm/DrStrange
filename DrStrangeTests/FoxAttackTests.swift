@@ -4,12 +4,10 @@ import XCTest
 final class FoxAttackTests: XCTestCase {
     private let timing = FoxAttackTiming()
 
-    private func makeEngine(level: DifficultyLevel = .beginner) -> WhackAMoleEngine {
+    private func makeEngine(board: DifficultySettings = .testSingleRow) -> WhackAMoleEngine {
         var configuration = GameConfiguration()
         configuration.randomSeed = 21
-        configuration.sessionDuration = 60
-        configuration.startingLevel = level
-        configuration.adaptiveDifficulty.isEnabled = false
+        configuration.board = board
         return WhackAMoleEngine(configuration: configuration)
     }
 
@@ -127,7 +125,7 @@ final class FoxAttackTests: XCTestCase {
     }
 
     func testOtherCharacterDoesNotExpireWhileFoxAttacks() throws {
-        var engine = makeEngine(level: .intermediate)
+        var engine = makeEngine(board: .standard)
         // Wait until two awake characters are up at once.
         var pair: [ActiveTarget] = []
         for _ in 0..<5000 where pair.count < 2 {
@@ -145,7 +143,7 @@ final class FoxAttackTests: XCTestCase {
     }
 
     func testDecoyTapDoesNotTriggerFox() throws {
-        var engine = makeEngine(level: .advanced)
+        var engine = makeEngine(board: .testFullBoardWithDecoys)
         var decoy: ActiveTarget?
         for _ in 0..<20000 where decoy == nil {
             engine.advance(by: 0.02)
@@ -288,10 +286,11 @@ final class FoxAttackTests: XCTestCase {
     }
 
     func testOldSavedSettingsStillLoad() throws {
-        let old = #"{"startingLevel":2,"sessionDuration":300,"patching":{"patchedEye":"left"},"soundEnabled":false}"#
+        // Saved before levels and the session length setting were removed.
+        let old = #"{"startingLevel":2,"sessionDuration":300,"adaptiveDifficulty":{"isEnabled":true},"patching":{"patchedEye":"left"},"soundEnabled":false}"#
         let configuration = try JSONDecoder().decode(GameConfiguration.self, from: Data(old.utf8))
-        XCTAssertEqual(configuration.startingLevel, .intermediate)
-        XCTAssertEqual(configuration.sessionDuration, 300)
+        XCTAssertEqual(configuration.board, .standard)
+        XCTAssertEqual(configuration.scoring, ScoringRules())
         XCTAssertEqual(configuration.patching.patchedEye, .left)
         XCTAssertFalse(configuration.soundEnabled)
         XCTAssertEqual(configuration.foxAttack, FoxAttackTiming())
@@ -300,7 +299,7 @@ final class FoxAttackTests: XCTestCase {
     func testSettingsWithOlderFoxTimingStillLoad() throws {
         let old = #"{"startingLevel":3,"foxAttack":{"emerge":0.28,"swing":0.42,"hitReaction":0.38,"returnHome":0.34,"nextTargetDelay":0.4},"patching":{"playingEye":"right"}}"#
         let configuration = try JSONDecoder().decode(GameConfiguration.self, from: Data(old.utf8))
-        XCTAssertEqual(configuration.startingLevel, .advanced)
+        XCTAssertEqual(configuration.board, .standard, "the old level is ignored")
         XCTAssertEqual(configuration.patching.playingEye, .right, "other settings are kept")
         XCTAssertEqual(configuration.foxAttack, FoxAttackTiming())
     }
@@ -404,7 +403,7 @@ final class FoxAttackTests: XCTestCase {
     }
 
     func testHolesOpenAtManyDifferentSpots() {
-        var engine = makeEngine(level: .advanced)
+        var engine = makeEngine(board: .testFullBoardWithDecoys)
         var spots: [BoardPoint] = []
         var seen = Set<Int>()
         for _ in 0..<12000 where !engine.isFinished {

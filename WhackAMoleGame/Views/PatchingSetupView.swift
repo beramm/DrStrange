@@ -9,13 +9,6 @@ struct PatchingSetupView: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    private var sessionMinutes: Binding<Int> {
-        Binding(
-            get: { Int(configuration.sessionDuration / 60) },
-            set: { configuration.sessionDuration = TimeInterval($0 * 60) }
-        )
-    }
-
     var body: some View {
         NavigationStack {
             Form {
@@ -35,17 +28,7 @@ struct PatchingSetupView: View {
                 } header: {
                     Text("Eye patch")
                 } footer: {
-                    Text("Enter the eyes as your child's eye doctor prescribed. This is saved with each session for your records; the game itself is the same for either eye.")
-                }
-
-                Section {
-                    Stepper(value: sessionMinutes, in: GameConfiguration.sessionMinutesRange) {
-                        LabeledContent("Session length", value: "\(sessionMinutes.wrappedValue) min")
-                    }
-                } header: {
-                    Text("Prescribed session duration")
-                } footer: {
-                    Text("Enter the play time advised by your child's eye doctor. The app does not recommend how long to patch or play. Start and end times are recorded automatically.")
+                    Text("Enter the eyes as your child's eye doctor prescribed. This is saved with each session for your records; the game itself is the same for either eye. Start and end times are recorded automatically. Each game lasts 2 minutes; the app does not recommend how long to patch or play.")
                 }
 
                 Section("For parents and caregivers") {

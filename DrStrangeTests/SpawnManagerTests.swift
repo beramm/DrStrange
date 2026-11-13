@@ -1,13 +1,36 @@
 import XCTest
 @testable import DrStrange
 
+/// Boards for tests that need something other than the game's single standard board.
+extension DifficultySettings {
+    /// One row of three holes, one character at a time, one look and no decoys.
+    static let testSingleRow: DifficultySettings = {
+        var settings = DifficultySettings.standard
+        settings.activeHoleIndices = [3, 4, 5]
+        settings.boardSpread = 0.75
+        settings.maxSimultaneousTargets = 1
+        settings.characterVariantCount = 1
+        return settings
+    }()
+
+    /// All nine holes, all four looks and some sleepy decoys.
+    static let testFullBoardWithDecoys: DifficultySettings = {
+        var settings = DifficultySettings.standard
+        settings.activeHoleIndices = Array(0..<9)
+        settings.boardSpread = 1
+        settings.characterVariantCount = 4
+        settings.decoyProbability = 0.25
+        return settings
+    }()
+}
+
 final class SpawnManagerTests: XCTestCase {
     private func makeManager(
-        level: DifficultyLevel = .advanced,
+        settings: DifficultySettings = .testFullBoardWithDecoys,
         rules: SpawnRules = SpawnRules(),
         seed: UInt64 = 42
     ) -> SpawnManager {
-        SpawnManager(settings: .defaults(for: level), rules: rules, seed: seed)
+        SpawnManager(settings: settings, rules: rules, seed: seed)
     }
 
     func testSameSeedProducesSameSequence() {
@@ -28,9 +51,9 @@ final class SpawnManagerTests: XCTestCase {
     }
 
     func testHolesStayWithinActiveSetAndAvoidOccupied() {
-        for level in DifficultyLevel.allCases {
-            var manager = makeManager(level: level)
-            let active = Set(DifficultySettings.defaults(for: level).activeHoleIndices)
+        for settings in [DifficultySettings.standard, .testSingleRow, .testFullBoardWithDecoys] {
+            var manager = makeManager(settings: settings)
+            let active = Set(settings.activeHoleIndices)
             for _ in 0..<300 {
                 let occupied: Set<Int> = active.count > 1 ? [active.sorted()[0]] : []
                 let spawn = try! XCTUnwrap(manager.makeSpawn(occupiedHoles: occupied))
@@ -45,7 +68,7 @@ final class SpawnManagerTests: XCTestCase {
         rules.noRepeatWindow = 2
         rules.minimumGridDistance = 1.5
         rules.maximumGridDistance = nil
-        var manager = makeManager(level: .advanced, rules: rules)
+        var manager = makeManager(rules: rules)
         var history: [Int] = []
         for _ in 0..<500 {
             history.append(manager.makeSpawn(occupiedHoles: [])!.holeIndex)
@@ -58,7 +81,7 @@ final class SpawnManagerTests: XCTestCase {
     }
 
     func testCoverageIsBalanced() {
-        var manager = makeManager(level: .advanced)
+        var manager = makeManager()
         var counts: [Int: Int] = [:]
         let draws = 900
         for _ in 0..<draws {
@@ -71,14 +94,14 @@ final class SpawnManagerTests: XCTestCase {
     }
 
     func testSequenceIsNotAFixedRotation() {
-        var manager = makeManager(level: .beginner)
+        var manager = makeManager(settings: .testSingleRow)
         let holes = (0..<60).map { _ in manager.makeSpawn(occupiedHoles: [])!.holeIndex }
         let period3 = zip(holes, holes.dropFirst(3)).allSatisfy { $0 == $1 }
         XCTAssertFalse(period3, "Spawn order should not cycle with a fixed period")
     }
 
     func testFallsBackWhenOnlyOneHoleIsFree() {
-        var manager = makeManager(level: .beginner)
+        var manager = makeManager(settings: .testSingleRow)
         _ = manager.makeSpawn(occupiedHoles: [])
         let last = manager.recentHoles.last!
         let others = Set([3, 4, 5]).subtracting([last])
@@ -88,7 +111,7 @@ final class SpawnManagerTests: XCTestCase {
     }
 
     func testVariantsAreEquallyFrequent() {
-        var manager = makeManager(level: .advanced)
+        var manager = makeManager()
         var counts: [CharacterVariant: Int] = [:]
         for _ in 0..<400 {
             counts[manager.makeSpawn(occupiedHoles: [])!.variant, default: 0] += 1
@@ -96,8 +119,8 @@ final class SpawnManagerTests: XCTestCase {
         XCTAssertEqual(Set(counts.values), [100])
     }
 
-    func testBeginnerUsesOneVariantAndNoDecoys() {
-        var manager = makeManager(level: .beginner)
+    func testSingleLookBoardUsesOneVariantAndNoDecoys() {
+        var manager = makeManager(settings: .testSingleRow)
         for _ in 0..<100 {
             let spawn = manager.makeSpawn(occupiedHoles: [])!
             XCTAssertEqual(spawn.variant, .sunny)
@@ -106,7 +129,7 @@ final class SpawnManagerTests: XCTestCase {
     }
 
     func testDecoysNeverMoreThanTwoInARow() {
-        var manager = makeManager(level: .advanced)
+        var manager = makeManager()
         var run = 0
         var decoys = 0
         for _ in 0..<1000 {
@@ -123,7 +146,7 @@ final class SpawnManagerTests: XCTestCase {
     }
 
     func testNoCornerToCornerJumps() {
-        var manager = makeManager(level: .advanced)
+        var manager = makeManager()
         var previous: Int?
         for _ in 0..<1000 {
             let hole = manager.makeSpawn(occupiedHoles: [])!.holeIndex
@@ -134,10 +157,10 @@ final class SpawnManagerTests: XCTestCase {
         }
     }
 
-    func testPositionsStayInsideTheLevelsPartOfTheBoard() {
-        for level in DifficultyLevel.allCases {
-            var manager = makeManager(level: level)
-            let spread = DifficultySettings.defaults(for: level).boardSpread
+    func testPositionsStayInsideTheBoardsSpread() {
+        for settings in [DifficultySettings.standard, .testSingleRow, .testFullBoardWithDecoys] {
+            var manager = makeManager(settings: settings)
+            let spread = settings.boardSpread
             for _ in 0..<300 {
                 let position = manager.makeSpawn(occupiedHoles: [])!.position
                 XCTAssertLessThanOrEqual(abs(position.x - 0.5), spread / 2 + 1e-9)
@@ -147,7 +170,7 @@ final class SpawnManagerTests: XCTestCase {
     }
 
     func testNewHoleKeepsClearOfOpenHoles() {
-        var manager = makeManager(level: .advanced)
+        var manager = makeManager()
         let open = BoardPoint(x: 0.5, y: 0.5)
         for _ in 0..<300 {
             let position = manager.makeSpawn(occupiedHoles: [4], openPositions: [open])!.position
@@ -156,7 +179,7 @@ final class SpawnManagerTests: XCTestCase {
     }
 
     func testPositionsAreContinuousNotASmallSet() {
-        var manager = makeManager(level: .advanced)
+        var manager = makeManager()
         let spots = Set((0..<200).map { _ in
             let position = manager.makeSpawn(occupiedHoles: [])!.position
             return Int(position.x * 1000) * 1000 + Int(position.y * 1000)
@@ -165,15 +188,22 @@ final class SpawnManagerTests: XCTestCase {
     }
 
     func testAllHoleImagesAreUsedEvenly() {
-        var manager = makeManager(level: .advanced)
+        var manager = makeManager()
         var counts: [Int: Int] = [:]
         for _ in 0..<300 { counts[manager.makeSpawn(occupiedHoles: [])!.artIndex, default: 0] += 1 }
         XCTAssertEqual(counts, [0: 100, 1: 100, 2: 100])
     }
 
+    func testStandardBoardHasNoDecoys() {
+        var manager = makeManager(settings: .standard)
+        for _ in 0..<300 {
+            XCTAssertEqual(manager.makeSpawn(occupiedHoles: [])!.role, .target)
+        }
+    }
+
     func testTimingStaysInConfiguredRanges() {
-        let settings = DifficultySettings.defaults(for: .intermediate)
-        var manager = makeManager(level: .intermediate)
+        let settings = DifficultySettings.standard
+        var manager = makeManager(settings: settings)
         for _ in 0..<200 {
             XCTAssertTrue(settings.spawnIntervalRange.contains(manager.nextInterval()))
             let duration = manager.makeSpawn(occupiedHoles: [])!.visibleDuration

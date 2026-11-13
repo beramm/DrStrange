@@ -8,7 +8,9 @@ struct GameBoardView: View {
     /// The whole screen, used to find where the painted grass is.
     let screenSize: CGSize
 
-    /// Width of a hole's area as a share of the board at the largest level size, and its shape.
+    /// `targetScale` of the largest moles; the cell share below is measured at this size.
+    private static let largestTargetScale = 0.95
+    /// Width of a hole's area as a share of the board at the largest mole size, and its shape.
     private static let cellWidthShare: CGFloat = 0.25
     private static let cellAspect: CGFloat = 0.85
 
@@ -38,8 +40,7 @@ struct GameBoardView: View {
     }
 
     static func cellSize(board: CGSize, targetScale: Double) -> CGSize {
-        let beginnerScale = DifficultySettings.defaults(for: .beginner).targetScale
-        let width = min(board.width * cellWidthShare, board.height * 0.41) * CGFloat(targetScale / beginnerScale)
+        let width = min(board.width * cellWidthShare, board.height * 0.41) * CGFloat(targetScale / largestTargetScale)
         return CGSize(width: width, height: width * cellAspect)
     }
 

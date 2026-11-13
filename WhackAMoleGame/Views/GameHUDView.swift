@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Top bar: exit, score, time progress, level, sound and pause. Icons first, minimal text.
+/// Top bar: exit, score, time progress, sound and pause. Icons first, minimal text.
 struct GameHUDView: View {
     let viewModel: WhackAMoleGameViewModel
     let onExit: () -> Void
@@ -16,8 +16,6 @@ struct GameHUDView: View {
 
             SessionProgressView(progress: viewModel.progress, remainingSeconds: viewModel.remainingSeconds, ink: ink)
                 .frame(maxWidth: .infinity)
-
-            LevelIndicatorView(level: viewModel.level, ink: ink)
 
             HUDButton(
                 systemImage: viewModel.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
@@ -91,6 +89,7 @@ struct SessionProgressView: View {
     }
 }
 
+/// Dots for a game level. Used by games that offer levels.
 struct LevelIndicatorView: View {
     let level: DifficultyLevel
     let ink: Color

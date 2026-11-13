@@ -36,7 +36,9 @@ struct SessionStore {
     }()
 }
 
-/// Remembers the last used configuration on this device.
+/// Remembers the last used settings on this device. The board and scoring always come from the
+/// current defaults, so a change to them reaches every device; saved session records keep the
+/// values each game was played with.
 struct ConfigurationStore {
     private static let key = "whackAMole.configuration"
     let defaults: UserDefaults
@@ -45,13 +47,35 @@ struct ConfigurationStore {
 
     func load() -> GameConfiguration {
         guard let data = defaults.data(forKey: Self.key),
-              let configuration = try? JSONDecoder().decode(GameConfiguration.self, from: data) else {
+              var configuration = try? JSONDecoder().decode(GameConfiguration.self, from: data) else {
             return GameConfiguration()
         }
+        let defaults = GameConfiguration()
+        configuration.board = defaults.board
+        configuration.scoring = defaults.scoring
         return configuration
     }
 
     func save(_ configuration: GameConfiguration) {
         defaults.set(try? JSONEncoder().encode(configuration), forKey: Self.key)
+    }
+}
+
+/// The best score on this device. Only the number is kept; it is a gameplay result, not a
+/// measure of vision or of treatment progress.
+struct HighScoreStore {
+    private static let key = "whackAMole.highScore"
+    let defaults: UserDefaults
+
+    static let standard = HighScoreStore(defaults: .standard)
+
+    var best: Int { defaults.integer(forKey: Self.key) }
+
+    /// Keeps `score` if it beats the best so far. Returns `true` for a new high score.
+    @discardableResult
+    func submit(_ score: Int) -> Bool {
+        guard score > best else { return false }
+        defaults.set(score, forKey: Self.key)
+        return true
     }
 }

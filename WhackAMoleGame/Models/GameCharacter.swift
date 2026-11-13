@@ -83,6 +83,8 @@ struct ActiveTarget: Identifiable, Equatable {
     let spawnedAt: TimeInterval
     let visibleDuration: TimeInterval
     var phase: TargetPhase = .up
+    /// Set when the child hits the character; shown with the points when the hammer lands.
+    var rating: HitRating?
     /// When the character hides if not tapped. Pushed back while the fox is attacking another
     /// character, so the child is never penalised for watching the animation.
     var expiresAt: TimeInterval
