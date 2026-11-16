@@ -234,13 +234,31 @@ final class FoxPathSessionTests: XCTestCase {
         var session = makeSession()
         waitForThief(&session)
         run(&session, .notFollowing, for: 1.3)
-        let heldAt = try XCTUnwrap(session.thief).progress
-        let events = run(&session, .trackingUnavailable, for: 8)
+        let before = try XCTUnwrap(session.thief)
+        let events = run(&session, .trackingUnavailable, for: ThiefSettings().patience + 1)
         XCTAssertTrue(livesLost(in: events).isEmpty)
         XCTAssertEqual(session.lives, 3)
         let thief = try XCTUnwrap(session.thief)
         XCTAssertEqual(thief.state, .approaching)
-        XCTAssertEqual(thief.progress, heldAt, accuracy: 1e-9, "the thief holds still while tracking is unavailable")
+        XCTAssertEqual(thief.progress, before.progress, accuracy: 1e-9, "the thief holds still while tracking is unavailable")
+        XCTAssertEqual(thief.age, before.age, accuracy: 1e-9, "missing tracking does not use up its patience")
+        XCTAssertEqual(thief.stateTime, before.stateTime, accuracy: 1e-9)
+    }
+
+    func testMissingGazeFreezesAThiefWhileItAppears() throws {
+        var session = makeSession()
+        waitForThief(&session)
+        let before = try XCTUnwrap(session.thief)
+
+        let events = run(&session, .trackingUnavailable, for: ThiefSettings().patience + 1)
+
+        XCTAssertTrue(livesLost(in: events).isEmpty)
+        let thief = try XCTUnwrap(session.thief)
+        XCTAssertEqual(thief.state, .appearing)
+        XCTAssertEqual(thief.progress, before.progress, accuracy: 1e-9)
+        XCTAssertEqual(thief.visibility, before.visibility, accuracy: 1e-9)
+        XCTAssertEqual(thief.age, before.age, accuracy: 1e-9)
+        XCTAssertEqual(thief.stateTime, before.stateTime, accuracy: 1e-9)
     }
 
     func testThiefNeverJumps() {

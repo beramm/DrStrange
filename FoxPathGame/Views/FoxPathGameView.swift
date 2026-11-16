@@ -25,6 +25,7 @@ struct FoxPathGameView: View {
 
     @State private var viewModel: FoxPathGameViewModel
     @State private var isConfirmingStop = false
+    @State private var isPausedForMissingPatch = false
     @State private var zoomAtPinchStart: CGFloat?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -68,6 +69,9 @@ struct FoxPathGameView: View {
                 if case let .gaze(controller) = input { controller.pauseForInactiveScene() }
             }
         }
+        .onChange(of: gazeController?.patchWearState, initial: true) { _, state in
+            respondToPatchState(state)
+        }
     }
 
     private var gameplay: some View {
@@ -90,12 +94,20 @@ struct FoxPathGameView: View {
                 .frame(maxHeight: .infinity, alignment: .top)
 
             if viewModel.phase == .paused, !isConfirmingStop {
-                PauseOverlay(onResume: viewModel.resume, onRest: viewModel.finishEarly)
+                if isPausedForMissingPatch, let gazeController {
+                    FoxPathMissingPatchPauseOverlay(
+                        isPatchVerified: gazeController.isPatchVerified,
+                        onResume: resumeAfterPatchCheck,
+                        onRest: viewModel.finishEarly
+                    )
+                } else {
+                    PauseOverlay(onResume: viewModel.resume, onRest: viewModel.finishEarly)
+                }
             }
         }
         .confirmationDialog("Stop the game?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
             Button("Stop the game") { viewModel.finishEarly() }
-            Button("Keep playing", role: .cancel) { viewModel.resume() }
+            Button("Keep playing", role: .cancel) { resumeAfterStopDialog() }
         }
     }
 
@@ -126,6 +138,41 @@ struct FoxPathGameView: View {
         viewModel.stop()
         viewModel = Self.makeViewModel(configuration: configuration, input: input)
         viewModel.start()
+        isPausedForMissingPatch = false
+        respondToPatchState(gazeController?.patchWearState)
+    }
+
+    private var gazeController: GazeInputController? {
+        guard case let .gaze(controller) = input else { return nil }
+        return controller
+    }
+
+    private func respondToPatchState(_ state: PatchWearState?) {
+        guard let gazeController else { return }
+        if !gazeController.oneEyeEnforcerEnabled {
+            if isPausedForMissingPatch {
+                isPausedForMissingPatch = false
+                viewModel.resume()
+            }
+            return
+        }
+        guard state == .missing, viewModel.phase != .finished else { return }
+        isPausedForMissingPatch = true
+        viewModel.pause()
+    }
+
+    private func resumeAfterPatchCheck() {
+        guard gazeController?.isPatchVerified == true else { return }
+        isPausedForMissingPatch = false
+        viewModel.resume()
+    }
+
+    private func resumeAfterStopDialog() {
+        if isPausedForMissingPatch {
+            guard gazeController?.isPatchVerified == true else { return }
+            isPausedForMissingPatch = false
+        }
+        viewModel.resume()
     }
 }
 
@@ -207,6 +254,56 @@ private struct PauseOverlay: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 460)
+            }
+            .padding(48)
+            .background(RoundedRectangle(cornerRadius: 36).fill(FoxPathPalette.cream))
+        }
+    }
+}
+
+private struct FoxPathMissingPatchPauseOverlay: View {
+    let isPatchVerified: Bool
+    let onResume: () -> Void
+    let onRest: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.32).ignoresSafeArea()
+            VStack(spacing: 20) {
+                Image(systemName: "eye.slash.fill")
+                    .font(.system(size: 68))
+                    .foregroundStyle(.orange)
+                    .accessibilityHidden(true)
+                Text("Patch check paused the game")
+                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
+                    .foregroundStyle(FoxPathPalette.ink)
+                Text(isPatchVerified
+                     ? "The one-eye check passed again. You can keep playing."
+                     : "Grown-ups: put the prescribed patch back on, then keep the child's face centred while the camera checks it.")
+                    .font(.title3)
+                    .foregroundStyle(FoxPathPalette.ink)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 560)
+                HStack(spacing: 20) {
+                    Button(action: onRest) {
+                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
+                            .frame(minWidth: 200, minHeight: 56)
+                    }
+                    .buttonStyle(.bordered)
+                    Button(action: onResume) {
+                        Label(isPatchVerified ? "Play" : "Checking…", systemImage: "play.fill")
+                            .frame(minWidth: 180, minHeight: 56)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(FoxPathPalette.accent)
+                    .disabled(!isPatchVerified)
+                }
+                .font(.title2.weight(.bold))
+                Text("The camera only checks whether one eye stays visible; it cannot confirm that the correct prescribed eye is patched.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 520)
             }
             .padding(48)
             .background(RoundedRectangle(cornerRadius: 36).fill(FoxPathPalette.cream))
