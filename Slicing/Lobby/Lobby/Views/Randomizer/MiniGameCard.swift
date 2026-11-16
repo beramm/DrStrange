@@ -1,57 +1,52 @@
 //
 //  MiniGameCard.swift
-//  One game card on the Game Map: cover picture, title (Days One) and tagline (Belanosima)
-//  on the same "Card" image as the character card.
+//  One game card on the Game Map. The design's card pictures already show the
+//  cover, the title and the tagline, so the card is just that picture.
+//  VoiceOver still reads the title and tagline.
 //
-//  Sizes come from the 421 × 570 "Card" image and are multiplied by `scale`.
-//  The card is drawn at full size; the Game Map shrinks the cards that aren't chosen.
+//  A locked game (testing setting "Lock games") is darkened and shows a lock.
+//
+//  The card is 421 × 570 at design size, multiplied by `scale`.
+//  The Game Map shrinks the cards that aren't chosen.
 //
 
 import SwiftUI
 
 struct MiniGameCard: View {
     let game: MiniGame
+    var isLocked = false
     /// 1 = design size. Pass the screen's scale so the card grows with the iPad.
     let scale: CGFloat
 
     var body: some View {
-        let s = scale
-
-        ZStack {
-            Image("Card")
-                .resizable()
-
-            // Cover picture. TODO: replace with the game's real cover image when it's ready.
-            RoundedRectangle(cornerRadius: 8 * s, style: .continuous)
-                .fill(Color.coverPlaceholder)
-                .frame(width: 324 * s, height: 280 * s)
-                .position(x: 210 * s, y: 186 * s)
-
-            // Title: one Text per line, pulled closer together than normal line spacing allows.
-            VStack(spacing: -10 * s) {
-                ForEach(game.cardTitle.components(separatedBy: "\n"), id: \.self) { line in
-                    Text(line)
+        Image(game.cardImageName)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 421 * scale, height: 570 * scale)
+            .overlay {
+                if isLocked {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 18 * scale, style: .continuous)
+                            .fill(.black.opacity(0.35))
+                            .padding(6 * scale)
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 64 * scale, weight: .bold))
+                            .foregroundStyle(Color.signText)
+                            .frame(width: 130 * scale, height: 130 * scale)
+                            .background(Circle().fill(Color.roundButton))
+                    }
                 }
             }
-            .textCase(.uppercase)
-            .font(.daysOne(40 * s))
-            .foregroundStyle(Color.ink)
-            .position(x: 210 * s, y: 393 * s)
-
-            Text(game.tagline)
-                .font(.belanosima(20 * s))
-                .foregroundStyle(Color.ink)
-                .multilineTextAlignment(.center)
-                .frame(width: 320 * s)
-                .position(x: 210 * s, y: 486 * s)
-        }
-        .frame(width: 421 * s, height: 570 * s)
-        .accessibilityElement(children: .combine)
+            .accessibilityElement()
+            .accessibilityLabel(isLocked ? "\(game.title), locked" : "\(game.title). \(game.tagline)")
     }
 }
 
 #Preview(traits: .landscapeLeft) {
-    MiniGameCard(game: .whackAMole, scale: 1)
-        .padding()
-        .background(Color.sky)
+    HStack {
+        MiniGameCard(game: .whackAMole, scale: 0.8)
+        MiniGameCard(game: .veggieKeeper, isLocked: true, scale: 0.8)
+    }
+    .padding()
+    .background(Color.sky)
 }

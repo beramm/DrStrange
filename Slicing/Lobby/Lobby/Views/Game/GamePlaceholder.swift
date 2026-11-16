@@ -17,8 +17,9 @@ struct SelectedGameView: View {
     }
 
     let game: MiniGame
+    /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
+    let onExit: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var configuration = ConfigurationStore.standard.load()
     @State private var gazeController = GazeInputController()
     @State private var presentedScreen: PresentedScreen?
@@ -36,7 +37,7 @@ struct SelectedGameView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62) {
-                dismiss()
+                onExit()
             }
             .padding(.leading, 37)
             .padding(.top, 20)
@@ -70,14 +71,15 @@ struct SelectedGameView: View {
     private func closeGameFlow() {
         gazeController.stop()
         presentedScreen = nil
-        dismiss()
+        onExit()
     }
 }
 #else
 struct SelectedGameView: View {
     let game: MiniGame
+    /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
+    let onExit: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         gameAnnouncement
@@ -95,7 +97,7 @@ struct SelectedGameView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62) {
-                dismiss()
+                onExit()
             }
             .padding(.leading, 37)
             .padding(.top, 20)
@@ -106,5 +108,5 @@ struct SelectedGameView: View {
 #endif
 
 #Preview(traits: .landscapeLeft) {
-    SelectedGameView(game: .whackAMole)
+    SelectedGameView(game: .whackAMole, onExit: {})
 }

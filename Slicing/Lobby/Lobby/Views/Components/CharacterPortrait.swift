@@ -18,12 +18,12 @@ struct CharacterPortrait: View {
                 .frame(width: diameter, height: diameter)
 
             // The full character image, enlarged and moved down so the head fills the circle.
-            // Mirrored left-to-right so the character faces right on the card.
+            // Not mirrored: the characters face the front, and mirroring would move the
+            // eye patch to the other eye.
             Image(imageName)
                 .resizable()
                 .scaledToFit()
                 .frame(width: diameter * 1.85, height: diameter * 1.85)
-                .scaleEffect(x: -1, y: 1)
                 .offset(y: diameter * 0.26)
         }
         .frame(width: diameter, height: diameter)

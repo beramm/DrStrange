@@ -20,12 +20,13 @@ nonisolated enum MiniGame: String, CaseIterable, Hashable {
         }
     }
 
-    /// The title split over two lines, as on the game card.
-    var cardTitle: String {
+    /// The finished game card from the design (cover picture, title and tagline
+    /// are all drawn in the picture).
+    var cardImageName: String {
         switch self {
-        case .veggieDash:   "Veggie\nDash"
-        case .whackAMole:   "Whack\na Mole"
-        case .veggieKeeper: "Veggie\nKeeper"
+        case .veggieDash:   "GameCardVeggieDash"
+        case .whackAMole:   "GameCardWhackAMole"
+        case .veggieKeeper: "GameCardVeggieKeeper"
         }
     }
 
@@ -46,9 +47,16 @@ nonisolated enum MiniGame: String, CaseIterable, Hashable {
     /// Caregiver setting that controls whether the game map spins and chooses automatically.
     static let randomSpinEnabledStorageKey = "randomGameSpinEnabled"
 
-    /// Picks a random game, skipping `lastGame` if there is one.
-    static func randomPick(avoiding lastGame: MiniGame?) -> MiniGame {
-        let choices = allCases.filter { $0 != lastGame }
-        return choices.randomElement() ?? .whackAMole
+    /// Is this game locked? With the "Lock games" testing setting on,
+    /// only Whack a Mole stays open.
+    func isLocked(whenGamesLocked gamesLocked: Bool) -> Bool {
+        gamesLocked && self != .whackAMole
+    }
+
+    /// Picks a random open game, skipping `lastGame` when another open game is left.
+    static func randomPick(avoiding lastGame: MiniGame?, gamesLocked: Bool) -> MiniGame {
+        let open = allCases.filter { !$0.isLocked(whenGamesLocked: gamesLocked) }
+        let choices = open.filter { $0 != lastGame }
+        return (choices.isEmpty ? open : choices).randomElement() ?? .whackAMole
     }
 }

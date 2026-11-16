@@ -9,5 +9,5 @@ nonisolated enum LobbyRoute: Hashable {
     case characterSelect
     case randomizer
     case game(MiniGame)
-    case settings
+    // Settings is not a screen: it is a pop-up over the current screen (see ContentView).
 }

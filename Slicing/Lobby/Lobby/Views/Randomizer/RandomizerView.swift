@@ -4,6 +4,10 @@
 //  A highlight hops across the three game cards. The highlighted card pops up
 //  to full size while the others shrink back. It slows down, stops on the
 //  chosen game, and after a short pause opens that game by itself.
+//  While it picks by itself, the screen is locked: no back or settings button.
+//
+//  With "Random game" off in Setting, the cards are buttons and the child picks.
+//  With "Lock games" on (testing), only Whack a Mole can be picked or played.
 //
 //  Every position below is taken from the 1194 × 834 Figma frame and then
 //  scaled to the real screen (same approach as LobbyView).
@@ -21,6 +25,8 @@ struct RandomizerView: View {
     @AppStorage(MiniGame.lastGameStorageKey) private var lastGameID = ""
     /// When disabled, the cards become direct choices and no spin runs.
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
+    /// Testing setting: locked games can't be picked or played.
+    @AppStorage(AppSettings.gamesLockedKey) private var gamesLocked = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
 
@@ -46,37 +52,45 @@ struct RandomizerView: View {
             ZStack {
                 LobbyScenery()
 
-                // Top bar: back, title, settings.
-                RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62 * s) {
-                    dismiss()
+                // Top bar: back, title, settings. When the game is picked at random,
+                // the screen is locked, so there is no back or settings button.
+                if !randomSpinEnabled {
+                    RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62 * s) {
+                        dismiss()
+                    }
+                    .position(x: 68 * sx, y: 83 * sy)
                 }
-                .position(x: 68 * sx, y: 83 * sy)
 
                 Text(randomSpinEnabled ? "Game map" : "Choose a game")
                     .textCase(.uppercase)
-                    .font(.doodle(80 * s))
+                    .doodleText(size: 80 * s)
                     .foregroundStyle(Color.titleBrown)
                     .position(x: 598 * sx, y: 80 * sy)
                     .accessibilityAddTraits(.isHeader)
 
-                RoundIconButton(systemImage: "gearshape.fill", label: "Settings", size: 62 * s, action: onSettings)
-                    .position(x: 1128 * sx, y: 83 * sy)
+                if !randomSpinEnabled {
+                    RoundIconButton(systemImage: "gearshape.fill", label: "Settings", size: 62 * s, action: onSettings)
+                        .position(x: 1128 * sx, y: 83 * sy)
+                }
 
                 // The three game cards. The highlighted one is full size and in front.
                 ForEach(Array(MiniGame.allCases.enumerated()), id: \.element) { index, game in
                     let isPopped = game == highlighted
+                    let isLocked = game.isLocked(whenGamesLocked: gamesLocked)
                     Group {
                         if randomSpinEnabled {
-                            MiniGameCard(game: game, scale: s)
+                            MiniGameCard(game: game, isLocked: isLocked, scale: s)
                         } else {
                             Button {
                                 chooseManually(game)
                             } label: {
-                                MiniGameCard(game: game, scale: s)
+                                MiniGameCard(game: game, isLocked: isLocked, scale: s)
                             }
                             .buttonStyle(.plain)
                             .disabled(manualSelectionPending)
-                            .accessibilityHint("Play \(game.title)")
+                            // A locked game can't be opened: chooseManually ignores the tap.
+                            // (Not .disabled here, which would also fade the lock.)
+                            .accessibilityHint(isLocked ? "" : "Play \(game.title)")
                         }
                     }
                         .scaleEffect(isPopped ? 1 : smallCardScale)
@@ -108,7 +122,8 @@ struct RandomizerView: View {
     }
 
     private func chooseManually(_ game: MiniGame) {
-        guard !randomSpinEnabled, !manualSelectionPending else { return }
+        guard !randomSpinEnabled, !manualSelectionPending,
+              !game.isLocked(whenGamesLocked: gamesLocked) else { return }
         manualSelectionPending = true
         highlighted = game
         lastGameID = game.rawValue
@@ -122,7 +137,8 @@ struct RandomizerView: View {
 
     private func spin() async {
         highlighted = nil
-        let pick = MiniGame.randomPick(avoiding: MiniGame(rawValue: lastGameID))
+        // Only open (unlocked) games can be picked.
+        let pick = MiniGame.randomPick(avoiding: MiniGame(rawValue: lastGameID), gamesLocked: gamesLocked)
 
         do {
             if !reduceMotion {
