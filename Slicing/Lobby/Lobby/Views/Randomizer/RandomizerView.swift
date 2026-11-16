@@ -19,11 +19,15 @@ struct RandomizerView: View {
 
     /// The last game picked, saved so the same game isn't picked twice in a row.
     @AppStorage(MiniGame.lastGameStorageKey) private var lastGameID = ""
+    /// When disabled, the cards become direct choices and no spin runs.
+    @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
 
     /// The card that is popped up right now (nil before the spin starts).
     @State private var highlighted: MiniGame?
+    @State private var manualSelectionPending = false
+    @State private var manualSelectionTask: Task<Void, Never>?
 
     /// Size of the Figma frame the design was made in.
     private let design = CGSize(width: 1194, height: 834)
@@ -48,7 +52,7 @@ struct RandomizerView: View {
                 }
                 .position(x: 68 * sx, y: 83 * sy)
 
-                Text("Game map")
+                Text(randomSpinEnabled ? "Game map" : "Choose a game")
                     .textCase(.uppercase)
                     .font(.doodle(80 * s))
                     .foregroundStyle(Color.titleBrown)
@@ -61,7 +65,20 @@ struct RandomizerView: View {
                 // The three game cards. The highlighted one is full size and in front.
                 ForEach(Array(MiniGame.allCases.enumerated()), id: \.element) { index, game in
                     let isPopped = game == highlighted
-                    MiniGameCard(game: game, scale: s)
+                    Group {
+                        if randomSpinEnabled {
+                            MiniGameCard(game: game, scale: s)
+                        } else {
+                            Button {
+                                chooseManually(game)
+                            } label: {
+                                MiniGameCard(game: game, scale: s)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(manualSelectionPending)
+                            .accessibilityHint("Play \(game.title)")
+                        }
+                    }
                         .scaleEffect(isPopped ? 1 : smallCardScale)
                         .zIndex(isPopped ? 1 : 0)
                         .position(x: cardCentersX[index] * sx, y: cardCenterY * sy)
@@ -74,8 +91,33 @@ struct RandomizerView: View {
         .toolbar(.hidden, for: .navigationBar)
         // A small tap feeling each time a card pops up.
         .sensoryFeedback(.selection, trigger: highlighted)
-        // Runs every time this screen appears, so coming back picks a new game.
-        .task { await spin() }
+        // Runs every time this screen appears when automatic selection is enabled.
+        .task(id: randomSpinEnabled) {
+            guard randomSpinEnabled else {
+                highlighted = nil
+                manualSelectionPending = false
+                return
+            }
+            await spin()
+        }
+        .onDisappear {
+            manualSelectionTask?.cancel()
+            manualSelectionTask = nil
+            manualSelectionPending = false
+        }
+    }
+
+    private func chooseManually(_ game: MiniGame) {
+        guard !randomSpinEnabled, !manualSelectionPending else { return }
+        manualSelectionPending = true
+        highlighted = game
+        lastGameID = game.rawValue
+        manualSelectionTask?.cancel()
+        manualSelectionTask = Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            onChosen(game)
+        }
     }
 
     private func spin() async {

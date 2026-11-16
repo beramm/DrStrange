@@ -15,7 +15,7 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
     private let cameraInput: GazeCameraInputConfiguration?
     private let ambientLight: GazeAmbientLightConfiguration?
     private let faceIsolationProcessor: FaceIsolationProcessor?
-    private let blazeGazeProcessor: BlazeGazeShadowProcessor?
+    private var faceSetupMonitor = FaceSetupMonitor()
 
     private let sessionLock = NSLock()
     private var session: ARSession?
@@ -30,9 +30,7 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         cameraInput: GazeCameraInputConfiguration? = nil,
         ambientLight: GazeAmbientLightConfiguration? = nil,
         faceIsolation: GazeFaceIsolationConfiguration? = nil,
-        faceIsolationPreview: VolatileFaceIsolationPreview? = nil,
-        blazeGaze: GazeBlazeGazeConfiguration? = nil,
-        blazeGazePreview: VolatileBlazeGazePreview? = nil
+        faceIsolationPreview: VolatileFaceIsolationPreview? = nil
     ) {
         self.previewHostView = previewHostView
         if let cameraFramePreview {
@@ -49,14 +47,6 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
             )
         } else {
             faceIsolationProcessor = nil
-        }
-        if let blazeGaze, let blazeGazePreview {
-            blazeGazeProcessor = BlazeGazeShadowProcessor(
-                configuration: blazeGaze,
-                preview: blazeGazePreview
-            )
-        } else {
-            blazeGazeProcessor = nil
         }
         super.init()
     }
@@ -102,14 +92,8 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         cameraFramePreviewProcessor?.start(orientation: faceImageOrientation)
         let options: ARSession.RunOptions = reset ? [.resetTracking, .removeExistingAnchors] : []
         let session = makeSession()
+        faceSetupMonitor.reset()
         session.run(configuration, options: options)
-        // MediaPipe creates a GPU/GL context while its graph is initialized.
-        // Let ARKit acquire and warm the TrueDepth session first so the shadow
-        // candidate can never race the control path for camera startup.
-        delegateQueue.asyncAfter(deadline: .now() + 0.75) { [weak self, weak session] in
-            guard let self, let session, self.isCurrentSession(session) else { return }
-            self.blazeGazeProcessor?.start(orientation: faceImageOrientation)
-        }
     }
 
     func pause() {
@@ -145,7 +129,6 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
         ambientLight?.reset()
         faceIsolationProcessor?.stop()
         cameraFramePreviewProcessor?.stop()
-        blazeGazeProcessor?.stop()
         released?.pause()
         released?.delegate = nil
     }
@@ -260,11 +243,8 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
             pixelBuffer: frame.capturedImage,
             timestamp: frame.timestamp
         )
-        blazeGazeProcessor?.process(
-            pixelBuffer: frame.capturedImage,
-            timestamp: frame.timestamp
-        )
         guard let face = frame.anchors.compactMap({ $0 as? ARFaceAnchor }).first, face.isTracked else {
+            faceSetupMonitor.reset()
             publish(frameTimestamp: frame.timestamp, tracking: .lost, setup: .unknown, eyes: .none)
             return
         }
@@ -322,17 +302,11 @@ final class PlatformObservationRuntime: NSObject, ObservationRuntime, ARSessionD
             return value.x.isFinite && value.y.isFinite && value.z.isFinite && value.w.isFinite
         } && rawDirection.x.isFinite && rawDirection.y.isFinite && rawDirection.z.isFinite &&
             simd_length(rawDirection) > 1e-9 && distance.isFinite
-        let facePositionReady = abs(faceTranslation.x) <= 0.18 &&
-            faceTranslation.y >= -0.25 && faceTranslation.y <= 0.12
-        let setup: SetupState = if !distance.isFinite || !facePositionReady {
-            .unknown
-        } else if distance < 0.40 {
-            .tooClose
-        } else if distance > 0.60 {
-            .tooFar
-        } else {
-            .ready
-        }
+        let setup = faceSetupMonitor.evaluate(
+            timestamp: frame.timestamp,
+            faceTranslation: faceTranslation,
+            headDirection: headDirection
+        )
         let selectedEyeOpen = eyeAvailability != .none
         let ray = finite ? SelectedEyeRayObservation(
             originX: origin.x,

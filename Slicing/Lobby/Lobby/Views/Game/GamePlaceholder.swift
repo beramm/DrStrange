@@ -45,11 +45,8 @@ struct SelectedGameView: View {
         .task {
             guard game == .whackAMole, !hasStarted else { return }
             hasStarted = true
-            // TestFlight production flow always requires the prescribed patch.
-            // Normalize any engineering value saved by an earlier local build.
-            configuration.oneEyeEnforcerEnabled = true
-            ConfigurationStore.standard.save(configuration)
-            gazeController.setOneEyeEnforcerEnabled(true)
+            // Apply the caregiver's saved gaze-testing setting before calibration.
+            gazeController.setOneEyeEnforcerEnabled(configuration.oneEyeEnforcerEnabled)
             presentedScreen = .calibration
         }
         .fullScreenCover(item: $presentedScreen) { screen in

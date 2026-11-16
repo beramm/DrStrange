@@ -1,3 +1,4 @@
+import DrStrangeGazeTracker
 import SwiftUI
 import UIKit
 
@@ -21,6 +22,21 @@ struct GazeCalibrationView: View {
                             x: target.x * geometry.size.width,
                             y: target.y * geometry.size.height
                         )
+                    if controller.calibrationNeedsGuidance {
+                        VStack {
+                            if target.y > 0.5 {
+                                guidanceBanner
+                                    .frame(maxWidth: 620)
+                                Spacer()
+                            } else {
+                                Spacer()
+                                guidanceBanner
+                                    .frame(maxWidth: 620)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 32)
+                    }
                 } else {
                     setupPanel
                 }
@@ -43,18 +59,23 @@ struct GazeCalibrationView: View {
     private var setupPanel: some View {
         VStack(spacing: 18) {
             Spacer(minLength: 36)
-            Text("Set up eye control")
+            Text("Get ready to play")
                 .font(.system(size: 42, weight: .heavy, design: .rounded))
-            Text(controller.oneEyeEnforcerEnabled
-                 ? "Put on the prescribed patch, then use the preview to centre your face. Keep the uncovered eye open and look directly at each target."
-                 : "Use the preview to centre your face, keep your eyes visible, and look directly at each target.")
-                .font(.title3)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 680)
+            HStack(spacing: 30) {
+                SetupStep(number: 1, text: "Face in oval")
+                SetupStep(number: 2, text: "Follow arrow")
+                SetupStep(number: 3, text: "Hold still")
+            }
 
             ZStack {
                 VolatileGazeCameraPreview(view: controller.cameraPreview)
                 if !controller.cameraStarted { Color.black }
+                FacePositionGuide(
+                    state: controller.sample.setupState,
+                    isReady: controller.isReadyToCalibrate,
+                    isCheckingPatch: controller.oneEyeEnforcerEnabled &&
+                        controller.patchWearState == .checking
+                )
             }
             .frame(width: 520, height: 390)
             .clipped()
@@ -64,11 +85,29 @@ struct GazeCalibrationView: View {
                     .padding(16)
             }
 
-            Button(controller.isPreparingCalibration ? "Get ready…" : "Start calibration") {
+            HStack(spacing: 12) {
+                ReadinessBadge(
+                    title: "Face",
+                    isReady: controller.sample.setupState == .ready
+                )
+                if controller.oneEyeEnforcerEnabled {
+                    ReadinessBadge(
+                        title: "Eye patch",
+                        isReady: controller.isPatchVerified
+                    )
+                }
+                ReadinessBadge(
+                    title: "Light",
+                    isReady: !controller.isSceneTooDark
+                )
+            }
+
+            Button(controller.isPreparingCalibration ? "Get ready…" : "Let's start!") {
                 controller.startCalibration()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .tint(controller.isReadyToCalibrate ? .green : .gray)
             .disabled(!controller.isReadyToCalibrate || controller.isPreparingCalibration)
 
             Button("Cancel") {
@@ -96,8 +135,8 @@ struct GazeCalibrationView: View {
         if controller.isSceneTooDark {
             return .init(
                 id: "dark",
-                title: "The room is too dark",
-                message: "Turn on a light so the camera can see your eye clearly.",
+                title: "Turn on a light",
+                message: "Ask a grown-up to make the room brighter.",
                 systemImage: "lightbulb.fill",
                 tone: .warning
             )
@@ -106,24 +145,72 @@ struct GazeCalibrationView: View {
         case .tooClose:
             return .init(
                 id: "close",
-                title: "Move a little farther away",
-                message: "Keep your face about an arm's length from the screen.",
+                title: "Move back a little",
+                message: "Move the iPad away from your face.",
                 systemImage: "arrow.backward.circle.fill",
                 tone: .warning
             )
         case .tooFar:
             return .init(
                 id: "far",
-                title: "Move a little closer",
-                message: "Bring your face closer to the screen.",
+                title: "Come a little closer",
+                message: "Bring the iPad toward your face.",
                 systemImage: "arrow.forward.circle.fill",
                 tone: .warning
+            )
+        case .misaligned:
+            return .init(
+                id: "angle",
+                title: "Point your nose at the iPad",
+                message: "Look straight at the screen.",
+                systemImage: "ipad.landscape",
+                tone: .warning
+            )
+        case .lookUp:
+            return .init(
+                id: "look-up",
+                title: "Look up a little",
+                message: "Move your nose toward the arrow.",
+                systemImage: "arrow.up.circle.fill",
+                tone: .warning
+            )
+        case .lookDown:
+            return .init(
+                id: "look-down",
+                title: "Look down a little",
+                message: "Move your nose toward the arrow.",
+                systemImage: "arrow.down.circle.fill",
+                tone: .warning
+            )
+        case .turnLeft:
+            return .init(
+                id: "turn-left",
+                title: "Turn left a little",
+                message: "Move your nose toward the arrow.",
+                systemImage: "arrow.left.circle.fill",
+                tone: .warning
+            )
+        case .turnRight:
+            return .init(
+                id: "turn-right",
+                title: "Turn right a little",
+                message: "Move your nose toward the arrow.",
+                systemImage: "arrow.right.circle.fill",
+                tone: .warning
+            )
+        case .stabilizing:
+            return .init(
+                id: "stable",
+                title: "Hold still…",
+                message: "Keep your head and the iPad still.",
+                systemImage: "viewfinder",
+                tone: .info
             )
         case .unknown:
             return .init(
                 id: "face",
-                title: "Centre your face",
-                message: "Look toward the screen and keep your face inside the preview.",
+                title: "Face in the oval",
+                message: "Move the iPad until your whole face is inside.",
                 systemImage: "face.smiling",
                 tone: .info
             )
@@ -135,8 +222,8 @@ struct GazeCalibrationView: View {
             if controller.patchWearState == .missing || controller.sample.eyeAvailability == .both {
                 return .init(
                     id: "patch",
-                    title: "Eye patch not detected",
-                    message: "Put on the prescribed patch and keep the other eye uncovered.",
+                    title: "Put on your eye patch",
+                    message: "Keep your other eye open.",
                     systemImage: "eye.slash.fill",
                     tone: .warning
                 )
@@ -144,8 +231,8 @@ struct GazeCalibrationView: View {
             if controller.sample.eyeAvailability == .none {
                 return .init(
                     id: "eye",
-                    title: "Keep the uncovered eye open",
-                    message: "Face the screen and make sure the camera can see the uncovered eye.",
+                    title: "Open your eye",
+                    message: "Look at the iPad.",
                     systemImage: "eye.fill",
                     tone: .warning
                 )
@@ -153,8 +240,8 @@ struct GazeCalibrationView: View {
             if controller.patchWearState == .checking {
                 return .init(
                     id: "checking",
-                    title: "Checking the eye patch",
-                    message: "Hold still for a moment.",
+                    title: "Hold still…",
+                    message: "Checking your eye patch.",
                     systemImage: "hourglass",
                     tone: .info
                 )
@@ -163,8 +250,8 @@ struct GazeCalibrationView: View {
 
         return .init(
             id: "ready",
-            title: "Ready to calibrate",
-            message: "Keep your head still, then select Start calibration.",
+            title: "Ready!",
+            message: "Tap the green Let's start button.",
             systemImage: "checkmark.circle.fill",
             tone: .success
         )
@@ -201,6 +288,112 @@ struct GazeCalibrationView: View {
         .transition(.opacity.combined(with: .scale(scale: 0.98)))
         .animation(.smooth(duration: 0.3), value: guidance.id)
         .accessibilityElement(children: .combine)
+    }
+}
+
+private struct SetupStep: View {
+    let number: Int
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("\(number)")
+                .font(.headline.weight(.heavy))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(.blue, in: Circle())
+            Text(text)
+                .font(.headline)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ReadinessBadge: View {
+    let title: String
+    let isReady: Bool
+
+    var body: some View {
+        Label(
+            title,
+            systemImage: isReady ? "checkmark.circle.fill" : "circle.dashed"
+        )
+        .font(.headline)
+        .foregroundStyle(isReady ? .green : .orange)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.thinMaterial, in: Capsule())
+        .accessibilityLabel("\(title): \(isReady ? "ready" : "not ready")")
+    }
+}
+
+private struct FacePositionGuide: View {
+    let state: SetupState
+    let isReady: Bool
+    let isCheckingPatch: Bool
+
+    private var color: Color {
+        if isReady { return .green }
+        if state == .stabilizing || isCheckingPatch { return .blue }
+        return .orange
+    }
+
+    private var label: String {
+        if isReady { return "Ready!" }
+        if state == .stabilizing || isCheckingPatch { return "Hold still…" }
+        return "Your face"
+    }
+
+    private var directionIcon: String? {
+        switch state {
+        case .lookUp: "arrow.up"
+        case .lookDown: "arrow.down"
+        case .turnLeft: "arrow.left"
+        case .turnRight: "arrow.right"
+        default: nil
+        }
+    }
+
+    private var directionOffset: CGSize {
+        switch state {
+        case .turnLeft: CGSize(width: -175, height: 0)
+        case .turnRight: CGSize(width: 175, height: 0)
+        default: CGSize(width: 175, height: 0)
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Ellipse()
+                .stroke(
+                    color,
+                    style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [12, 9])
+                )
+                .frame(width: 220, height: 290)
+                .overlay(alignment: .top) {
+                    Text(label)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(color.opacity(0.92), in: Capsule())
+                        .offset(y: -18)
+                }
+
+            if let directionIcon {
+                Image(systemName: directionIcon)
+                    .font(.system(size: 48, weight: .black))
+                    .foregroundStyle(.white)
+                    .frame(width: 76, height: 76)
+                    .background(.orange.opacity(0.95), in: Circle())
+                    .overlay { Circle().stroke(.white, lineWidth: 4) }
+                    .offset(directionOffset)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+        .animation(.smooth(duration: 0.25), value: state)
+        .accessibilityHidden(true)
     }
 }
 

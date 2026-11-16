@@ -43,6 +43,8 @@ nonisolated enum MiniGame: String, CaseIterable, Hashable {
 
     /// Key used to remember the last game played, so the same one isn't picked twice in a row.
     static let lastGameStorageKey = "lastMiniGame"
+    /// Caregiver setting that controls whether the game map spins and chooses automatically.
+    static let randomSpinEnabledStorageKey = "randomGameSpinEnabled"
 
     /// Picks a random game, skipping `lastGame` if there is one.
     static func randomPick(avoiding lastGame: MiniGame?) -> MiniGame {

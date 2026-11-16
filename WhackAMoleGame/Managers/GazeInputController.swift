@@ -34,12 +34,10 @@ final class GazeInputController {
     @ObservationIgnored private var patchWearMonitor = PatchWearMonitor()
 
     init() {
-        // Keep production on the native full-sensor ARKit path. ARKit cannot
-        // consume the isolated face crop, so both experimental sidecars stay
-        // disabled and cannot compete for processing time.
+        // Paddy links only the native full-sensor ARKit tracker product. The
+        // experimental model sidecars live in the separate engineering product.
         let host = GazeTrackerFactory.makeTrackerWithVolatilePreview(
-            faceIsolationEnabled: false,
-            blazeGazeEnabled: false
+            faceIsolationEnabled: false
         )
         tracker = host.tracker
         cameraPreview = host.preview
@@ -66,7 +64,12 @@ final class GazeInputController {
         cameraStarted &&
             sample.setupState == .ready &&
             visibleEyeIsAvailable &&
-            isPatchVerified
+            isPatchVerified &&
+            !isSceneTooDark
+    }
+
+    var calibrationNeedsGuidance: Bool {
+        activeCalibrationTarget != nil && !isReadyToCalibrate
     }
 
     var isCalibrated: Bool { sample.calibrationState == .calibrated }
@@ -202,6 +205,12 @@ final class GazeInputController {
             status = switch (sample.setupState, sample.eyeAvailability, oneEyeEnforcerEnabled) {
             case (.tooClose, _, _): "Move farther from the front camera"
             case (.tooFar, _, _): "Move closer to the front camera"
+            case (.misaligned, _, _): "Point your nose at the iPad"
+            case (.lookUp, _, _): "Look up a little"
+            case (.lookDown, _, _): "Look down a little"
+            case (.turnLeft, _, _): "Turn left a little"
+            case (.turnRight, _, _): "Turn right a little"
+            case (.stabilizing, _, _): "Hold still"
             case (.ready, .both, false): "Testing mode — start calibration"
             case (.ready, .both, true): "Put on the prescribed eye patch and keep your face still"
             case (.ready, .leftOnly, true), (.ready, .rightOnly, true):
