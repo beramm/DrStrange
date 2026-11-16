@@ -83,15 +83,10 @@ enum MapSpriteKind: String, CaseIterable {
     case lamp
     case finishStall
     case steppingStone
-    /// A grey rock by the path or a house.
+    /// A grey rock beside the path.
     case pathRock
     case grassTuft1, grassTuft2
     case soilSpeck
-    /// Garden plants and props, cut from the house and veggie stall art.
-    case leafyPlant
-    case onionSprout
-    case baskets
-    case veggieCrate
 
     /// Asset in the `FoxPath` namespace.
     var assetName: String {
@@ -109,10 +104,6 @@ enum MapSpriteKind: String, CaseIterable {
         case .grassTuft1: "FoxPath/GrassTuft1"
         case .grassTuft2: "FoxPath/GrassTuft2"
         case .soilSpeck: "FoxPath/SoilSpeck"
-        case .leafyPlant: "FoxPath/LeafyPlant"
-        case .onionSprout: "FoxPath/OnionSprout"
-        case .baskets: "FoxPath/Baskets"
-        case .veggieCrate: "FoxPath/VeggieCrate"
         }
     }
 
@@ -129,10 +120,6 @@ enum MapSpriteKind: String, CaseIterable {
         case .grassTuft1: CGSize(width: 16.5, height: 22)
         case .grassTuft2: CGSize(width: 16, height: 17.5)
         case .soilSpeck: CGSize(width: 35, height: 16)
-        case .leafyPlant: CGSize(width: 98, height: 83)
-        case .onionSprout: CGSize(width: 60, height: 56)
-        case .baskets: CGSize(width: 100, height: 62)
-        case .veggieCrate: CGSize(width: 110, height: 46)
         }
     }
 
@@ -152,20 +139,11 @@ enum MapSpriteKind: String, CaseIterable {
         case .onionHouseFront, .onionHouseBack: 0.18...0.81
         case .lamp: 0.2...0.8
         case .finishStall: 0.04...0.95
-        case .leafyPlant: 0.3...0.7
         default: 0...1
         }
     }
 
     /// Horizontal centre of the front door, as a fraction of the width. Front houses only.
-    /// Small garden plants and props that fill the open grass.
-    var isGardenPiece: Bool {
-        switch self {
-        case .leafyPlant, .onionSprout, .baskets, .veggieCrate: true
-        default: false
-        }
-    }
-
     var doorCenter: CGFloat? {
         switch self {
         case .carrotHouseFront: 0.5

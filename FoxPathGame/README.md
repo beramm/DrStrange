@@ -181,20 +181,23 @@ which side they come from is drawn from the same seed.
   or down, never back. The length of each straight stretch (2–3 tiles) and the height of each turn
   (1–3 rows) are drawn at random, and the path stays in the middle rows so houses fit above and
   below it. The last three tiles are always straight so the finish stall fits above them.
-- **Houses.** Carrot, mushroom and onion houses are shuffled and spread along the map: each one
-  first tries its own share of the width, so they do not bunch up on one side. A house
-  above the path shows its front with the door, stepping stones lead from the door towards the
-  path (up to five), and two more stones may sit either side of the doorstep. A house below the path shows its back and may be partly cut by the bottom edge. Three to five
-  grey rocks lie on the grass in front of every house.
+- **Houses.** Four or five carrot, mushroom and onion houses are shuffled and spread along the
+  map: each one first tries its own share of the width, so they do not bunch up on one side.
+  They take turns above and below the path, so both sides have about as many houses (at most one
+  more on one side) and neither side looks empty. When a house does not fit on its side, another
+  kind of house is tried there before the other side. A house above the path shows its front with
+  the door; a house below shows its back, may stand farther down the map and may be partly cut by
+  the bottom edge.
+- **Stepping stones.** Every front door has at least two stepping stones, and neighbouring doors
+  get different layouts: a trail that wiggles from the door down to the path (up to six stones),
+  two stones side by side below the door (sometimes with a third below them), or a trail that
+  leaves the door at a slant and ends on the grass. Small and large stones are mixed in every
+  layout. A house seen from behind sometimes has one or two stones beside it.
 - **Finish stall.** The veggie stall stands just above the end of the path, near the right edge,
   and the friend stops in front of the middle of its counter.
 - **Lamps** stand beside the path, spread along the whole walk.
 - **Rocks by the path.** Seven to ten grey rocks sit just beside the path, spread along the whole
   walk on alternating sides, never on the path itself.
-- **Gardens.** After the houses and lamps, the generator keeps finding the emptiest open spot on
-  the grass and puts a small garden there (a bed of onions, a clump of leafy plants, baskets with
-  a crate of vegetables, or plants with a basket), until no spot is more than about 165 map units
-  from scenery. The four garden styles are shuffled so neighbouring gardens differ.
 - **Grass tufts, soil specks and grass patches** are scattered over the remaining grass.
 - **Thief's side**, as described above.
 - **Clearance.** Nothing stands on the path, and nothing that is drawn in front of the friend may
@@ -284,11 +287,8 @@ transparency kept.
   their canvases and drawn at the tile scale (about 0.22 map units per pixel).
 - **Finish stall** (`Decorations/FinishStall`): the "Veggies" market stall, supplied as a separate
   file (`FINISH.png`).
-- **Cut from the supplied art** (the Drive folder has no separate props or plants):
-  `Decorations/VeggieCrate` (a crate of vegetables from the stall's counter, a garden prop), `Decorations/Baskets` (the baskets in front of the stall),
-  `Decorations/LeafyPlant` (the carrot house's leaves) and `Decorations/OnionSprout` (the top of
-  the onion house, faded into the ground). The stall's poles and counter were removed from the
-  crops.
+- Only the supplied pictures are used on the map. Nothing is cut out of other pictures or
+  drawn as extra scenery.
 - **Drawn in code:** the warning overlay, the focus ring, the role card, the ground ovals under the
   friend and the thief, and the HUD (timer and hearts).
 - **Missing:** dedicated sound effects (built-in system sounds stand in), optional background
@@ -297,7 +297,7 @@ transparency kept.
 
 ## Testing
 
-- `DrStrangeTests` has 46 unit tests for this game:
+- `DrStrangeTests` has 48 unit tests for this game:
   - `FoxPathSessionTests` (23): every character can be the primary or the thief but never both,
     the thief is the other character of the walk, roles are drawn again for each path, the clock
     starts at the first look and stops at exactly 2 minutes, time up removes a thief that is still
@@ -311,11 +311,12 @@ transparency kept.
     and nothing happens after, reaching the stall chases the thief away, the thief comes into view on
     the map beside the character, old saved settings with a level still load, and the walk is
     faster than before
-  - `FoxPathGeneratorTests` (12): seed reproducibility and variety, the path only goes right, up or
-    down and never crosses itself, the route stays on the path tiles, scenery (gardens included)
-    never stands on the path or covers the character, houses do not overlap, every map has houses,
-    lamps and one finish stall, gardens of more than one kind fill the open grass, rocks and
-    stones stay off the path, the stall stands
+  - `FoxPathGeneratorTests` (14): seed reproducibility and variety, the path only goes right, up or
+    down and never crosses itself, the route stays on the path tiles, scenery never stands on the
+    path or covers the character, houses do not overlap, every map has houses, lamps and one
+    finish stall, houses are balanced above and below the path and spread over both halves, only
+    the supplied scenery is used, every front door has stepping stones in sizes and layouts that
+    vary, rocks and stones stay off the path, the stall stands
     behind the end of the route, every picture exists in the asset catalog, and every walk cycle
     follows the distance walked
   - `FoxPathEngineTests` (8): nothing counts before the first look, the start dwell, walking speed,

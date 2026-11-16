@@ -93,30 +93,49 @@ final class FoxPathGeneratorTests: XCTestCase {
         }
     }
 
-    func testGardensFillTheOpenGrass() {
+    func testHousesAreBalancedAroundThePath() {
         for seed in seeds {
             let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
-            let pieces = map.standingSprites.filter(\.kind.isGardenPiece)
-            XCTAssertGreaterThanOrEqual(pieces.count, 4, "seed \(seed)")
-            XCTAssertGreaterThanOrEqual(Set(pieces.map(\.kind)).count, 2, "seed \(seed): more than one kind")
-
-            // No big empty area is left: every open spot has scenery nearby.
-            let line = FoxPathGenerator.pathLine(for: map.route)
-            var widest: CGFloat = 0
-            for y in stride(from: CGFloat(140), through: map.size.height - 40, by: 64) {
-                for x in stride(from: CGFloat(80), through: map.size.width - 80, by: 64) {
-                    let point = CGPoint(x: x, y: y)
-                    guard line.distance(to: point) > FoxPathMetrics.pathHalfWidth + 70 else { continue }
-                    let nearest = map.standingSprites.map { sprite -> CGFloat in
-                        let dx = max(sprite.frame.minX - x, 0, x - sprite.frame.maxX)
-                        let dy = max(sprite.frame.minY - y, 0, y - sprite.frame.maxY)
-                        return hypot(dx, dy)
-                    }.min() ?? .greatestFiniteMagnitude
-                    widest = max(widest, nearest)
-                }
-            }
-            XCTAssertLessThan(widest, 300, "seed \(seed): open grass \(widest) units from any scenery")
+            let sides = FoxPathGenerator.houseSides(of: map)
+            XCTAssertGreaterThanOrEqual(map.houses.count, 4, "seed \(seed)")
+            XCTAssertTrue(FoxPathGenerator.isBalanced(map), "seed \(seed): \(sides.above) above, \(sides.below) below")
+            // Spread along the map: both halves have a house.
+            XCTAssertTrue(map.houses.contains { $0.frame.midX < map.size.width / 2 }, "seed \(seed)")
+            XCTAssertTrue(map.houses.contains { $0.frame.midX > map.size.width / 2 }, "seed \(seed)")
         }
+    }
+
+    func testOnlySuppliedSceneryIsUsed() {
+        let kinds = Set(seeds.flatMap { seed -> [MapSpriteKind] in
+            let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
+            return (map.standingSprites + map.groundSprites).map(\.kind)
+        })
+        XCTAssertEqual(kinds.filter { !$0.isHouse }, Set<MapSpriteKind>([.lamp, .finishStall, .steppingStone, .pathRock, .grassTuft1, .grassTuft2, .soilSpeck]))
+    }
+
+    func testSteppingStonesInFrontOfDoorsVary() {
+        var layouts = Set<String>()
+        for seed in seeds {
+            let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
+            let stones = map.groundSprites.filter { $0.kind == .steppingStone }
+            var yardWidths: [CGFloat] = []
+            for house in map.houses {
+                guard let door = house.kind.doorCenter else { continue }
+                let doorX = house.frame.minX + house.frame.width * door
+                let yard = stones.filter {
+                    abs($0.frame.midX - doorX) < 260 && $0.frame.midY > house.baseline - 20 && $0.frame.midY < house.baseline + 260
+                }
+                XCTAssertGreaterThanOrEqual(yard.count, 2, "seed \(seed): stones in front of \(house.kind)")
+                guard !yard.isEmpty else { continue }
+                yardWidths += yard.map(\.frame.width)
+                // Rough shape of the layout: how many stones and which way they lead from the door.
+                let lean = yard.map { $0.frame.midX - doorX }.reduce(0, +) / CGFloat(yard.count)
+                layouts.insert("\(yard.count) \(lean < -25 ? "left" : (lean > 25 ? "right" : "down"))")
+            }
+            guard let widest = yardWidths.max(), let narrowest = yardWidths.min() else { continue }
+            XCTAssertGreaterThan(widest / narrowest, 1.1, "seed \(seed): stones of different sizes")
+        }
+        XCTAssertGreaterThanOrEqual(layouts.count, 6, "front yards should not all look alike: \(layouts)")
     }
 
     func testRocksAndStonesStayOffThePath() {
