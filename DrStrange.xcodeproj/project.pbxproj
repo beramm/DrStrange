@@ -45,7 +45,30 @@
 			);
 			target = A1D500000000000000000012 /* WhackAMoleGame */;
 		};
-		A1D5000000000000000000E3 /* Exceptions for "FoxPathGame" folder in "DrStrange" target */ = {
+		A1D5000000000000000000E3 /* Exceptions for "Slicing/Lobby/Lobby" folder in "DrStrange" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				MyApp.swift,
+			);
+			target = A1D500000000000000000010 /* DrStrange */;
+		};
+		A1D5000000000000000000E4 /* Exceptions for "DrStrange" folder in "DrStrange" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A1D500000000000000000010 /* DrStrange */;
+		};
+		A1D5000000000000000000E5 /* Exceptions for "Slicing/Lobby/Lobby" folder in "WhackAMoleGame" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				MyApp.swift,
+			);
+			target = A1D500000000000000000012 /* WhackAMoleGame */;
+		};
+		A1D5000000000000000001F3 /* Exceptions for "FoxPathGame" folder in "DrStrange" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				App/FoxPathGameApp.swift,
@@ -53,14 +76,14 @@
 			);
 			target = A1D500000000000000000010 /* DrStrange */;
 		};
-		A1D5000000000000000000E4 /* Exceptions for "FoxPathGame" folder in "FoxPathGame" target */ = {
+		A1D5000000000000000001F4 /* Exceptions for "FoxPathGame" folder in "FoxPathGame" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				README.md,
 			);
 			target = A1D500000000000000000013 /* FoxPathGame */;
 		};
-		A1D5000000000000000000E5 /* Exceptions for "WhackAMoleGame" folder in "FoxPathGame" target */ = {
+		A1D5000000000000000001F5 /* Exceptions for "WhackAMoleGame" folder in "FoxPathGame" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				App/WhackAMoleGameApp.swift,
@@ -73,6 +96,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A1D500000000000000000030 /* DrStrange */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A1D5000000000000000000E4 /* Exceptions for "DrStrange" folder in "DrStrange" target */,
+			);
 			path = DrStrange;
 			sourceTree = "<group>";
 		};
@@ -86,16 +112,25 @@
 			exceptions = (
 				A1D5000000000000000000E1 /* Exceptions for "WhackAMoleGame" folder in "DrStrange" target */,
 				A1D5000000000000000000E2 /* Exceptions for "WhackAMoleGame" folder in "WhackAMoleGame" target */,
-				A1D5000000000000000000E5 /* Exceptions for "WhackAMoleGame" folder in "FoxPathGame" target */,
+				A1D5000000000000000001F5 /* Exceptions for "WhackAMoleGame" folder in "FoxPathGame" target */,
 			);
 			path = WhackAMoleGame;
 			sourceTree = "<group>";
 		};
-		A1D500000000000000000033 /* FoxPathGame */ = {
+		A1D500000000000000000033 /* Slicing/Lobby/Lobby */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				A1D5000000000000000000E3 /* Exceptions for "FoxPathGame" folder in "DrStrange" target */,
-				A1D5000000000000000000E4 /* Exceptions for "FoxPathGame" folder in "FoxPathGame" target */,
+				A1D5000000000000000000E3 /* Exceptions for "Slicing/Lobby/Lobby" folder in "DrStrange" target */,
+				A1D5000000000000000000E5 /* Exceptions for "Slicing/Lobby/Lobby" folder in "WhackAMoleGame" target */,
+			);
+			path = Slicing/Lobby/Lobby;
+			sourceTree = "<group>";
+		};
+		A1D500000000000000000133 /* FoxPathGame */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A1D5000000000000000001F3 /* Exceptions for "FoxPathGame" folder in "DrStrange" target */,
+				A1D5000000000000000001F4 /* Exceptions for "FoxPathGame" folder in "FoxPathGame" target */,
 			);
 			path = FoxPathGame;
 			sourceTree = "<group>";
@@ -141,8 +176,9 @@
 			isa = PBXGroup;
 			children = (
 				A1D500000000000000000030 /* DrStrange */,
+				A1D500000000000000000033 /* Slicing/Lobby/Lobby */,
 				A1D500000000000000000032 /* WhackAMoleGame */,
-				A1D500000000000000000033 /* FoxPathGame */,
+				A1D500000000000000000133 /* FoxPathGame */,
 				A1D500000000000000000031 /* DrStrangeTests */,
 				A1D500000000000000000003 /* Products */,
 			);
@@ -177,7 +213,8 @@
 			fileSystemSynchronizedGroups = (
 				A1D500000000000000000030 /* DrStrange */,
 				A1D500000000000000000032 /* WhackAMoleGame */,
-				A1D500000000000000000033 /* FoxPathGame */,
+				A1D500000000000000000033 /* Slicing/Lobby/Lobby */,
+				A1D500000000000000000133 /* FoxPathGame */,
 			);
 			name = DrStrange;
 			packageProductDependencies = (
@@ -222,6 +259,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				A1D500000000000000000032 /* WhackAMoleGame */,
+				A1D500000000000000000033 /* Slicing/Lobby/Lobby */,
 			);
 			name = WhackAMoleGame;
 			packageProductDependencies = (
@@ -245,7 +283,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				A1D500000000000000000032 /* WhackAMoleGame */,
-				A1D500000000000000000033 /* FoxPathGame */,
+				A1D500000000000000000133 /* FoxPathGame */,
 			);
 			name = FoxPathGame;
 			packageProductDependencies = (
@@ -385,12 +423,14 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = DrStrange;
-				INFOPLIST_KEY_NSCameraUsageDescription = "DrStrange uses the front camera for its custom on-device gaze tracker.";
+				INFOPLIST_FILE = DrStrange/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Paddy: Patch Buddy";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Paddy: Patch Buddy uses the front camera for its custom on-device gaze tracker.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -414,12 +454,14 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = DrStrange;
-				INFOPLIST_KEY_NSCameraUsageDescription = "DrStrange uses the front camera for its custom on-device gaze tracker.";
+				INFOPLIST_FILE = DrStrange/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Paddy: Patch Buddy";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Paddy: Patch Buddy uses the front camera for its custom on-device gaze tracker.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -534,10 +576,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = WhackAMoleAccent;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8H23JMG37G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Whack-a-Mole";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Whack-a-Mole uses the front camera for its custom on-device gaze tracker.";
+				INFOPLIST_FILE = DrStrange/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Paddy: Patch Buddy";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Paddy uses the front camera for its custom on-device gaze tracker.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -563,10 +608,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = WhackAMoleAccent;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8H23JMG37G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Whack-a-Mole";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Whack-a-Mole uses the front camera for its custom on-device gaze tracker.";
+				INFOPLIST_FILE = DrStrange/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Paddy: Patch Buddy";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Paddy uses the front camera for its custom on-device gaze tracker.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

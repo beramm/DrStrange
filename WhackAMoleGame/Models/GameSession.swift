@@ -16,7 +16,11 @@ struct TrialRecord: Codable, Equatable, Identifiable {
     let level: DifficultyLevel
     /// Seconds of active play (pauses excluded) when the character appeared.
     let spawnedAt: TimeInterval
+    /// Where on the board the hole opened. Missing in sessions saved before holes were random.
+    var position: BoardPoint?
     var outcome: TrialOutcome?
+    /// Optional for backwards compatibility with session files saved before proximity scoring.
+    var pointsAwarded: Int?
 }
 
 enum SessionEndReason: String, Codable {
@@ -39,6 +43,8 @@ struct LevelChange: Codable, Equatable {
 /// These are game performance indicators only. They are not diagnostic measurements and are not
 /// evidence of clinical improvement.
 struct GameSessionRecord: Codable, Equatable, Identifiable {
+    static let defaultPointsPerHit = 10
+
     let id: UUID
     let gameIdentifier: String
     let startedAt: Date
@@ -73,6 +79,15 @@ struct GameSessionRecord: Codable, Equatable, Identifiable {
     var decoysShown: Int { trials.filter { $0.role == .decoy && $0.outcome != nil }.count }
 
     var decoyTaps: Int { trials.filter { $0.outcome == .decoyTapped }.count }
+
+    /// Saved per-hit points, with the original 10-point rule retained for legacy sessions.
+    var score: Int {
+        realTargets.reduce(into: 0) { total, trial in
+            if case .hit = trial.outcome {
+                total += trial.pointsAwarded ?? Self.defaultPointsPerHit
+            }
+        }
+    }
 
     /// Hits divided by real targets that finished (hit or missed). `nil` before any target finishes.
     var accuracy: Double? {

@@ -15,7 +15,7 @@ struct HomeView: View {
                     GameCard(
                         imageName: FoxCharacterView.assetName(1),
                         title: "Whack-a-Mole",
-                        subtitle: "Tap the friends with a star"
+                        subtitle: "Tap the moles"
                     )
                 }
                 .buttonStyle(.plain)

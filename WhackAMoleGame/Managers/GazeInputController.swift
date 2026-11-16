@@ -9,29 +9,41 @@ import UIKit
 @MainActor
 @Observable
 final class GazeInputController {
+    private static let calibrationLayout = CalibrationLayout.ninePosition
+
     private(set) var sample: GazeSample
     private(set) var activeCalibrationTarget: NormalizedGazePoint?
     private(set) var status = "Starting the front camera…"
     private(set) var cameraStatus = "ARKit input pending"
     private(set) var cameraStarted = false
     private(set) var isPreparingCalibration = false
+    private(set) var patchWearState: PatchWearState = .checking
+    private(set) var oneEyeEnforcerEnabled = true
+    private(set) var isSceneTooDark = false
 
     let cameraPreview: UIView
 
     @ObservationIgnored private let tracker: GazeTracker
     @ObservationIgnored private let cameraInput: GazeCameraInputConfiguration
+    @ObservationIgnored private let ambientLight: GazeAmbientLightConfiguration
     @ObservationIgnored private var calibrationTargets: [NormalizedGazePoint] = []
     @ObservationIgnored private var targetIndex = 0
     @ObservationIgnored private var transitionPending = false
     @ObservationIgnored private var calibrationTask: Task<Void, Never>?
     @ObservationIgnored private var wasPausedByScene = false
+    @ObservationIgnored private var patchWearMonitor = PatchWearMonitor()
 
     init() {
-        let host = GazeTrackerFactory.makeTrackerWithVolatilePreview()
+        // Paddy links only the native full-sensor ARKit tracker product. The
+        // experimental model sidecars live in the separate engineering product.
+        let host = GazeTrackerFactory.makeTrackerWithVolatilePreview(
+            faceIsolationEnabled: false
+        )
         tracker = host.tracker
         cameraPreview = host.preview
         cameraInput = host.cameraInput
-        cameraInput.mode = .zoomedOnePointFive
+        ambientLight = host.ambientLight
+        cameraInput.mode = .fullSensor
         sample = GazeSample(
             pointNormalized: nil,
             timestamp: MonotonicTimestamp(uptimeNanoseconds: 0),
@@ -43,36 +55,62 @@ final class GazeInputController {
         )
         tracker.setSampleHandler { [weak self] value in
             Task { @MainActor in
-                self?.sample = value
-                self?.processCalibrationState()
+                self?.consume(value)
             }
         }
     }
 
     var isReadyToCalibrate: Bool {
-        cameraStarted && sample.setupState == .ready && sample.eyeAvailability == .rightOnly
+        cameraStarted &&
+            sample.setupState == .ready &&
+            visibleEyeIsAvailable &&
+            isPatchVerified &&
+            !isSceneTooDark
+    }
+
+    var calibrationNeedsGuidance: Bool {
+        activeCalibrationTarget != nil && !isReadyToCalibrate
     }
 
     var isCalibrated: Bool { sample.calibrationState == .calibrated }
+
+    var isPatchVerified: Bool { !oneEyeEnforcerEnabled || patchWearState == .verified }
 
     var hasUsableGaze: Bool {
         isCalibrated &&
             sample.trackingState == .tracking &&
             sample.setupState == .ready &&
-            sample.eyeAvailability == .rightOnly &&
+            visibleEyeIsAvailable &&
             sample.quality.level == .usable &&
             sample.pointNormalized != nil
     }
 
+    private var visibleEyeIsAvailable: Bool {
+        sample.eyeAvailability == .leftOnly ||
+            sample.eyeAvailability == .rightOnly ||
+            (!oneEyeEnforcerEnabled && sample.eyeAvailability == .both)
+    }
+
+    func setOneEyeEnforcerEnabled(_ enabled: Bool) {
+        guard oneEyeEnforcerEnabled != enabled else { return }
+        oneEyeEnforcerEnabled = enabled
+        tracker.setOneEyeEnforcementEnabled(enabled)
+        patchWearMonitor.reset()
+        patchWearState = enabled ? .checking : .verified
+        processCalibrationState()
+    }
+
     func startCamera() {
         guard !cameraStarted else { return }
-        cameraInput.mode = .zoomedOnePointFive
+        cameraInput.mode = .fullSensor
         Task {
             do {
                 try await tracker.start()
                 cameraStarted = true
                 updateCameraStatus()
-                status = "Centre your face 40–60 cm away and keep the right eye visible"
+                status = oneEyeEnforcerEnabled
+                    ? "Centre your face 40–60 cm away and keep the uncovered eye visible"
+                    : "Testing mode — centre your face and keep your eyes visible"
             } catch {
                 updateCameraStatus()
                 status = "Camera start failed: \(error)"
@@ -89,7 +127,7 @@ final class GazeInputController {
         status = "Hold still — calibration begins in 3 seconds"
 
         do {
-            try tracker.beginCalibration(layout: .perimeterToCentre13)
+            try tracker.beginCalibration(layout: Self.calibrationLayout)
         } catch {
             transitionPending = false
             isPreparingCalibration = false
@@ -100,7 +138,7 @@ final class GazeInputController {
         calibrationTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
             guard let self, !Task.isCancelled else { return }
-            calibrationTargets = CalibrationLayout.perimeterToCentre13.targets
+            calibrationTargets = Self.calibrationLayout.targets
             targetIndex = 0
             transitionPending = false
             isPreparingCalibration = false
@@ -116,6 +154,9 @@ final class GazeInputController {
         transitionPending = false
         isPreparingCalibration = false
         activeCalibrationTarget = nil
+        patchWearMonitor.reset()
+        patchWearState = oneEyeEnforcerEnabled ? .checking : .verified
+        isSceneTooDark = false
         status = "Stopped; volatile gaze and calibration data discarded"
         cameraStatus = "ARKit input stopped; camera restored to 1.0×"
     }
@@ -161,11 +202,23 @@ final class GazeInputController {
 
     private func processCalibrationState() {
         if cameraStarted, activeCalibrationTarget == nil, !isPreparingCalibration, !isCalibrated {
-            status = switch (sample.setupState, sample.eyeAvailability) {
-            case (.tooClose, _): "Move farther from the front camera"
-            case (.tooFar, _): "Move closer to the front camera"
-            case (.ready, .rightOnly): "Ready — start calibration"
-            case (.ready, _): "Keep the selected right eye open and visible"
+            status = switch (sample.setupState, sample.eyeAvailability, oneEyeEnforcerEnabled) {
+            case (.tooClose, _, _): "Move farther from the front camera"
+            case (.tooFar, _, _): "Move closer to the front camera"
+            case (.misaligned, _, _): "Point your nose at the iPad"
+            case (.lookUp, _, _): "Look up a little"
+            case (.lookDown, _, _): "Look down a little"
+            case (.turnLeft, _, _): "Turn left a little"
+            case (.turnRight, _, _): "Turn right a little"
+            case (.stabilizing, _, _): "Hold still"
+            case (.ready, .both, false): "Testing mode — start calibration"
+            case (.ready, .both, true): "Put on the prescribed eye patch and keep your face still"
+            case (.ready, .leftOnly, true), (.ready, .rightOnly, true):
+                patchWearState == .verified
+                    ? "One-eye check passed — start calibration"
+                    : "Checking the patch — keep still"
+            case (.ready, .leftOnly, false), (.ready, .rightOnly, false): "Testing mode — start calibration"
+            case (.ready, .none, _): "Keep the uncovered eye open and visible"
             default: "Centre your face 40–60 cm from the landscape camera"
             }
         }
@@ -200,5 +253,30 @@ final class GazeInputController {
         } else {
             cameraStatus = "Custom ARKit camera input unavailable"
         }
+    }
+
+    private func consume(_ value: GazeSample) {
+        sample = value
+        isSceneTooDark = ambientLight.state() == .tooDark
+        guard oneEyeEnforcerEnabled else {
+            patchWearState = .verified
+            processCalibrationState()
+            return
+        }
+        let observation: PatchEyeObservation
+        if value.setupState != .ready {
+            observation = .unavailable
+        } else {
+            observation = switch value.eyeAvailability {
+            case .both: .bothEyes
+            case .leftOnly, .rightOnly: .singleEye
+            case .none: .unavailable
+            }
+        }
+        patchWearState = patchWearMonitor.consume(
+            observation,
+            timestampNanoseconds: value.timestamp.uptimeNanoseconds
+        )
+        processCalibrationState()
     }
 }

@@ -123,6 +123,61 @@ intermittent publication-latency p90 values as high as 56.374 ms while every
 maximum stayed below 100 ms; this remains an engineering risk for later mapping
 and robustness work.
 
+## Engineering face-isolation assessment
+
+The gaze-owned `DemoApp` contains an engineering-only, volatile face-isolation
+assessment. It runs Vision face detection at up to 10 Hz on a separate queue,
+adds 35% square padding around the largest detected face, and renders a
+normalized `224×224` crop beside the full ARKit preview. The crop is a candidate
+model input only: it does not drive the ARKit gaze mapper, calibration, or
+gameplay.
+
+The app reports face-detection rate, source pixels retained, crop-processing
+latency, and separate gaze-stream p90/maximum latency and rate while isolation
+is on versus off. To compare on the target iPad:
+
+1. Start the camera at the supported 40–60 cm distance with isolation on.
+2. Hold the ordinary test pose for at least 30 seconds, including the intended
+   patch and glasses condition when applicable.
+3. Turn isolation off for at least 30 seconds without changing the setup.
+4. Compare the on/off gaze figures. The existing complete-pipeline gates remain
+   at least 30 valid samples/second, p90 latency at or below 50 ms, and maximum
+   latency at or below 100 ms.
+5. Use **Reset comparison** before changing distance, lighting, patch side, or
+   eyewear so conditions are not mixed.
+
+Images, face bounds, and crops remain in volatile memory and are cleared on
+stop. Only rolling aggregate timings and counts are shown; the assessment does
+not persist, log, cache, or transmit them.
+
+The demo also exposes an engineering-only **Enforce one-eye-only input**
+toggle. It defaults to on. Turning it off allows either the selected right eye
+alone or both eyes to satisfy calibration and validation availability; it does
+not allow left-eye-only or no-eye input. Changing the toggle invalidates any
+current calibration so samples collected under different eye rules are never
+mixed.
+
+## Engineering BlazeGaze shadow
+
+The demo now also runs a real, engineering-only BlazeGaze candidate beside the
+unchanged ARKit control. Google MediaPipe Face Landmarker produces a 478-point
+mesh on-device; the pinned MacGaze/WebEyeTrack homography then creates the
+actual `512×128` two-eye strip shown in the UI. Core ML consumes that strip,
+the MediaPipe head rotation, and a centimetre-scale face origin. The green
+cursor is raw BlazeGaze output until at least three accepted calibration
+targets are available, then uses a small Gaussian RBF correction fitted only
+from the current volatile calibration.
+
+The square `224×224` preview remains a diagnostic and is explicitly not the
+model tensor. ARKit remains the control and continues to own calibration state,
+held-out validation, and the public seven-field sample. The shadow model does
+not drive gameplay. Frames, landmarks, eye strips, predictions, and RBF pairs
+are memory-only and cleared on stop.
+
+Model artifacts and their checksums/licenses are recorded in
+`DemoApp/App/Models/THIRD_PARTY_NOTICES.md`. The target iPad must still produce
+held-out accuracy evidence before this candidate can be adopted.
+
 ## Build and test
 
 Run contract tests on the development Mac:

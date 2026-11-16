@@ -134,6 +134,43 @@ final class SpawnManagerTests: XCTestCase {
         }
     }
 
+    func testPositionsStayInsideTheLevelsPartOfTheBoard() {
+        for level in DifficultyLevel.allCases {
+            var manager = makeManager(level: level)
+            let spread = DifficultySettings.defaults(for: level).boardSpread
+            for _ in 0..<300 {
+                let position = manager.makeSpawn(occupiedHoles: [])!.position
+                XCTAssertLessThanOrEqual(abs(position.x - 0.5), spread / 2 + 1e-9)
+                XCTAssertLessThanOrEqual(abs(position.y - 0.5), spread / 2 + 1e-9)
+            }
+        }
+    }
+
+    func testNewHoleKeepsClearOfOpenHoles() {
+        var manager = makeManager(level: .advanced)
+        let open = BoardPoint(x: 0.5, y: 0.5)
+        for _ in 0..<300 {
+            let position = manager.makeSpawn(occupiedHoles: [4], openPositions: [open])!.position
+            XCTAssertGreaterThanOrEqual(position.distance(to: open), SpawnRules().minimumHoleSeparation)
+        }
+    }
+
+    func testPositionsAreContinuousNotASmallSet() {
+        var manager = makeManager(level: .advanced)
+        let spots = Set((0..<200).map { _ in
+            let position = manager.makeSpawn(occupiedHoles: [])!.position
+            return Int(position.x * 1000) * 1000 + Int(position.y * 1000)
+        })
+        XCTAssertGreaterThan(spots.count, 190, "holes are not tied to a fixed set of positions")
+    }
+
+    func testAllHoleImagesAreUsedEvenly() {
+        var manager = makeManager(level: .advanced)
+        var counts: [Int: Int] = [:]
+        for _ in 0..<300 { counts[manager.makeSpawn(occupiedHoles: [])!.artIndex, default: 0] += 1 }
+        XCTAssertEqual(counts, [0: 100, 1: 100, 2: 100])
+    }
+
     func testTimingStaysInConfiguredRanges() {
         let settings = DifficultySettings.defaults(for: .intermediate)
         var manager = makeManager(level: .intermediate)
@@ -142,6 +179,12 @@ final class SpawnManagerTests: XCTestCase {
             let duration = manager.makeSpawn(occupiedHoles: [])!.visibleDuration
             XCTAssertEqual(duration, settings.visibleDuration, accuracy: settings.visibleDuration * settings.visibleDurationJitter + 1e-9)
         }
+    }
+
+    func testMoleVisibleDurationsAreTwiceTheOriginalValues() {
+        XCTAssertEqual(DifficultySettings.defaults(for: .beginner).visibleDuration, 6.4)
+        XCTAssertEqual(DifficultySettings.defaults(for: .intermediate).visibleDuration, 5.2)
+        XCTAssertEqual(DifficultySettings.defaults(for: .advanced).visibleDuration, 4.4)
     }
 }
 
