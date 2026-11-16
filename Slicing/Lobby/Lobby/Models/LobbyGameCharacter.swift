@@ -18,27 +18,26 @@ nonisolated struct GameCharacter: Identifiable, Hashable {
         id: "fox",
         name: "Doomie",
         tagline: "“Small paws, big adventures\nthis little fox is ready to farm”",
-        imageName: Buddy.imageName
+        imageName: "CharacterFox"
+    )
+
+    static let bunny = GameCharacter(
+        id: "bunny",
+        name: "Bea",
+        tagline: "“Floppy ears, happy cheers\nthis little bunny loves to hop”",
+        imageName: "CharacterBunny"
+    )
+
+    static let raccoon = GameCharacter(
+        id: "raccoon",
+        name: "Coonie",
+        tagline: "“Striped tail, never fail\nthis little raccoon finds every treat”",
+        imageName: "CharacterRaccoon"
     )
 
     /// Every character on the select screen, in order.
-    /// Bunny and Bear are prototype characters (placeholder art and text)
-    /// until the design team's characters arrive.
-    static let all: [GameCharacter] = [
-        fox,
-        GameCharacter(
-            id: "bunny",
-            name: "Bunny",
-            tagline: "“Hop, hop, hooray!\nthis bunny is ready to play”",
-            imageName: "Bunny"
-        ),
-        GameCharacter(
-            id: "bear",
-            name: "Bear",
-            tagline: "“Big hugs, bigger smiles\nthis bear is ready to help”",
-            imageName: "Bear"
-        ),
-    ]
+    /// The taglines of Bea and Coonie are placeholders and can still change.
+    static let all: [GameCharacter] = [fox, bunny, raccoon]
 
     /// Key used to save the chosen character on the device.
     static let storageKey = "selectedCharacterID"

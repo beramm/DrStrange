@@ -9,6 +9,7 @@ import SwiftUI
 
 extension Font {
     /// Doodle Chalk: buttons and screen titles (file: Fonts/Doodlechalk.ttf).
+    /// Use `.doodleText(size:)` on text instead, so it also gets its letter spacing.
     static func doodle(_ size: CGFloat) -> Font {
         .custom("DoodleChalkDemoRegular", size: size)
     }
@@ -21,5 +22,15 @@ extension Font {
     /// Belanosima: character tagline on the character card.
     static func belanosima(_ size: CGFloat) -> Font {
         .custom("Belanosima-Regular", size: size)
+    }
+}
+
+extension View {
+    /// Doodle Chalk with extra space between the letters. Without it the letters
+    /// sit too close together. The design asks for tracking 25 (25/1000 of the
+    /// font size, which is 4 px on 160 px text), so the space grows with the text.
+    func doodleText(size: CGFloat) -> some View {
+        font(.doodle(size))
+            .tracking(size * 0.025)
     }
 }

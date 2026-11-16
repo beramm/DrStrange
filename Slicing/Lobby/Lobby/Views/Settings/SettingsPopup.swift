@@ -1,0 +1,204 @@
+//
+//  SettingsPopup.swift
+//  The Setting pop-up, from the final design: a faded brown layer over the
+//  screen, with the Setting card on top.
+//
+//  Changes are only kept when the player taps SAVE. The X closes the card and
+//  forgets the changes.
+//
+//  Positions are fractions (0–1) of the card picture's width and height,
+//  so the card looks the same at every size.
+//
+
+import SwiftUI
+
+struct SettingsPopup: View {
+    let onClose: () -> Void
+
+    @AppStorage(AppSettings.languageKey) private var savedLanguage = AppLanguage.english
+    @AppStorage(AppSettings.backgroundSoundKey) private var savedBackgroundSound = true
+    @AppStorage(AppSettings.soundEffectsKey) private var savedSoundEffects = true
+    @AppStorage(AppSettings.wearsEyePatchKey) private var savedWearsEyePatch = true
+    @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var savedRandomSpin = true
+    @AppStorage(AppSettings.gamesLockedKey) private var savedGamesLocked = true
+
+    // The choices on the card, before they are saved.
+    @State private var language = AppLanguage.english
+    @State private var backgroundSound = true
+    @State private var soundEffects = true
+    @State private var wearsEyePatch = true
+    @State private var randomSpin = true
+    @State private var gamesLocked = true
+
+    /// Width ÷ height of the card picture.
+    private let cardAspect: CGFloat = 1933 / 1405
+
+    var body: some View {
+        GeometryReader { geo in
+            // As big as fits: at most 70% of the screen width and 90% of its height.
+            let width = min(geo.size.width * 0.7, geo.size.height * 0.9 * cardAspect)
+            let height = width / cardAspect
+
+            ZStack {
+                // Faded brown layer. It catches taps, so the screen behind can't be used.
+                Color.popupShade
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {}
+                    .accessibilityHidden(true)
+
+                card(width: width, height: height)
+                    .frame(width: width, height: height)
+                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            }
+        }
+        .onAppear(perform: loadSaved)
+    }
+
+    private func card(width w: CGFloat, height h: CGFloat) -> some View {
+        let pillHeight = h * 0.075
+
+        return ZStack(alignment: .topLeading) {
+            // The card picture already shows the "SETTING" title.
+            Image("SettingsCard")
+                .resizable()
+                .accessibilityLabel("Setting")
+                .accessibilityAddTraits(.isHeader)
+
+            Button(action: onClose) {
+                Image("ButtonClose")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: w * 0.085)
+            }
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityLabel("Close")
+            .position(x: w * 0.9, y: h * 0.11)
+
+            row("Language", y: 0.245, width: w, height: h) {
+                ChoicePill(title: "English", isChosen: language == .english, width: w * 0.19, height: pillHeight) {
+                    language = .english
+                }
+                ChoicePill(title: "Bahasa", isChosen: language == .bahasa, width: w * 0.19, height: pillHeight) {
+                    language = .bahasa
+                }
+            }
+
+            row("Background sound", y: 0.345, width: w, height: h) {
+                onOffPills(isOn: $backgroundSound, pillHeight: pillHeight, width: w)
+            }
+
+            row("Sound effect", y: 0.445, width: w, height: h) {
+                onOffPills(isOn: $soundEffects, pillHeight: pillHeight, width: w)
+            }
+
+            // Testing option: NO lets someone play with both eyes open.
+            row("Wearing eye patch", y: 0.545, width: w, height: h) {
+                ChoicePill(title: "Yes", isChosen: wearsEyePatch, width: w * 0.115, height: pillHeight) {
+                    wearsEyePatch = true
+                }
+                ChoicePill(title: "No", isChosen: !wearsEyePatch, width: w * 0.115, height: pillHeight) {
+                    wearsEyePatch = false
+                }
+            }
+
+            row("Random game", y: 0.645, width: w, height: h) {
+                onOffPills(isOn: $randomSpin, pillHeight: pillHeight, width: w)
+            }
+
+            // Testing option: ON leaves only Whack a Mole playable.
+            row("Lock games", y: 0.745, width: w, height: h) {
+                onOffPills(isOn: $gamesLocked, pillHeight: pillHeight, width: w)
+            }
+
+            Button(action: save) {
+                Image("ButtonBoard")
+                    .resizable()
+                    .scaledToFit()
+                    .overlay {
+                        Text("Save")
+                            .textCase(.uppercase)
+                            .doodleText(size: h * 0.068)
+                            .foregroundStyle(Color.signText)
+                            // The board's thick bottom edge: lift the word a little.
+                            .offset(y: -h * 0.008)
+                    }
+                    .frame(width: w * 0.25)
+            }
+            .buttonStyle(PressableButtonStyle())
+            .position(x: w * 0.5, y: h * 0.87)
+        }
+    }
+
+    /// One setting: its name on the left, its choices on the right.
+    private func row<Choices: View>(
+        _ title: LocalizedStringKey,
+        y: CGFloat,
+        width w: CGFloat,
+        height h: CGFloat,
+        @ViewBuilder choices: () -> Choices
+    ) -> some View {
+        HStack(spacing: w * 0.015) {
+            Text(title)
+                .textCase(.uppercase)
+                .font(.daysOne(h * 0.042))
+                .foregroundStyle(Color.pillOutline)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Spacer(minLength: w * 0.02)
+            choices()
+        }
+        .accessibilityElement(children: .contain)
+        .frame(width: w * 0.86)
+        .position(x: w * 0.5, y: h * y)
+    }
+
+    private func onOffPills(isOn: Binding<Bool>, pillHeight: CGFloat, width w: CGFloat) -> some View {
+        HStack(spacing: w * 0.015) {
+            ChoicePill(title: "On", isChosen: isOn.wrappedValue, width: w * 0.115, height: pillHeight) {
+                isOn.wrappedValue = true
+            }
+            ChoicePill(title: "Off", isChosen: !isOn.wrappedValue, width: w * 0.115, height: pillHeight) {
+                isOn.wrappedValue = false
+            }
+        }
+    }
+
+    /// Shows the saved settings on the card.
+    private func loadSaved() {
+        language = savedLanguage
+        backgroundSound = savedBackgroundSound
+        soundEffects = savedSoundEffects
+        wearsEyePatch = savedWearsEyePatch
+        randomSpin = savedRandomSpin
+        gamesLocked = savedGamesLocked
+        #if canImport(DrStrangeGazeTracker)
+        // In the Paddy app, Whack-a-Mole keeps this choice in its own settings.
+        wearsEyePatch = ConfigurationStore.standard.load().oneEyeEnforcerEnabled
+        #endif
+    }
+
+    /// Keeps the choices on the card, then closes it.
+    private func save() {
+        savedLanguage = language
+        savedBackgroundSound = backgroundSound
+        savedSoundEffects = soundEffects
+        savedWearsEyePatch = wearsEyePatch
+        savedRandomSpin = randomSpin
+        savedGamesLocked = gamesLocked
+        #if canImport(DrStrangeGazeTracker)
+        // Whack-a-Mole's patch check ("one-eye enforcer") follows the eye patch choice.
+        var configuration = ConfigurationStore.standard.load()
+        configuration.oneEyeEnforcerEnabled = wearsEyePatch
+        ConfigurationStore.standard.save(configuration)
+        #endif
+        onClose()
+    }
+}
+
+#Preview(traits: .landscapeLeft) {
+    ZStack {
+        LobbyScenery()
+        SettingsPopup(onClose: {})
+    }
+}

@@ -41,7 +41,7 @@ struct CharacterSelectView: View {
 
                 Text("Choose your character")
                     .textCase(.uppercase)
-                    .font(.doodle(80 * s))
+                    .doodleText(size: 80 * s)
                     .foregroundStyle(Color.titleBrown)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
