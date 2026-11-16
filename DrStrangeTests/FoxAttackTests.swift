@@ -290,10 +290,10 @@ final class FoxAttackTests: XCTestCase {
         let old = #"{"startingLevel":2,"sessionDuration":300,"adaptiveDifficulty":{"isEnabled":true},"patching":{"patchedEye":"left"},"soundEnabled":false}"#
         let configuration = try JSONDecoder().decode(GameConfiguration.self, from: Data(old.utf8))
         XCTAssertEqual(configuration.board, .standard)
-        XCTAssertEqual(configuration.scoring, ScoringRules())
         XCTAssertEqual(configuration.patching.patchedEye, .left)
         XCTAssertFalse(configuration.soundEnabled)
         XCTAssertEqual(configuration.foxAttack, FoxAttackTiming())
+        XCTAssertTrue(configuration.oneEyeEnforcerEnabled)
     }
 
     func testSettingsWithOlderFoxTimingStillLoad() throws {

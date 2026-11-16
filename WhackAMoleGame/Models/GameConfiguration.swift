@@ -58,57 +58,19 @@ struct DifficultySettings: Codable, Equatable {
     var decoyProbability: Double
 
     /// The one board every game uses: holes open in two rows of zones, at most two moles up at a
-    /// time, three character looks and no sleeping moles.
+    /// time, three character looks and no sleeping moles. Moles stay up long enough for a gaze
+    /// selection.
     static let standard = DifficultySettings(
         activeHoleIndices: [0, 1, 2, 3, 4, 5],
         boardSpread: 0.9,
         targetScale: 0.8,
         spawnIntervalRange: 1.9...2.9,
-        visibleDuration: 2.6,
+        visibleDuration: 5.2,
         visibleDurationJitter: 0.1,
         maxSimultaneousTargets: 2,
         characterVariantCount: 3,
         decoyProbability: 0
     )
-}
-
-/// How fast a hit was, from the moment the character starts to rise until it is tapped (or
-/// selected by gaze). A gameplay rating only; it is not a measure of vision or reaction time.
-enum HitRating: String, Codable, CaseIterable, Identifiable {
-    case perfect
-    case great
-    case good
-
-    var id: String { rawValue }
-
-    var points: Int {
-        switch self {
-        case .perfect: 30
-        case .great: 20
-        case .good: 10
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .perfect: "Perfect"
-        case .great: "Great"
-        case .good: "Good"
-        }
-    }
-}
-
-/// Response-time limits for each rating. `.gameDesign` placeholders, chosen so a gaze selection
-/// (the mole climbing out for 0.55 s plus a 0.6 s dwell) can still earn Perfect.
-struct ScoringRules: Codable, Equatable {
-    var perfectWithin: TimeInterval = 1.4
-    var greatWithin: TimeInterval = 2.0
-
-    func rating(forResponseTime responseTime: TimeInterval) -> HitRating {
-        if responseTime <= perfectWithin { return .perfect }
-        if responseTime <= greatWithin { return .great }
-        return .good
-    }
 }
 
 /// Rules for where characters may appear. All `.gameDesign`.
@@ -144,10 +106,11 @@ struct GameConfiguration: Codable, Equatable {
     static let sessionDuration: TimeInterval = 120
 
     var board = DifficultySettings.standard
-    var scoring = ScoringRules()
     var spawnRules = SpawnRules()
     var foxAttack = FoxAttackTiming()
     var patching = PatchingConfiguration()
+    /// Engineering switch for testing gaze control without a patch. Production behavior defaults on.
+    var oneEyeEnforcerEnabled = true
     var soundEnabled: Bool = true
     var hapticsEnabled: Bool = true
     /// Fixed seed for reproducible sessions (research / QA). `nil` picks a fresh seed each session.
@@ -162,11 +125,11 @@ extension GameConfiguration {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = GameConfiguration()
         board = (try? container.decodeIfPresent(DifficultySettings.self, forKey: .board)) ?? defaults.board
-        scoring = (try? container.decodeIfPresent(ScoringRules.self, forKey: .scoring)) ?? defaults.scoring
         spawnRules = (try? container.decodeIfPresent(SpawnRules.self, forKey: .spawnRules)) ?? defaults.spawnRules
         // Timing saved by an older version has different fields; fall back to the defaults.
         foxAttack = (try? container.decodeIfPresent(FoxAttackTiming.self, forKey: .foxAttack)) ?? defaults.foxAttack
         patching = try container.decodeIfPresent(PatchingConfiguration.self, forKey: .patching) ?? defaults.patching
+        oneEyeEnforcerEnabled = try container.decodeIfPresent(Bool.self, forKey: .oneEyeEnforcerEnabled) ?? defaults.oneEyeEnforcerEnabled
         soundEnabled = try container.decodeIfPresent(Bool.self, forKey: .soundEnabled) ?? defaults.soundEnabled
         hapticsEnabled = try container.decodeIfPresent(Bool.self, forKey: .hapticsEnabled) ?? defaults.hapticsEnabled
         randomSeed = try container.decodeIfPresent(UInt64.self, forKey: .randomSeed)

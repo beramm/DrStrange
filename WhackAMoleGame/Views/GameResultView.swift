@@ -84,11 +84,9 @@ struct GameResultView: View {
 
     private var metrics: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
-            ForEach(HitRating.allCases) { rating in
-                MetricTile(title: "\(rating.title) (+\(rating.points))", value: "\(session.count(of: rating))")
-            }
-            MetricTile(title: "Missed", value: "\(session.misses)")
             MetricTile(title: "Characters", value: "\(session.targetsSpawned)")
+            MetricTile(title: "Hits", value: "\(session.hits)")
+            MetricTile(title: "Missed", value: "\(session.misses)")
             MetricTile(title: "Accuracy", value: session.accuracy.map { $0.formatted(.percent.precision(.fractionLength(0))) } ?? "–")
             MetricTile(title: "Avg. response", value: session.averageResponseTime.map { String(format: "%.2f s", $0) } ?? "–")
             MetricTile(title: "Play time", value: SessionProgressView.format(Int(session.activePlayDuration.rounded())))

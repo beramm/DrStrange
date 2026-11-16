@@ -36,8 +36,8 @@ struct SessionStore {
     }()
 }
 
-/// Remembers the last used settings on this device. The board and scoring always come from the
-/// current defaults, so a change to them reaches every device; saved session records keep the
+/// Remembers the last used settings on this device. The board always comes from the current
+/// defaults, so a change to them reaches every device; saved session records keep the
 /// values each game was played with.
 struct ConfigurationStore {
     private static let key = "whackAMole.configuration"
@@ -52,7 +52,6 @@ struct ConfigurationStore {
         }
         let defaults = GameConfiguration()
         configuration.board = defaults.board
-        configuration.scoring = defaults.scoring
         return configuration
     }
 

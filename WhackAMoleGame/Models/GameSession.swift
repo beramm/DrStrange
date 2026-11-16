@@ -18,6 +18,8 @@ struct TrialRecord: Codable, Equatable, Identifiable {
     /// Where on the board the hole opened. Missing in sessions saved before holes were random.
     var position: BoardPoint?
     var outcome: TrialOutcome?
+    /// Optional for backwards compatibility with session files saved before proximity scoring.
+    var pointsAwarded: Int?
 }
 
 enum SessionEndReason: String, Codable {
@@ -34,6 +36,8 @@ enum SessionEndReason: String, Codable {
 /// These are game performance indicators only. They are not diagnostic measurements and are not
 /// evidence of clinical improvement.
 struct GameSessionRecord: Codable, Equatable, Identifiable {
+    static let defaultPointsPerHit = 10
+
     let id: UUID
     let gameIdentifier: String
     let startedAt: Date
@@ -66,26 +70,19 @@ struct GameSessionRecord: Codable, Equatable, Identifiable {
 
     var decoyTaps: Int { trials.filter { $0.outcome == .decoyTapped }.count }
 
-    /// Hits divided by real targets that finished (hit or missed). `nil` before any target finishes.
-    var accuracy: Double? {
-        targetsSpawned == 0 ? nil : Double(hits) / Double(targetsSpawned)
-    }
-
-    /// Rating of each hit, in the order the characters appeared.
-    var hitRatings: [HitRating] {
-        realTargets.compactMap { trial -> HitRating? in
-            if case let .hit(responseTime) = trial.outcome {
-                configuration.scoring.rating(forResponseTime: responseTime)
-            } else {
-                nil
+    /// Saved per-hit points, with the original 10-point rule retained for legacy sessions.
+    var score: Int {
+        realTargets.reduce(into: 0) { total, trial in
+            if case .hit = trial.outcome {
+                total += trial.pointsAwarded ?? Self.defaultPointsPerHit
             }
         }
     }
 
-    /// Points from every hit: Perfect 30, Great 20, Good 10. Misses and sleepy taps cost nothing.
-    var score: Int { hitRatings.reduce(0) { $0 + $1.points } }
-
-    func count(of rating: HitRating) -> Int { hitRatings.filter { $0 == rating }.count }
+    /// Hits divided by real targets that finished (hit or missed). `nil` before any target finishes.
+    var accuracy: Double? {
+        targetsSpawned == 0 ? nil : Double(hits) / Double(targetsSpawned)
+    }
 
     /// Mean time from a character starting to appear until it was tapped.
     var averageResponseTime: TimeInterval? {

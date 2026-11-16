@@ -47,14 +47,17 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 - Every game lasts **2 minutes** of play (pauses excluded). This is the length of one round, a
   gameplay choice. It is not a recommended patching or play time, and it cannot be changed in the
   app.
-- The app never works out which eye is amblyopic, never suggests patch wear time, and does not use
-  the camera, so it cannot and does not claim that the patch is worn or on the correct eye.
+- The app never works out which eye is amblyopic or suggests patch wear time. Its on-device camera
+  heuristic requires the selected right eye to remain visible while the other eye is obscured; it
+  cannot confirm the patch material, fit, or prescription.
 - The patching screen includes short guidance for parents and caregivers: patch first, supervise,
   stop if there is discomfort, keep check-ups, and scores are not an eye test.
 
 ### Comfort and stopping
 
 - **Pause** (top right) freezes the game clock. Leaving the app pauses automatically.
+- If both eyes remain visible for 1 second, the game pauses. Play stays disabled until only the
+  selected right eye has been consistently visible again for 1.5 seconds.
 - The pause screen has **Rest my eyes**, which ends the session straight away and shows the
   summary. It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
 - **✕** (top left) asks "Stop the game?" and then also shows the summary.
@@ -62,23 +65,18 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 
 ## Gameplay
 
-The home screen has two ways to play:
-
-- **Calibrate & Play** runs the gaze calibration and then plays with eye control (the child looks
-  at a mole to hit it).
-- **Play with a finger** starts the game straight away and the child taps the moles. It uses no
-  camera and no calibration, which is handy for trying the game, for practice, or on a device
-  where gaze tracking does not work well. The rules, the 2 minutes and the scoring are the same.
+**Calibrate & Play** on the home screen runs the gaze calibration and then plays with eye control:
+the child looks at a mole to hit it. The moles do not respond to touch.
 
 1. The game starts on an empty painted meadow, with no holes showing. A hole opens at a random spot and a
    mole climbs out of it, frame by frame.
-2. The child finds it and taps it. The whole hole area counts, so taps do not need to be precise.
+2. The child finds it and keeps looking at it until the gaze dwell completes.
 3. The fox's yellow card opens beside that mole: it grows from its centre as a rounded square with
    a slight spring, and a square ring ripples out. Meanwhile the fox fades out of its corner.
 4. The fox rises up from the bottom of the card and swings. Its hammer slides out from behind the
    card and lands on the mole's helmet. The mole screws up its face, plays its 24-frame hit
-   animation sinking back down the hole, and the rating with its points floats up, for example
-   "Perfect +30". There is no flashing and the motion is short.
+   animation sinking back down the hole, and the points float up in an illustrated bubble
+   (Perfect, Good or OK). There is no flashing and the motion is short.
 5. The hammer slides back behind
    the card, the fox sinks down out of its bottom, the empty card shrinks away and the fox is back
    in its corner.
@@ -96,25 +94,24 @@ the fox does not attack it.
 
 ### Scoring
 
-Each hit is rated by how quickly the mole was tapped (or selected by gaze), measured from the
-moment it starts to climb out of its hole:
+Each gaze hit scores by how close the child's gaze stayed to the centre of the mole during the
+dwell (`GazeProximityTier`, the median distance divided by the outer activation radius):
 
-| Rating | Response time | Points |
+| Bubble | Gaze distance from the centre | Points |
 |---|---|---|
-| Perfect | up to 1.4 s | 30 |
-| Great | up to 2.0 s | 20 |
-| Good | slower, while the mole is still up | 10 |
+| Perfect | up to 0.35 | 60 |
+| Good | up to 0.70 | 30 |
+| OK | further out, still inside the activation radius | 20 |
 
-The limits leave room for gaze play: a mole takes 0.55 s to climb out and a gaze selection needs a
-0.6 s dwell, so a quick look still earns Perfect. Misses and sleeping-mole taps cost nothing. The
-points appear when the hammer lands; a hit tapped just before the game ends still counts.
+A hit without a gaze tier (for example in sessions saved before proximity scoring) counts 10
+points. Misses and sleeping-mole taps cost nothing. The points appear when the hammer lands; a hit
+made just before the game ends still counts.
 
 ### High score
 
 The home screen shows the best score on this iPad, and the result screen shows "New high score!"
 when a game beats it (a tie does not). Only that one number is kept, in `UserDefaults`
-(`whackAMole.highScore`). Games that were stopped early count too, and so do games played with a
-finger.
+(`whackAMole.highScore`). Games that were stopped early count too.
 
 ### The fox attack
 
@@ -146,11 +143,11 @@ The sequence always runs in this order:
 |---|---|---|
 | `idle` | No character on the board; the fox waits in its corner. | – |
 | `targetAppearing` | A mole is climbing out of its hole (24 frames). | 0.55 s |
-| `targetActive` | A character is up and can be tapped; the fox waits with its hammer raised. | 2.6 s ±10 % |
+| `targetActive` | A character is up and can be selected; the fox waits with its hammer raised. | 5.2 s ±10 % |
 | `frameAppearing` | After a valid tap, the yellow card opens beside the character: the whole card, border included, grows from its centre as a rounded square with a slight spring, and a square ring ripples out. The corner fox fades away. | 0.34 s |
 | `foxEmerging` | The fox rises up from the bottom of the card, clipped to the inside of the card, with its hammer hidden. | 0.36 s |
 | `foxAttacking` | The fox leans in and swings (frames 1→21, speeding up) while the hammer slides out from behind the card. It ends at impact. | 0.36 s |
-| `targetHit` | The hammer is on the helmet (frame 21). The mole's hit animation starts and the rating floats up ("Perfect +30"). | 0.45 s |
+| `targetHit` | The hammer is on the helmet (frame 21). The mole's hit animation starts and the points bubble floats up. | 0.45 s |
 | `foxRetracting` | The mole's climb plays backwards (0.45 s, carrying on into the next step). The hammer slides back behind the card, then the fox sinks down out of the card's bottom. | 0.36 s |
 | `frameDisappearing` | The empty card shrinks back to its centre; the fox fades back in at its corner. | 0.28 s |
 | `nextTarget` | A short pause before the next character may appear. | 0.3 s |
@@ -204,7 +201,7 @@ WhackAMoleGame/
 ├── App/            WhackAMoleGameApp (@main, standalone only), GameEntryView
 ├── Views/          GameHomeView, PatchingSetupView, WhackAMoleGameView, GameBoardView,
 │                   GameHUDView, GameResultView
-├── Components/     CharacterView (target), MoleHoleView, ScoreView, FeedbackView (rating and points),
+├── Components/     CharacterView (target), MoleHoleView, ScoreView, FeedbackView (points bubble),
 │                   FoxCharacterView, FoxWindowView, AttackAnimationView
 ├── ViewModels/     WhackAMoleGameViewModel
 ├── Models/         GameConfiguration, PatchingConfiguration, GameCharacter, GameSession,
@@ -271,7 +268,7 @@ There are no levels: every game uses the same board (`DifficultySettings.standar
 | Board area used | central 90 % |
 | Hole and mole size | 84 % of the largest size |
 | Spawn interval (s) | 1.9–2.9 |
-| Visible for (s) | 2.6 ±10 % |
+| Visible for (s) | 5.2 ±10 % (long enough for a gaze dwell) |
 | Max up at once | 2 |
 | Character looks (all the same mole art for now) | 3 |
 | Sleeping moles (decoys) | none |
@@ -285,18 +282,17 @@ device. All values in this section are gameplay placeholders for review.
 The summary screen shows:
 
 - an encouraging message, the score, and the high score (or "New high score!")
-- how many hits were Perfect, Great and Good, missed, characters, accuracy and average response
-  time
+- characters, hits, missed, accuracy and average response time
 - play time
 - a session record: start and end time, why it ended, patched eye and playing eye
 
 Every session is also saved as JSON in `Application Support/Sessions/WhackAMole/<id>.json`
 (`GameSessionRecord`). Each file contains:
 
-- the configuration, with the board, the scoring limits, the patching record and the random seed
+- the configuration, with the board, the patching record and the random seed
 - the end reason
-- per-character trials: hole, look, role, appear time and outcome (the rating and score are worked
-  out from the response times and the saved scoring limits)
+- per-character trials: hole, look, role, appear time, outcome and the points awarded (the score is
+  their sum)
 - off-target taps
 
 Records saved by older versions, with levels and session length, still load; those fields are
@@ -307,15 +303,17 @@ The format is meant for a future progress dashboard.
 - **Accuracy** = hits / (hits + misses), counting real targets only.
 - **Response time** is measured from when the character starts to appear to the tap, in game time
   (pauses excluded), with about 16 ms resolution. It is a gameplay timing, not a clinical reaction
-  time, and the Perfect, Great and Good ratings built on it are gameplay ratings too.
+  time.
+- **Points** come from gaze proximity during the dwell. They are a gameplay score, not a measure of
+  fixation or vision.
 
 These are gameplay metrics only. They are not visual acuity measurements and not evidence of
 clinical improvement.
 
 ## Clinical limitations
 
-- The app cannot see whether the patch is worn or which eye it covers. A caregiver should
-  supervise.
+- The camera can only infer sustained one-eye versus two-eye visibility from ARKit blink signals.
+  It cannot confirm patch material, fit, or the prescription, so a caregiver should supervise.
 - It does not decide or check which eye is amblyopic, and does not recommend patch wear time,
   session length or frequency.
 - Game time is not a substitute for prescribed patching hours or for check-ups.
@@ -332,7 +330,7 @@ clinical improvement.
 | `PatchingConfiguration.patchedEye` / `playingEye` | not recorded | Entered by caregiver from the prescription (documentation only) |
 | `GameConfiguration.sessionDuration` | 120 s, fixed | Gameplay design (one round); not a recommended play time |
 | `DifficultySettings.standard`, `SpawnRules` | see above | Gameplay design; needs clinical review |
-| `ScoringRules` (`perfectWithin`, `greatWithin`) | 1.4 s, 2.0 s | Gameplay design; needs clinical review |
+| `GazeProximityTier` (Perfect 60 / Good 30 / OK 20, limits 0.35 and 0.70) | see above | Gameplay design; needs clinical review |
 
 ## Assets
 
@@ -388,13 +386,14 @@ clinical improvement.
 
 ## Testing
 
-- `DrStrangeTests`: 72 unit tests covering:
+- `DrStrangeTests`: TESTCOUNT unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - the 2-minute session end, stop and rest-break reasons, JSON round trip
-  - scoring: rating limits, points for each rating, no points for misses, the high score keeps only
-    a better score, and saved settings always use the current board and scoring
+  - scoring: awarded points add up, no points for misses, the high score keeps only a better
+    score, and saved settings always use the current board
   - patching record validation, and that gameplay is identical whichever eye is patched
+  - interaction-layer gaze smoothing, including jitter damping and tracking-loss reset
   - the fox attack:
     - starts only on a valid tap, aims at the tapped character, and runs its phases in order
     - the character waits for the impact
@@ -411,6 +410,7 @@ clinical improvement.
     - one helper for the whole game, in every attack
     - helper choice never changes the spawns
     - the raccoon uses the same swing over its own frames, and its hammer lands on the character
+  - one-eye patch-state verification, blink tolerance, removal debounce and re-verification
 - Manual checks on the iPad Pro 11-inch simulator:
   - patching setup, including the same-eye warning
   - play and hit animation

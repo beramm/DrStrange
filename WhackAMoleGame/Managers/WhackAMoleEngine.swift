@@ -2,7 +2,7 @@ import Foundation
 
 enum EngineEvent: Equatable {
     case spawned(ActiveTarget)
-    case hit(ActiveTarget, responseTime: TimeInterval, rating: HitRating)
+    case hit(ActiveTarget, responseTime: TimeInterval)
     case missed(ActiveTarget)
     case decoyTapped(ActiveTarget)
     /// The fox leaves its window towards the tapped character.
@@ -162,14 +162,17 @@ struct WhackAMoleEngine {
     /// Tap on a hole.
     ///
     /// - An awake character starts the fox's attack on that character. The hit, its response
-    ///   time and its rating are recorded at the tap; the character reacts and the points are
+    ///   time and its points are recorded at the tap; the character reacts and the points are
     ///   shown when the hammer lands.
     /// - A sleeping mole (decoy) reacts by itself; the fox does not attack it.
     /// - Taps on empty holes are counted but never penalised.
     /// - While an attack is running, every tap is ignored, so rapid or repeated taps can never
     ///   start a second attack.
     @discardableResult
-    mutating func tapHole(_ holeIndex: Int) -> [EngineEvent] {
+    mutating func tapHole(
+        _ holeIndex: Int,
+        awardedPoints: Int = GameSessionRecord.defaultPointsPerHit
+    ) -> [EngineEvent] {
         guard !isFinished, attack == nil else { return [] }
         guard let index = targets.firstIndex(where: { $0.holeIndex == holeIndex && $0.phase.isUp }) else {
             session.offTargetTaps += 1
@@ -179,14 +182,13 @@ struct WhackAMoleEngine {
 
         switch target.role {
         case .target:
-            let responseTime = clock - target.spawnedAt
-            let rating = configuration.scoring.rating(forResponseTime: responseTime)
             targets[index].phase = .targeted
-            targets[index].rating = rating
+            targets[index].pointsAwarded = awardedPoints
             let artIndex = holes.first { $0.request.holeIndex == target.holeIndex }?.request.artIndex ?? 0
             attack = FoxAttack(targetID: target.id, holeIndex: target.holeIndex, artIndex: artIndex, startedAt: clock, helper: helper)
-            record(target, outcome: .hit(responseTime: responseTime))
-            return [.hit(targets[index], responseTime: responseTime, rating: rating), .attackStarted(targets[index])]
+            let responseTime = clock - target.spawnedAt
+            record(target, outcome: .hit(responseTime: responseTime), pointsAwarded: awardedPoints)
+            return [.hit(targets[index], responseTime: responseTime), .attackStarted(targets[index])]
         case .decoy:
             targets[index].phase = .hit(at: clock)
             record(target, outcome: .decoyTapped)
@@ -310,9 +312,14 @@ struct WhackAMoleEngine {
         }
     }
 
-    private mutating func record(_ target: ActiveTarget, outcome: TrialOutcome) {
+    private mutating func record(
+        _ target: ActiveTarget,
+        outcome: TrialOutcome,
+        pointsAwarded: Int? = nil
+    ) {
         guard let index = session.trials.lastIndex(where: { $0.id == target.id }) else { return }
         session.trials[index].outcome = outcome
+        session.trials[index].pointsAwarded = pointsAwarded
     }
 
     private mutating func finish(reason: SessionEndReason, now: Date) {

@@ -133,11 +133,15 @@ final class WhackAMoleGameViewModel {
 
     // MARK: - Input
 
-    func tapHole(_ hole: Int) {
+    func activateGazeTarget(_ activation: GazeActivation) {
         guard phase == .playing else { return }
-        // Bring the engine clock up to the moment of the tap for an accurate response time.
+        // Advance first, then verify identity so a dwell cannot land on a replacement character
+        // that happened to appear in the same hole.
         tick()
-        apply(engine.tapHole(hole))
+        guard engine.targets.contains(where: {
+            $0.id == activation.targetID && $0.holeIndex == activation.holeIndex && $0.phase.isUp
+        }) else { return }
+        apply(engine.tapHole(activation.holeIndex, awardedPoints: activation.tier.points))
     }
 
     /// A tap on the empty board.
@@ -186,7 +190,7 @@ final class WhackAMoleGameViewModel {
                 break
             case let .attackImpact(target):
                 // Points and sound arrive when the hammer lands, not at the tap.
-                score += target.rating?.points ?? 0
+                score = engine.session.score
                 feedback.hit()
             case .decoyTapped:
                 feedback.decoyTapped()

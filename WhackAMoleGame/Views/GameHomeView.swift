@@ -1,14 +1,11 @@
 import SwiftUI
 
-/// Entry screen for the game: the high score, a big Play button (eye control) and a finger
-/// practice button for the child, and a panel for the adult with the patching session record and
-/// game options.
+/// Entry screen for the game: the high score and a big Play button for the child, and a panel
+/// for the adult with the patching session record and game options.
 struct GameHomeView: View {
     private enum PresentedScreen: String, Identifiable {
         case calibration
         case game
-        /// Played with a finger: no camera and no calibration.
-        case touchGame
 
         var id: String { rawValue }
     }
@@ -27,10 +24,16 @@ struct GameHomeView: View {
                 .frame(width: 440)
         }
         .background(WhackAMolePalette.meadow.ignoresSafeArea())
-        .navigationTitle("Whack-a-Mole")
+        .navigationTitle("Paddy")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: configuration) { _, newValue in
             ConfigurationStore.standard.save(newValue)
+        }
+        .onAppear {
+            gazeController.setOneEyeEnforcerEnabled(configuration.oneEyeEnforcerEnabled)
+        }
+        .onChange(of: configuration.oneEyeEnforcerEnabled) { _, enabled in
+            gazeController.setOneEyeEnforcerEnabled(enabled)
         }
         .fullScreenCover(item: $presentedScreen) { screen in
             switch screen {
@@ -43,12 +46,6 @@ struct GameHomeView: View {
             case .game:
                 WhackAMoleGameView(configuration: configuration, gazeController: gazeController) {
                     gazeController.stop()
-                    highScore = HighScoreStore.standard.best
-                    presentedScreen = nil
-                }
-            case .touchGame:
-                // Without a gaze controller the moles are tapped with a finger.
-                WhackAMoleGameView(configuration: configuration) {
                     highScore = HighScoreStore.standard.best
                     presentedScreen = nil
                 }
@@ -81,18 +78,6 @@ struct GameHomeView: View {
             .buttonStyle(.borderedProminent)
             .tint(WhackAMolePalette.accent)
             .clipShape(Capsule())
-
-            Button {
-                presentedScreen = .touchGame
-            } label: {
-                Label("Play with a finger", systemImage: "hand.point.up.left.fill")
-                    .font(.system(.title3, design: .rounded).weight(.bold))
-                    .frame(minWidth: 240, minHeight: 52)
-            }
-            .buttonStyle(.bordered)
-            .tint(WhackAMolePalette.ink)
-            .clipShape(Capsule())
-            .accessibilityHint("Tap the moles with a finger. No camera is used.")
         }
         .padding(32)
     }
@@ -123,6 +108,14 @@ struct GameHomeView: View {
                 Text("Game")
             } footer: {
                 Text("Every game lasts 2 minutes of play. This is the length of one round, not a recommended patching or play time.")
+            }
+
+            Section {
+                Toggle("One-eye enforcer", isOn: $configuration.oneEyeEnforcerEnabled)
+            } header: {
+                Text("Gaze testing")
+            } footer: {
+                Text("Testing only. Turn this off to calibrate and play with both eyes visible. Patch-loss pauses will also be disabled.")
             }
         }
         .scrollContentBackground(.hidden)

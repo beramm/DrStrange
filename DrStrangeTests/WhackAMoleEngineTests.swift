@@ -33,11 +33,21 @@ final class WhackAMoleEngineTests: XCTestCase {
         let target = try XCTUnwrap(advanceToSpawn(&engine))
         engine.advance(by: 0.8)
         let events = engine.tapHole(target.holeIndex)
-        guard case let .hit(_, responseTime, rating)? = events.first else { return XCTFail("expected hit, got \(events)") }
+        guard case let .hit(_, responseTime)? = events.first else { return XCTFail("expected hit, got \(events)") }
         XCTAssertEqual(responseTime, 0.8, accuracy: 1e-6)
-        XCTAssertEqual(rating, .perfect)
         XCTAssertEqual(engine.session.hits, 1)
         XCTAssertEqual(engine.session.averageResponseTime ?? 0, 0.8, accuracy: 1e-6)
+    }
+
+    func testProximityPointsAreRecordedInSessionScore() throws {
+        var engine = WhackAMoleEngine(configuration: makeConfiguration())
+        let target = try XCTUnwrap(advanceToSpawn(&engine))
+
+        _ = engine.tapHole(target.holeIndex, awardedPoints: 30)
+
+        XCTAssertEqual(engine.session.score, 30)
+        XCTAssertEqual(engine.session.trials.last?.pointsAwarded, 30)
+        XCTAssertEqual(engine.targets.first(where: { $0.id == target.id })?.pointsAwarded, 30)
     }
 
     func testCharacterCannotBeHitTwice() throws {
@@ -112,36 +122,23 @@ final class WhackAMoleEngineTests: XCTestCase {
         XCTAssertTrue(engine.tapHole(4).isEmpty)
     }
 
-    func testRatingsFollowResponseTime() {
-        let rules = ScoringRules()
-        XCTAssertEqual(rules.rating(forResponseTime: 0.5), .perfect)
-        XCTAssertEqual(rules.rating(forResponseTime: 1.4), .perfect)
-        XCTAssertEqual(rules.rating(forResponseTime: 1.41), .great)
-        XCTAssertEqual(rules.rating(forResponseTime: 2.0), .great)
-        XCTAssertEqual(rules.rating(forResponseTime: 2.01), .good)
-        XCTAssertEqual(rules.rating(forResponseTime: 5), .good)
-        XCTAssertEqual(HitRating.allCases.map(\.points), [30, 20, 10])
-    }
-
-    func testScoreAddsPointsForEachRating() throws {
+    func testScoreAddsTheAwardedPointsOfEveryHit() throws {
         var engine = WhackAMoleEngine(configuration: makeConfiguration())
         var expected = 0
-        // One hit per rating, each tapped after a different wait.
-        for (wait, rating) in [(0.8, HitRating.perfect), (1.7, .great), (2.2, .good)] {
+        // Proximity tiers from gaze (60, 30, 20), then a hit with the default points.
+        for points in [60, 30, 20, nil] as [Int?] {
             let target = try XCTUnwrap(advanceToSpawn(&engine))
-            engine.advance(by: wait)
-            let events = engine.tapHole(target.holeIndex)
-            guard case let .hit(hit, _, given)? = events.first else { return XCTFail("expected hit, got \(events)") }
-            XCTAssertEqual(given, rating)
-            XCTAssertEqual(hit.rating, rating, "the character carries its rating for the hit animation")
-            expected += rating.points
+            engine.advance(by: 0.8)
+            if let points {
+                engine.tapHole(target.holeIndex, awardedPoints: points)
+            } else {
+                engine.tapHole(target.holeIndex)
+            }
+            expected += points ?? GameSessionRecord.defaultPointsPerHit
             XCTAssertEqual(engine.session.score, expected)
             engine.advance(by: FoxAttackTiming().total + 0.05)
         }
-        XCTAssertEqual(engine.session.count(of: .perfect), 1)
-        XCTAssertEqual(engine.session.count(of: .great), 1)
-        XCTAssertEqual(engine.session.count(of: .good), 1)
-        XCTAssertEqual(engine.session.score, 60)
+        XCTAssertEqual(engine.session.score, 120)
     }
 
     func testMissesScoreNothing() throws {
@@ -166,19 +163,17 @@ final class WhackAMoleEngineTests: XCTestCase {
         XCTAssertEqual(store.best, 150)
     }
 
-    func testSavedSettingsAlwaysUseTheCurrentBoardAndScoring() throws {
+    func testSavedSettingsAlwaysUseTheCurrentBoard() throws {
         let suite = "WhackAMoleConfigurationTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = ConfigurationStore(defaults: defaults)
         var configuration = GameConfiguration()
         configuration.board.activeHoleIndices = [4]
-        configuration.scoring.perfectWithin = 0.1
         configuration.soundEnabled = false
         store.save(configuration)
         let loaded = store.load()
         XCTAssertEqual(loaded.board, .standard)
-        XCTAssertEqual(loaded.scoring, ScoringRules())
         XCTAssertFalse(loaded.soundEnabled)
     }
 

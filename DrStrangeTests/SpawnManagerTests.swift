@@ -210,6 +210,10 @@ final class SpawnManagerTests: XCTestCase {
             XCTAssertEqual(duration, settings.visibleDuration, accuracy: settings.visibleDuration * settings.visibleDurationJitter + 1e-9)
         }
     }
+
+    func testMolesStayUpLongEnoughForAGazeDwell() {
+        XCTAssertEqual(DifficultySettings.standard.visibleDuration, 5.2)
+    }
 }
 
 final class ShuffleBagTests: XCTestCase {
