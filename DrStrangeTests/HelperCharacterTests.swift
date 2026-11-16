@@ -19,8 +19,8 @@ final class HelperCharacterTests: XCTestCase {
         return nil
     }
 
-    func testFoxAndRaccoonAreInThePool() {
-        XCTAssertEqual(HelperCharacter.allCases, [.fox, .raccoon])
+    func testFoxRaccoonAndBunnyAreInThePool() {
+        XCTAssertEqual(HelperCharacter.allCases, [.fox, .raccoon, .bunny])
     }
 
     func testEveryHelperFrameIsInTheAssetCatalog() {
@@ -32,6 +32,7 @@ final class HelperCharacterTests: XCTestCase {
         }
         XCTAssertEqual(FoxCharacterView.assetName(1), "FoxHammer/Frame01", "the fox's frames are unchanged")
         XCTAssertEqual(FoxCharacterView.assetName(99, helper: .raccoon), "RaccoonHammer/Frame24")
+        XCTAssertEqual(FoxCharacterView.assetName(99, helper: .bunny), "BunnyHammer/Frame09")
     }
 
     func testEveryHelperIsEquallyLikely() {
@@ -88,6 +89,20 @@ final class HelperCharacterTests: XCTestCase {
         XCTAssertEqual(frame(.hitting, 0.3), HelperCharacter.raccoon.frameCount)
         XCTAssertEqual(frame(.foxRetracting, 0.5), 1)
         XCTAssertEqual(frame(.frameDisappearing, 0.5), 1)
+    }
+
+    func testBunnyUsesTheSameSwingOverItsOwnFrames() {
+        func frame(_ phase: FoxAttackPhase, _ progress: Double) -> Int {
+            FoxCharacterView.frame(for: FoxPose(phase: phase, progress: progress, holeIndex: 0, helper: .bunny))
+        }
+        XCTAssertEqual(frame(.foxEmerging, 0.5), 1)
+        XCTAssertEqual(frame(.attacking, 0), 1)
+        XCTAssertEqual(frame(.attacking, 1), HelperCharacter.bunny.frameCount)
+        XCTAssertEqual(frame(.hitting, 0.3), HelperCharacter.bunny.frameCount)
+        XCTAssertEqual(frame(.foxRetracting, 0.5), 1)
+        let swing = stride(from: 0.0, through: 1.0, by: 0.05).map { frame(.attacking, $0) }
+        XCTAssertEqual(swing, swing.sorted(), "the swing only moves forward")
+        XCTAssertEqual(Set(swing).count, HelperCharacter.bunny.frameCount, "every frame is shown during the swing")
     }
 
     func testEveryHelperLandsItsHammerOnTheCharacter() {
