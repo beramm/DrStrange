@@ -34,11 +34,15 @@ final class GazeInputController {
     @ObservationIgnored private var wasPausedByScene = false
 
     init() {
-        let host = GazeTrackerFactory.makeTrackerWithVolatilePreview()
+        // Same setup as Whack-a-Mole on development: the native full-sensor ARKit
+        // tracker, without the experimental face-isolation sidecar.
+        let host = GazeTrackerFactory.makeTrackerWithVolatilePreview(
+            faceIsolationEnabled: false
+        )
         tracker = host.tracker
         cameraPreview = host.preview
         cameraInput = host.cameraInput
-        cameraInput.mode = .zoomedOnePointFive
+        cameraInput.mode = .fullSensor
         sample = GazeSample(
             pointNormalized: nil,
             timestamp: MonotonicTimestamp(uptimeNanoseconds: 0),
@@ -57,7 +61,12 @@ final class GazeInputController {
     }
 
     var isReadyToCalibrate: Bool {
-        cameraStarted && sample.setupState == .ready && sample.eyeAvailability == .rightOnly
+        cameraStarted && sample.setupState == .ready && oneEyeIsVisible
+    }
+
+    /// The patch covers one eye, so exactly one eye (left or right) should be visible.
+    private var oneEyeIsVisible: Bool {
+        sample.eyeAvailability == .leftOnly || sample.eyeAvailability == .rightOnly
     }
 
     var isCalibrated: Bool { sample.calibrationState == .calibrated }
@@ -66,20 +75,20 @@ final class GazeInputController {
         isCalibrated &&
             sample.trackingState == .tracking &&
             sample.setupState == .ready &&
-            sample.eyeAvailability == .rightOnly &&
+            oneEyeIsVisible &&
             sample.quality.level == .usable &&
             sample.pointNormalized != nil
     }
 
     func startCamera() {
         guard !cameraStarted else { return }
-        cameraInput.mode = .zoomedOnePointFive
+        cameraInput.mode = .fullSensor
         Task {
             do {
                 try await tracker.start()
                 cameraStarted = true
                 updateCameraStatus()
-                status = "Centre your face 40–60 cm away and keep the right eye visible"
+                status = "Centre your face 40–60 cm away and keep the uncovered eye visible"
             } catch {
                 updateCameraStatus()
                 status = "Camera start failed: \(error)"
@@ -171,8 +180,9 @@ final class GazeInputController {
             status = switch (sample.setupState, sample.eyeAvailability) {
             case (.tooClose, _): "Move farther from the front camera"
             case (.tooFar, _): "Move closer to the front camera"
-            case (.ready, .rightOnly): "Ready — start calibration"
-            case (.ready, _): "Keep the selected right eye open and visible"
+            case (.ready, .leftOnly), (.ready, .rightOnly): "Ready — start calibration"
+            case (.ready, .both): "Put on the eye patch"
+            case (.ready, _): "Keep the uncovered eye open and visible"
             default: "Centre your face 40–60 cm from the landscape camera"
             }
         }
