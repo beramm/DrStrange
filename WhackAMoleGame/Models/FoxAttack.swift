@@ -39,6 +39,8 @@ struct FoxAttack: Equatable {
     let holeIndex: Int
     var artIndex = 0
     let startedAt: TimeInterval
+    /// Who swings the hammer: the game's helper. Only the artwork depends on it.
+    var helper = HelperCharacter.fox
 
     /// Phase and progress (0...1) within it, or `nil` once the attack is over.
     func state(at clock: TimeInterval, timing: FoxAttackTiming) -> (phase: FoxAttackPhase, progress: Double)? {
@@ -108,4 +110,6 @@ struct FoxPose: Equatable {
     let holeIndex: Int
     /// Which hole image it is, for placing the hammer on the mole.
     var artIndex = 0
+    /// Who swings the hammer in this attack.
+    var helper = HelperCharacter.fox
 }

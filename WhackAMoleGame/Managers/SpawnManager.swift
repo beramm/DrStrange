@@ -21,13 +21,13 @@ struct SpawnRequest: Equatable {
 ///   never certain. Then a random spot inside that zone, at least `minimumHoleSeparation` from other
 ///   open holes and the previous hole. Nothing is shown until the hole opens there.
 /// - Timing: uniform draw from `spawnIntervalRange`; visibility = `visibleDuration` +/- jitter.
-/// - Look: shuffle bag over the level's character variants, so each look appears equally often.
+/// - Look: shuffle bag over the board's character variants, so each look appears equally often.
 /// - Role: decoys with `decoyProbability`, never more than two in a row.
 struct SpawnManager {
     static let gridColumns = 3
 
     let seed: UInt64
-    private(set) var settings: DifficultySettings
+    let settings: DifficultySettings
     let rules: SpawnRules
 
     private var generator: SeededGenerator
@@ -44,13 +44,6 @@ struct SpawnManager {
         self.rules = rules
         self.generator = SeededGenerator(seed: seed)
         self.variantBag = ShuffleBag(Self.variants(for: settings))
-    }
-
-    mutating func update(settings newSettings: DifficultySettings) {
-        if newSettings.characterVariantCount != settings.characterVariantCount {
-            variantBag = ShuffleBag(Self.variants(for: newSettings))
-        }
-        settings = newSettings
     }
 
     mutating func nextInterval() -> TimeInterval {

@@ -13,7 +13,6 @@ final class WhackAMoleGameViewModel {
         case finished
     }
 
-    static let pointsPerHit = GameSessionRecord.defaultPointsPerHit
     private static let countdownSeconds = 3.0
     /// Upper bound on one frame step, so a hitch (or the app returning from background) cannot
     /// skip a whole character.
@@ -24,13 +23,18 @@ final class WhackAMoleGameViewModel {
     private(set) var phase: Phase = .countdown(3)
     private(set) var targets: [ActiveTarget] = []
     private(set) var score = 0
-    private(set) var level: DifficultyLevel
-    private(set) var settings: DifficultySettings
+    /// Best score on this device before this game ended.
+    private(set) var highScore: Int
+    /// `true` when this game beat the previous high score.
+    private(set) var isNewHighScore = false
+    let settings: DifficultySettings
     private(set) var remainingSeconds: Int
     private(set) var progress: Double = 0
     /// The fox's attack in progress; `nil` while it waits in its window.
     /// Updated every frame during an attack, from game time, so pausing freezes the fox exactly.
     private(set) var foxPose: FoxPose?
+    /// The helper for this game (fox or raccoon), picked at random when the game starts.
+    var helper: HelperCharacter { engine.helper }
     private(set) var interactionState: GameInteractionState = .idle
     /// The holes on the board right now. There are none until a mole is about to appear.
     private(set) var holes: [HoleVisual] = []
@@ -38,8 +42,6 @@ final class WhackAMoleGameViewModel {
     private(set) var moleVisuals: [Int: MoleVisual] = [:]
 
     var foxAnimationState: FoxAnimationState { FoxAnimationState(foxPose) }
-    /// Set briefly after an adaptive level change.
-    private(set) var levelBanner: DifficultyLevel?
     private(set) var finishedSession: GameSessionRecord?
 
     var soundEnabled: Bool {
@@ -51,9 +53,9 @@ final class WhackAMoleGameViewModel {
     @ObservationIgnored private var lastTick: CFTimeInterval?
     @ObservationIgnored private var countdownRemaining = WhackAMoleGameViewModel.countdownSeconds
     @ObservationIgnored private var phaseBeforePause: Phase = .playing
-    @ObservationIgnored private var bannerTask: Task<Void, Never>?
     @ObservationIgnored private let feedback: FeedbackPlayer
     @ObservationIgnored private let sessionStore: SessionStore
+    @ObservationIgnored private let highScoreStore: HighScoreStore
 
     #if DEBUG
     /// QA hooks for checking animations on the simulator:
@@ -66,15 +68,20 @@ final class WhackAMoleGameViewModel {
     }()
     #endif
 
-    init(configuration: GameConfiguration, sessionStore: SessionStore = .standard) {
+    init(
+        configuration: GameConfiguration,
+        sessionStore: SessionStore = .standard,
+        highScoreStore: HighScoreStore = .standard
+    ) {
         self.configuration = configuration
         self.engine = WhackAMoleEngine(configuration: configuration)
-        self.level = configuration.startingLevel
-        self.settings = configuration.settings(for: configuration.startingLevel)
-        self.remainingSeconds = Int(configuration.sessionDuration.rounded(.up))
+        self.settings = configuration.board
+        self.remainingSeconds = Int(GameConfiguration.sessionDuration.rounded(.up))
         self.soundEnabled = configuration.soundEnabled
         self.feedback = FeedbackPlayer(soundEnabled: configuration.soundEnabled, hapticsEnabled: configuration.hapticsEnabled)
         self.sessionStore = sessionStore
+        self.highScoreStore = highScoreStore
+        self.highScore = highScoreStore.best
     }
 
     func target(inHole hole: Int) -> ActiveTarget? {
@@ -98,7 +105,6 @@ final class WhackAMoleGameViewModel {
     func stop() {
         loopTask?.cancel()
         loopTask = nil
-        bannerTask?.cancel()
     }
 
     func pause() {
@@ -119,15 +125,10 @@ final class WhackAMoleGameViewModel {
     func finishEarly(reason: SessionEndReason) {
         guard phase != .finished else { return }
         engine.end(reason: reason)
-        // A hit tapped just before stopping counts even if the hammer had not landed yet.
-        score = engine.session.score
         foxPose = nil
         moleVisuals = [:]
         holes = []
-        phase = .finished
-        finishedSession = engine.session
-        save(engine.session)
-        stop()
+        complete()
     }
 
     // MARK: - Input
@@ -187,24 +188,15 @@ final class WhackAMoleGameViewModel {
             switch event {
             case .spawned, .missed, .hit, .attackStarted, .attackFinished:
                 break
-            case .attackImpact:
+            case let .attackImpact(target):
                 // Points and sound arrive when the hammer lands, not at the tap.
                 score = engine.session.score
                 feedback.hit()
             case .decoyTapped:
                 feedback.decoyTapped()
-            case let .levelChanged(_, to):
-                settings = engine.settings
-                level = to
-                feedback.levelChanged()
-                showBanner(for: to)
             case .finished:
-                score = engine.session.score
-                phase = .finished
-                finishedSession = engine.session
-                save(engine.session)
-                feedback.sessionFinished()
-                stop()
+                complete()
+                if !isNewHighScore { feedback.sessionFinished() }
             }
         }
         syncFromEngine()
@@ -222,21 +214,23 @@ final class WhackAMoleGameViewModel {
         if roundedProgress != progress { progress = roundedProgress }
 
         let pose = engine.attack.flatMap { attack in
-            engine.attackState.map { FoxPose(phase: $0.phase, progress: $0.progress, holeIndex: attack.holeIndex, artIndex: attack.artIndex) }
+            engine.attackState.map { FoxPose(phase: $0.phase, progress: $0.progress, holeIndex: attack.holeIndex, artIndex: attack.artIndex, helper: attack.helper) }
         }
         if pose != foxPose { foxPose = pose }
         let state = engine.interactionState
         if state != interactionState { interactionState = state }
     }
 
-    private func showBanner(for level: DifficultyLevel) {
-        levelBanner = level
-        bannerTask?.cancel()
-        bannerTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
-            self?.levelBanner = nil
-        }
+    /// Final score, high score and saving, for both a finished and a stopped game.
+    private func complete() {
+        // A hit tapped just before the end counts even if the hammer had not landed yet.
+        score = engine.session.score
+        isNewHighScore = highScoreStore.submit(score)
+        if isNewHighScore { feedback.newHighScore() }
+        phase = .finished
+        finishedSession = engine.session
+        save(engine.session)
+        stop()
     }
 
     private func save(_ record: GameSessionRecord) {

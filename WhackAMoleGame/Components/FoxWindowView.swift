@@ -11,9 +11,11 @@ struct FoxWindowView: View {
     var reveal: Double = 1
     /// 0...1 progress of the ring that ripples out while the card opens; `nil` hides it.
     var ring: Double?
+    /// Whose card it is: only the colours change, to match that helper's art.
+    var helper = HelperCharacter.fox
 
-    static let fill = Color(red: 0.984, green: 0.800, blue: 0.400)
-    static let border = Color(red: 0.957, green: 0.608, blue: 0.227)
+    private var fill: Color { helper.cardFill }
+    private var border: Color { helper.cardBorder }
     /// Corner radius and border width as a fraction of the card's width.
     static let cornerRatio: CGFloat = 0.055
     static let borderRatio: CGFloat = 0.018
@@ -22,10 +24,10 @@ struct FoxWindowView: View {
         GeometryReader { proxy in
             let size = proxy.size
             RoundedRectangle(cornerRadius: size.width * Self.cornerRatio)
-                .fill(Self.fill)
+                .fill(fill)
                 .overlay(
                     RoundedRectangle(cornerRadius: size.width * Self.cornerRatio)
-                        .strokeBorder(Self.border, lineWidth: size.width * Self.borderRatio)
+                        .strokeBorder(border, lineWidth: size.width * Self.borderRatio)
                 )
                 .frame(width: size.width, height: size.height)
                 // The whole card, border included, grows from its centre.
@@ -35,7 +37,7 @@ struct FoxWindowView: View {
                     if let ring {
                         let grow = 0.5 + 0.75 * ring
                         RoundedRectangle(cornerRadius: size.width * Self.cornerRatio * grow)
-                            .stroke(Self.border, lineWidth: max(size.width * 0.03 * (1 - ring), 1))
+                            .stroke(border, lineWidth: max(size.width * 0.03 * (1 - ring), 1))
                             .frame(width: size.width * grow, height: size.height * grow)
                             .opacity(0.6 * (1 - ring))
                     }
