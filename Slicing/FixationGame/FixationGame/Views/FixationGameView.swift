@@ -16,6 +16,8 @@ import SwiftUI
 struct FixationGameView: View {
     /// The gaze tracker, already calibrated. nil = finger mode.
     let gaze: GazeInputController?
+    /// The character who keeps the stall. The other two come to steal.
+    let character: GameCharacter
     /// Back to the start screen.
     let onExit: () -> Void
 
@@ -38,8 +40,8 @@ struct FixationGameView: View {
     /// How long the thief needs to take one veggie.
     private let thiefSeconds: Double = 2
     /// Extra space around the stall that still counts as "looking at it".
-    /// The tracker is accurate to roughly 1–1.5°, so the edge needs some slack.
-    private let gazeMargin: CGFloat = 60
+    /// Kept small, so looking at a mole (beside the stall) counts as looking away.
+    private let gazeMargin: CGFloat = 10
     /// Show where the tracker thinks the eye is looking (helpful while testing).
     private let showsGazeDot = true
 
@@ -67,9 +69,9 @@ struct FixationGameView: View {
         usesGaze ? gazeIsOnStall : fingerIsDown
     }
 
-    /// The fox sleeps while nobody watches the stall (also before the game starts).
-    /// On the pause screen it stays awake.
-    private var foxIsAwake: Bool {
+    /// The keeper sleeps while nobody watches the stall (also before the game starts).
+    /// On the pause screen they stay awake.
+    private var keeperIsAwake: Bool {
         (phase == .waiting || phase == .playing) ? isWatching : true
     }
 
@@ -119,8 +121,9 @@ struct FixationGameView: View {
     private var gameplay: some View {
         ZStack {
             MarketSceneView(
+                keeper: character,
                 veggiesLeft: veggiesLeft,
-                foxIsAwake: foxIsAwake,
+                keeperIsAwake: keeperIsAwake,
                 thiefIsHere: thiefIsHere,
                 molesCanAppear: phase == .playing,
                 onStallFrameChange: { stallFrame = $0 }
@@ -233,11 +236,12 @@ struct FixationGameView: View {
 
     // MARK: - Gaze
 
-    /// The gaze point in screen points. The tracker gives 0–1 values across the screen:
-    /// (0, 0) is the top-left corner and (1, 1) the bottom-right.
+    /// The gaze point in screen points. The tracker gives 0–1 values across the area
+    /// the calibration circles covered (see GazeScreenArea): (0, 0) is its top-left
+    /// circle and (1, 1) its bottom-right circle.
     private func gazePoint(_ gaze: GazeInputController) -> CGPoint? {
         guard let point = gaze.sample.pointNormalized else { return nil }
-        return CGPoint(x: point.x * screenSize.width, y: point.y * screenSize.height)
+        return GazeScreenArea.screenPoint(x: point.x, y: point.y, in: screenSize)
     }
 
     /// Is the eye looking at the stall right now? Lost tracking counts as looking away.
@@ -298,5 +302,5 @@ struct FixationGameView: View {
 }
 
 #Preview("Fixation game (finger)", traits: .landscapeLeft) {
-    FixationGameView(gaze: nil, onExit: {})
+    FixationGameView(gaze: nil, character: .fox, onExit: {})
 }

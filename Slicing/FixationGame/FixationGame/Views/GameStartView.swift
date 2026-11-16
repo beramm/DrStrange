@@ -3,6 +3,8 @@
 //  First screen of the game. Leads to eye control (calibrate, then play) or,
 //  for testing without the front camera (e.g. in the simulator), to finger play.
 //  Same flow as the Whack-a-Mole game: calibration → game.
+//  The stall keeper is the fox for now. Later the player's character will come
+//  from onboarding ("Choose your character") and be passed in here.
 //
 
 import SwiftUI
@@ -16,6 +18,9 @@ struct GameStartView: View {
     /// One tracker session shared by calibration and the game, like Whack-a-Mole.
     @State private var gaze = GazeInputController()
     @State private var screen: Screen?
+    /// Who keeps the stall; the other two characters are the thieves.
+    /// Fox for now. Later this will be the character chosen in onboarding.
+    private let character = GameCharacter.fox
 
     var body: some View {
         ZStack {
@@ -65,13 +70,13 @@ struct GameStartView: View {
                     onCancel: { screen = nil }
                 )
             case .gazeGame:
-                FixationGameView(gaze: gaze) {
+                FixationGameView(gaze: gaze, character: character) {
                     // Turn the camera off when leaving the game.
                     gaze.stop()
                     screen = nil
                 }
             case .fingerGame:
-                FixationGameView(gaze: nil) { screen = nil }
+                FixationGameView(gaze: nil, character: character) { screen = nil }
             }
         }
     }

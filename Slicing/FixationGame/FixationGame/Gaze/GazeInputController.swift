@@ -96,7 +96,7 @@ final class GazeInputController {
         status = "Hold still — calibration begins in 3 seconds"
 
         do {
-            try tracker.beginCalibration(layout: .perimeterToCentre13)
+            try tracker.beginCalibration(layout: .ninePosition)
         } catch {
             transitionPending = false
             isPreparingCalibration = false
@@ -107,7 +107,7 @@ final class GazeInputController {
         calibrationTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
             guard let self, !Task.isCancelled else { return }
-            calibrationTargets = CalibrationLayout.perimeterToCentre13.targets
+            calibrationTargets = CalibrationLayout.ninePosition.targets
             targetIndex = 0
             transitionPending = false
             isPreparingCalibration = false
@@ -151,7 +151,7 @@ final class GazeInputController {
         transitionPending = true
         let target = calibrationTargets[targetIndex]
         activeCalibrationTarget = target
-        status = "Target \(targetIndex + 1) of \(calibrationTargets.count) — look at the centre"
+        status = "Target \(targetIndex + 1) of \(calibrationTargets.count) — look at the centre of the circle"
 
         calibrationTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))

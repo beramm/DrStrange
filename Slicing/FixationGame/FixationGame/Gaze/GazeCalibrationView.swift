@@ -1,7 +1,8 @@
 //
 //  GazeCalibrationView.swift
 //  Copied from the Whack-a-Mole game (WhackAMoleGame/Views) on the development branch.
-//  Setup screen: camera preview, then the dots to look at during calibration.
+//  Setup screen: camera preview, then 9 pulsing circles to look at, one at a time
+//  (the same 9-point calibration and look as Whack-a-Mole on development).
 //
 
 import DrStrangeGazeTracker
@@ -20,28 +21,22 @@ struct GazeCalibrationView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color(red: 0.03, green: 0.04, blue: 0.07).ignoresSafeArea()
+                Color.white.ignoresSafeArea()
 
                 if let target = controller.activeCalibrationTarget {
+                    // Kept away from the screen edges; the game uses the same area.
                     CalibrationFixationTarget()
-                        .position(
-                            x: target.x * geometry.size.width,
-                            y: target.y * geometry.size.height
-                        )
+                        .position(GazeScreenArea.screenPoint(x: target.x, y: target.y, in: geometry.size))
                 } else {
                     setupPanel
                 }
-
-                statusPanel
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .padding(20)
             }
         }
         // Place the dots across the WHOLE screen, the same area the game uses for the
         // gaze point. Without this, the dots sit inside the safe area (a little smaller
         // than the screen), and the game's gaze point comes out shifted and squashed.
         .ignoresSafeArea()
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
         .statusBarHidden()
         .onAppear { controller.startCamera() }
         .onChange(of: controller.isCalibrated) { _, calibrated in
@@ -57,10 +52,10 @@ struct GazeCalibrationView: View {
 
     private var setupPanel: some View {
         VStack(spacing: 18) {
-            Spacer(minLength: 110)
+            Spacer(minLength: 36)
             Text("Set up eye control")
                 .font(.system(size: 42, weight: .heavy, design: .rounded))
-            Text("Use the preview to centre your face. Keep the right eye open and look directly at each target.")
+            Text("Use the preview to centre your face. Keep the uncovered eye open and look at the centre of each pulsing circle.")
                 .font(.title3)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 680)
@@ -89,25 +84,7 @@ struct GazeCalibrationView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(32)
-    }
-
-    private var statusPanel: some View {
-        HStack(alignment: .top, spacing: 20) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(controller.status).font(.headline)
-                Text(controller.cameraStatus).font(.caption.monospaced())
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("tracking \(controller.sample.trackingState.rawValue)")
-                Text("setup \(controller.sample.setupState.rawValue)")
-                Text("eye \(controller.sample.eyeAvailability.rawValue)")
-                Text("calibration \(controller.sample.calibrationState.rawValue)")
-            }
-            .font(.caption.monospaced())
-        }
-        .padding(14)
-        .background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 16))
+        .foregroundStyle(.black)
     }
 }
 
@@ -123,7 +100,7 @@ private struct CalibrationFixationTarget: View {
 
     var body: some View {
         ZStack {
-            Circle().stroke(.white, lineWidth: 5).frame(width: 72, height: 72)
+            Circle().stroke(.black, lineWidth: 5).frame(width: 72, height: 72)
             Circle().fill(.orange).frame(width: 30, height: 30)
                 .scaleEffect(contracted ? 0.35 : 1)
                 .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: contracted)
