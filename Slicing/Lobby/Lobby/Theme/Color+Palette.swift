@@ -6,15 +6,31 @@
 import SwiftUI
 
 extension Color {
-    static let skyTop           = Color(red: 0.78, green: 0.91, blue: 0.99)
-    static let skyBottom        = Color(red: 0.96, green: 0.98, blue: 0.93)
-    static let hill             = Color(red: 0.62, green: 0.84, blue: 0.55)
-    static let hillFar          = Color(red: 0.74, green: 0.90, blue: 0.66)
-    static let cardFill         = Color.white.opacity(0.92)
-    static let namePlate        = Color(red: 1.00, green: 0.85, blue: 0.40)
-    static let ink              = Color(red: 0.13, green: 0.17, blue: 0.24)
-    static let playGreen        = Color(red: 0.25, green: 0.72, blue: 0.40)
-    static let playGreenDark    = Color(red: 0.15, green: 0.50, blue: 0.27)
-    static let settingsBlue     = Color(red: 0.36, green: 0.55, blue: 0.90)
-    static let settingsBlueDark = Color(red: 0.22, green: 0.38, blue: 0.68)
+    /// Dark brown text (character and game names, taglines).
+    static let ink        = Color(red: 0.24, green: 0.16, blue: 0.12)
+
+    // MARK: Lobby (from the final lobby design)
+
+    /// Light blue sky behind the lobby.
+    static let sky          = Color(red: 0.90, green: 0.96, blue: 0.99)
+    /// Wooden sign buttons, their ropes and their text.
+    static let signBoard    = Color(red: 0.59, green: 0.38, blue: 0.25)
+    static let signRope     = Color(red: 0.48, green: 0.31, blue: 0.17)
+    static let signText     = Color(red: 0.98, green: 0.91, blue: 0.89)
+
+    // MARK: Character select (from the final design)
+
+    /// "CHOOSE YOUR CHARACTER" title.
+    static let titleBrown     = Color(red: 0.55, green: 0.35, blue: 0.23)
+    /// Round back and settings buttons.
+    static let roundButton    = Color(red: 0.79, green: 0.38, blue: 0.25)
+    /// Square previous / next arrows.
+    static let arrowYellow    = Color(red: 1.00, green: 0.84, blue: 0.43)
+    /// Circle behind the character on the card.
+    static let portraitBlue   = Color(red: 0.55, green: 0.76, blue: 0.94)
+
+    // MARK: Game Map (randomizer)
+
+    /// Stand-in for a game's cover picture until the real covers are ready.
+    static let coverPlaceholder = Color(red: 0.64, green: 0.78, blue: 0.88)
 }

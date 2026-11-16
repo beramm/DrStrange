@@ -22,7 +22,7 @@ let package = Package(
         ),
         .testTarget(
             name: "DrStrangeGazeTrackerTests",
-            dependencies: ["DrStrangeGazeTracker"]
+            dependencies: ["DrStrangeGazeTracker", "DrStrangeGazeTrackerPlatform"]
         )
     ]
 )
