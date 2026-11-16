@@ -62,6 +62,14 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 
 ## Gameplay
 
+The home screen has two ways to play:
+
+- **Calibrate & Play** runs the gaze calibration and then plays with eye control (the child looks
+  at a mole to hit it).
+- **Play with a finger** starts the game straight away and the child taps the moles. It uses no
+  camera and no calibration, which is handy for trying the game, for practice, or on a device
+  where gaze tracking does not work well. The rules, the 2 minutes and the scoring are the same.
+
 1. The game starts on an empty painted meadow, with no holes showing. A hole opens at a random spot and a
    mole climbs out of it, frame by frame.
 2. The child finds it and taps it. The whole hole area counts, so taps do not need to be precise.
@@ -105,7 +113,8 @@ points appear when the hammer lands; a hit tapped just before the game ends stil
 
 The home screen shows the best score on this iPad, and the result screen shows "New high score!"
 when a game beats it (a tie does not). Only that one number is kept, in `UserDefaults`
-(`whackAMole.highScore`). Games that were stopped early count too.
+(`whackAMole.highScore`). Games that were stopped early count too, and so do games played with a
+finger.
 
 ### The fox attack
 
