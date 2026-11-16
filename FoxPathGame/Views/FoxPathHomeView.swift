@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Entry screen for Follow the Fox: a big level picker for the child and a panel with game
-/// options for the adult.
+/// Entry screen for Follow the Fox: the three friends and a big Play button for the child, and a
+/// panel with game options for the adult.
 struct FoxPathHomeView: View {
     private enum PresentedScreen: String, Identifiable {
         case calibration
@@ -56,24 +56,25 @@ struct FoxPathHomeView: View {
 
     private var childPanel: some View {
         VStack(spacing: 28) {
-            Image(FoxWalkAnimation.standingAsset)
-                .resizable()
-                .scaledToFit()
-                .frame(height: 210)
-                .accessibilityHidden(true)
+            HStack(alignment: .bottom, spacing: 18) {
+                ForEach(PathCharacter.allCases) { character in
+                    Image(character.standingAsset)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 190)
+                }
+            }
+            .accessibilityHidden(true)
 
-            Text("Keep your eyes on the fox all the way to the veggie stall")
+            Text("Follow your friend to the veggie stall and keep the veggies safe from the thief!")
                 .font(.system(.title2, design: .rounded).weight(.bold))
                 .foregroundStyle(FoxPathPalette.ink)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: 560)
 
-            HStack(spacing: 20) {
-                ForEach(DifficultyLevel.allCases) { level in
-                    LevelCard(level: level, isSelected: configuration.level == level) {
-                        configuration.level = level
-                    }
-                }
-            }
+            Label("2 minutes · 3 hearts", systemImage: "heart.fill")
+                .font(.system(.title3, design: .rounded).weight(.bold))
+                .foregroundStyle(FoxPathPalette.heart)
 
             Button {
                 presentedScreen = .calibration
@@ -111,58 +112,28 @@ struct FoxPathHomeView: View {
             } header: {
                 Text("Game")
             } footer: {
-                Text("Each game draws a new path with new houses and lamps. Pinch the map or use the magnifier buttons to zoom.")
+                Text("Every path is new, and the fox, the bunny and the raccoon swap roles at random. Pinch the map or use the magnifier buttons to zoom.")
             }
 
             Section {
-                LabeledContent("Fox speed", value: speedText)
+                LabeledContent("Game length", value: "\(Int(FoxPathConfiguration.sessionDuration / 60)) min")
+                LabeledContent("Hearts", value: "\(FoxPathConfiguration.initialLives)")
+                LabeledContent("Walking speed", value: speedText)
                 LabeledContent("Look-away allowance", value: String(format: "%.2f s", settings.lookAwayGrace))
                 LabeledContent("Time to refocus", value: String(format: "%.2f s", settings.refocusDwell))
             } header: {
-                Text("\(configuration.level.title) level (for grown-ups)")
+                Text("How the game works (for grown-ups)")
             } footer: {
-                ClinicalNote("Follow the Fox is a game. It does not diagnose, measure or treat vision, and its levels are game settings that still need clinical review. Patching and play time follow your child's eye doctor.")
+                ClinicalNote("Follow the Fox is a game. It does not diagnose, measure or treat vision, and these are game settings that still need clinical review. The 2 minutes are one game, not a recommended play time. Patching and play time follow your child's eye doctor.")
             }
         }
         .scrollContentBackground(.hidden)
         .background(WhackAMolePalette.cream.opacity(0.6))
     }
 
-    private var settings: FoxPathSettings { configuration.settings(for: configuration.level) }
+    private var settings: FoxPathSettings { configuration.settings }
 
     private var speedText: String {
         String(format: "%.1f tiles/s", settings.foxSpeed / Double(FoxPathMetrics.cellSize.width))
-    }
-}
-
-private struct LevelCard: View {
-    let level: DifficultyLevel
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 12) {
-                HStack(spacing: 6) {
-                    ForEach(0..<level.rawValue, id: \.self) { _ in
-                        Image(systemName: "star.fill")
-                    }
-                }
-                .font(.title)
-                .foregroundStyle(FoxPathPalette.star)
-                Text(level.title)
-                    .font(.system(.title3, design: .rounded).weight(.bold))
-                    .foregroundStyle(FoxPathPalette.ink)
-            }
-            .frame(width: 170, height: 130)
-            .background(RoundedRectangle(cornerRadius: 24).fill(FoxPathPalette.cream))
-            .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .strokeBorder(isSelected ? FoxPathPalette.accent : .clear, lineWidth: 5)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(level.title)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

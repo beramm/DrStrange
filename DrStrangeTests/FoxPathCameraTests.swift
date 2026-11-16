@@ -6,7 +6,7 @@ final class FoxPathCameraTests: XCTestCase {
     private let step = 1.0 / 60
 
     private func makeMap() -> FoxPathMap {
-        FoxPathGenerator.makeMap(seed: 7, settings: .defaults(for: .intermediate))
+        FoxPathGenerator.makeMap(seed: 7, settings: .standard)
     }
 
     /// Walks the fox along the whole route and calls `check` after every frame.

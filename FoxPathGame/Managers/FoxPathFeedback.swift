@@ -29,9 +29,26 @@ final class FoxPathFeedback {
         play(1104)
     }
 
+    /// The character reached the stall.
     func finished() {
         play(1025)
         if hapticsEnabled { notification.notificationOccurred(.success) }
+    }
+
+    /// A thief comes into view. A soft cue, no alarm.
+    func thiefAppeared() {
+        play(1105)
+    }
+
+    /// A thief took vegetables and a heart is gone.
+    func lifeLost() {
+        play(1073)
+        if hapticsEnabled { notification.notificationOccurred(.warning) }
+    }
+
+    /// Time is up or the last heart is gone.
+    func gameEnded() {
+        play(1025)
     }
 
     private func play(_ id: SystemSoundID) {

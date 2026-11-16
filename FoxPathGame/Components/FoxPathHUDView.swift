@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Top bar: exit, how far the fox has walked, zoom and pause. Icons first, minimal text.
+/// Top bar: exit, time left, hearts, zoom and pause. Icons first, minimal text.
 struct FoxPathHUDView: View {
     let viewModel: FoxPathGameViewModel
     let onExit: () -> Void
@@ -11,13 +11,11 @@ struct FoxPathHUDView: View {
         HStack(spacing: 20) {
             HUDButton(systemImage: "xmark", label: "Exit game", ink: ink, action: onExit)
 
-            PathProgressView(progress: viewModel.progress, ink: ink)
-                .frame(maxWidth: .infinity)
+            CountdownView(seconds: viewModel.remainingSeconds, ink: ink)
 
-            LevelIndicatorView(level: viewModel.configuration.level, ink: ink)
-                .padding(.horizontal, 14)
-                .frame(height: 60)
-                .background(Capsule().fill(.white.opacity(0.75)))
+            LivesView(lives: viewModel.lives, total: FoxPathConfiguration.initialLives)
+
+            Spacer(minLength: 0)
 
             HUDButton(systemImage: "minus.magnifyingglass", label: "Zoom out", ink: ink) {
                 viewModel.zoomOut()
@@ -41,32 +39,59 @@ struct FoxPathHUDView: View {
     }
 }
 
-/// How much of the path is behind the fox, with the finish stall at the end of the bar.
-private struct PathProgressView: View {
-    let progress: Double
+/// Time left in the game as MM:SS.
+private struct CountdownView: View {
+    let seconds: Int
     let ink: Color
 
     var body: some View {
-        HStack(spacing: 12) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.75))
-                    Capsule()
-                        .fill(FoxPathPalette.accent)
-                        .frame(width: max(proxy.size.height, proxy.size.width * progress))
-                        .animation(.linear(duration: 0.2), value: progress)
-                }
-            }
-            .frame(height: 18)
-            Image(systemName: "storefront")
+        Label {
+            Text(Self.format(seconds))
+                .font(.system(.title, design: .rounded).weight(.heavy))
+                .monospacedDigit()
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.snappy, value: seconds)
+        } icon: {
+            Image(systemName: "timer")
                 .font(.title2.weight(.bold))
-                .foregroundStyle(ink)
+        }
+        .foregroundStyle(seconds <= 10 ? FoxPathPalette.danger : ink)
+        .padding(.horizontal, 20)
+        .frame(height: 60)
+        .background(Capsule().fill(.white.opacity(0.75)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Time left")
+        .accessibilityValue("\(seconds / 60) minutes \(seconds % 60) seconds")
+    }
+
+    static func format(_ seconds: Int) -> String {
+        String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+/// One heart per life. A lost heart turns into an outline with a short, gentle shrink.
+private struct LivesView: View {
+    let lives: Int
+    let total: Int
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<total, id: \.self) { index in
+                let isFull = index < lives
+                Image(systemName: isFull ? "heart.fill" : "heart")
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundStyle(isFull ? FoxPathPalette.heart : FoxPathPalette.heart.opacity(0.45))
+                    .scaleEffect(isFull ? 1 : 0.85)
+                    .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.6), value: isFull)
+            }
         }
         .padding(.horizontal, 18)
         .frame(height: 60)
-        .background(Capsule().fill(.white.opacity(0.55)))
+        .background(Capsule().fill(.white.opacity(0.75)))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Path walked")
-        .accessibilityValue("\(Int((progress * 100).rounded())) percent")
+        .accessibilityLabel("Hearts")
+        .accessibilityValue("\(lives) of \(total)")
     }
 }

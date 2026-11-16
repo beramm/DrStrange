@@ -13,8 +13,8 @@ enum FoxPathInput {
     }
 }
 
-/// Full-screen gameplay. Shows the result screen in place when the walk ends, whether the fox
-/// reached the stall or the game was stopped early.
+/// Full-screen gameplay. Shows the result screen in place when the game ends: time is up, the
+/// last heart is gone, or the game was stopped early.
 struct FoxPathGameView: View {
     /// Seconds without a gaze sample before the pointer counts as lost.
     private static let gazeTimeout: TimeInterval = 0.5
@@ -44,7 +44,7 @@ struct FoxPathGameView: View {
             if let result = viewModel.result {
                 FoxPathResultView(
                     result: result,
-                    level: configuration.level,
+                    character: viewModel.roles.primary,
                     onPlayAgain: restart,
                     onDone: onClose
                 )
@@ -94,7 +94,7 @@ struct FoxPathGameView: View {
             }
         }
         .confirmationDialog("Stop the game?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
-            Button("Stop and see my stars") { viewModel.finishEarly() }
+            Button("Stop the game") { viewModel.finishEarly() }
             Button("Keep playing", role: .cancel) { viewModel.resume() }
         }
     }
@@ -121,7 +121,7 @@ struct FoxPathGameView: View {
         isConfirmingStop = true
     }
 
-    /// Every new game draws a new map.
+    /// Every new game draws new maps and new roles.
     private func restart() {
         viewModel.stop()
         viewModel = Self.makeViewModel(configuration: configuration, input: input)

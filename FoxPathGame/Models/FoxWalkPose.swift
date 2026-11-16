@@ -1,17 +1,26 @@
 import CoreGraphics
 import Foundation
 
-/// Where the fox stands on the map and which picture it shows.
+/// Where a character stands on the map and which picture it shows.
 struct FoxWalkPose: Equatable {
-    /// Ground point under the fox's feet, in map units.
+    var character: PathCharacter
+    /// Ground point under the character's feet, in map units.
     var feet: CGPoint
     var facing: FoxFacing
     var assetName: String
+    /// The side view walks right; mirrored, it walks left.
+    var isMirrored = false
+
+    /// A character standing still at `feet`, facing the player.
+    static func standing(_ character: PathCharacter, at feet: CGPoint) -> FoxWalkPose {
+        FoxWalkPose(character: character, feet: feet, facing: .front, assetName: character.standingAsset)
+    }
 
     /// Where the picture is drawn so the feet land on `feet`.
     var frame: CGRect {
-        let size = facing.size
-        let anchor = facing.feetAnchor
+        let size = character.size(facing: facing)
+        var anchor = character.feetAnchor(facing: facing)
+        if isMirrored { anchor.x = 1 - anchor.x }
         return CGRect(
             x: feet.x - size.width * anchor.x,
             y: feet.y - size.height * anchor.y,
@@ -20,36 +29,39 @@ struct FoxWalkPose: Equatable {
         )
     }
 
-    /// Middle of the fox's body: what the player is asked to look at.
+    /// Middle of the body: what the player is asked to look at.
     var bodyCenter: CGPoint {
-        CGPoint(x: feet.x, y: feet.y - facing.size.height * 0.5)
+        CGPoint(x: feet.x, y: feet.y - character.size(facing: facing).height * 0.5)
     }
+
+    var height: CGFloat { character.size(facing: facing).height }
 }
 
 /// Picks walk-cycle pictures from the distance walked, so the legs keep time with the ground
-/// at any speed and freeze exactly when the fox stops.
+/// at any speed and freeze exactly when the character stops.
 enum FoxWalkAnimation {
-    /// Map units for one full side-view cycle.
-    static let sideCycleLength: CGFloat = 104
+    /// Map units walked per side-view picture (the fox's 39-picture cycle covers 104 units).
+    static let sideStepLength: CGFloat = 104 / 39
     /// Map units for one full front or back cycle (4 pictures).
     static let frontCycleLength: CGFloat = 64
-    /// The picture used whenever the fox stands and waits.
-    static let standingAsset = "FoxPath/Front1"
+    /// The fox standing, for screens outside the game (the DrStrange home card).
+    static let standingAsset = PathCharacter.fox.standingAsset
 
-    /// The provided side view is a 39-picture cycle in which several pictures repeat. Only the
-    /// unique ones are in the asset catalog; this is the order they play in.
-    static let sideSequence: [Int] = Array(1...11) + [8, 7, 14, 5, 4, 3, 2, 1]
-        + Array(20...29) + Array((21...29).reversed()) + [39]
+    /// Map units for one full side-view cycle of `character`.
+    static func sideCycleLength(of character: PathCharacter) -> CGFloat {
+        sideStepLength * CGFloat(character.sideSequence.count)
+    }
 
-    static func assetName(facing: FoxFacing, distance: CGFloat) -> String {
+    static func assetName(for character: PathCharacter, facing: FoxFacing, distance: CGFloat) -> String {
         switch facing {
         case .side:
-            let index = step(distance, cycleLength: sideCycleLength, count: sideSequence.count)
-            return String(format: "FoxPath/Side%02d", sideSequence[index])
+            let sequence = character.sideSequence
+            let index = step(distance, cycleLength: sideCycleLength(of: character), count: sequence.count)
+            return character.sideAsset(frame: sequence[index])
         case .front:
-            return "FoxPath/Front\(step(distance, cycleLength: frontCycleLength, count: 4) + 1)"
+            return character.frontAsset(frame: step(distance, cycleLength: frontCycleLength, count: 4) + 1)
         case .back:
-            return "FoxPath/Back\(step(distance, cycleLength: frontCycleLength, count: 4) + 1)"
+            return character.backAsset(frame: step(distance, cycleLength: frontCycleLength, count: 4) + 1)
         }
     }
 

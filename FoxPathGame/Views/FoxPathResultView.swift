@@ -3,7 +3,8 @@ import SwiftUI
 /// End-of-game summary. A big friendly result for the child, details for the adult below.
 struct FoxPathResultView: View {
     let result: FoxPathResult
-    let level: DifficultyLevel
+    /// The character the child was following last, shown on the result.
+    let character: PathCharacter
     let onPlayAgain: () -> Void
     let onDone: () -> Void
 
@@ -26,38 +27,57 @@ struct FoxPathResultView: View {
 
     private var celebration: some View {
         HStack(spacing: 24) {
-            Image(FoxWalkAnimation.standingAsset)
+            Image(character.standingAsset)
                 .resizable()
                 .scaledToFit()
                 .frame(height: 220)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 10) {
-                Text(result.reachedEnd ? "You made it!" : "Time to rest!")
+                Text(headline)
                     .font(.system(size: 56, weight: .heavy, design: .rounded))
-                Text(result.reachedEnd ? "The fox got to the veggie stall with your help." : "Resting your eyes was a good choice.")
+                Text(message)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.secondary)
-                if result.reachedEnd {
+                if result.endReason != .stopped {
                     HStack(spacing: 10) {
-                        ForEach(1...3, id: \.self) { index in
-                            Image(systemName: index <= result.stars ? "star.fill" : "star")
+                        ForEach(0..<FoxPathConfiguration.initialLives, id: \.self) { index in
+                            Image(systemName: index < result.livesLeft ? "heart.fill" : "heart")
                         }
                     }
-                    .font(.system(size: 52, weight: .heavy))
-                    .foregroundStyle(FoxPathPalette.star)
+                    .font(.system(size: 48, weight: .heavy))
+                    .foregroundStyle(FoxPathPalette.heart)
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(result.stars) of 3 stars")
+                    .accessibilityLabel("\(result.livesLeft) of \(FoxPathConfiguration.initialLives) hearts left")
                 }
             }
             .foregroundStyle(FoxPathPalette.ink)
         }
     }
 
+    private var headline: String {
+        switch result.endReason {
+        case .timeUp: "Time's up!"
+        case .noLivesLeft: "Game over"
+        case .stopped: "Time to rest!"
+        }
+    }
+
+    private var message: String {
+        switch result.endReason {
+        case .timeUp:
+            result.thefts == 0 ? "You kept every veggie safe!" : "Great following! Let's guard the veggies again."
+        case .noLivesLeft:
+            "The veggies are gone this time. Try again!"
+        case .stopped:
+            "Resting your eyes was a good choice."
+        }
+    }
+
     private var metrics: some View {
         HStack(spacing: 16) {
-            MetricCard(title: "Time", value: Self.format(result.elapsedTime), systemImage: "clock.fill")
-            MetricCard(title: "Fox had to wait", value: "\(result.offTrackCount)×", systemImage: "exclamationmark.circle.fill")
-            MetricCard(title: "Level", value: level.title, systemImage: "star.circle.fill")
+            MetricCard(title: "Time played", value: Self.format(result.playTime), systemImage: "clock.fill")
+            MetricCard(title: "Paths finished", value: "\(result.walksCompleted)", systemImage: "storefront.fill")
+            MetricCard(title: "Had to wait", value: "\(result.offTrackCount)×", systemImage: "exclamationmark.circle.fill")
         }
     }
 
@@ -76,7 +96,7 @@ struct FoxPathResultView: View {
             }
             .buttonStyle(.bordered)
             Button(action: onPlayAgain) {
-                Label("New path", systemImage: "arrow.clockwise")
+                Label("Play again", systemImage: "arrow.clockwise")
                     .frame(minWidth: 220, minHeight: 64)
             }
             .buttonStyle(.borderedProminent)

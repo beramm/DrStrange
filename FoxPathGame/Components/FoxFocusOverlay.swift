@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Everything that tells the player where to look: a guide ring while the fox waits, and the
-/// off-track warning when the pointer has left the fox.
+/// Everything that tells the player where to look: who to follow on each new path, a guide ring
+/// while the character waits, and the off-track warning when the pointer has left it.
 ///
 /// The warning is a slow fade and a gentle breathing motion. Nothing flashes, and with
 /// Reduce Motion the cues hold still.
@@ -32,6 +32,13 @@ struct FoxFocusOverlay: View {
                     .position(x: fox.x, y: max(fox.y - height * 0.5 - bubbleSize * 0.6, bubbleSize * 0.5 + 8))
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
             }
+            if state == .waiting {
+                RoleIntroCard(roles: viewModel.roles)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 100)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .id(viewModel.walkNumber)
+            }
             if let hint {
                 Text(hint)
                     .font(.system(.title2, design: .rounded).weight(.heavy))
@@ -54,16 +61,53 @@ struct FoxFocusOverlay: View {
     }
 
     private var hint: String? {
+        let name = viewModel.roles.primary.name
         switch viewModel.trackingState {
         case .waiting:
-            usesGaze ? "Look at the fox to start" : "Touch the fox to start"
+            return usesGaze ? "Look at \(name) to start" : "Touch \(name) to start"
         case .offTrack:
-            usesGaze ? "Look at the fox!" : "Put your finger on the fox!"
+            return usesGaze ? "Look at \(name)!" : "Put your finger on \(name)!"
         case .following:
-            viewModel.needsPointer ? "Looking for your eye…" : nil
+            return viewModel.needsPointer ? "Looking for your eye…" : nil
         case .finished:
-            nil
+            return nil
         }
+    }
+}
+
+/// Shown while a new path waits for the first look: who to follow, and who is after the
+/// vegetables this time.
+private struct RoleIntroCard: View {
+    let roles: CharacterRoles
+
+    var body: some View {
+        HStack(spacing: 22) {
+            HStack(spacing: 12) {
+                Image(roles.primary.standingAsset)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 86)
+                Text("Follow \(roles.primary.name)!")
+                    .font(.system(.title, design: .rounded).weight(.heavy))
+                    .foregroundStyle(FoxPathPalette.ink)
+            }
+            Rectangle()
+                .fill(FoxPathPalette.ink.opacity(0.15))
+                .frame(width: 2, height: 64)
+            HStack(spacing: 10) {
+                Image(roles.thief.standingAsset)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 60)
+                Text("\(roles.thief.name) wants\nthe veggies!")
+                    .font(.system(.headline, design: .rounded).weight(.bold))
+                    .foregroundStyle(FoxPathPalette.danger)
+            }
+        }
+        .padding(.horizontal, 26)
+        .padding(.vertical, 12)
+        .background(Capsule().fill(.white.opacity(0.92)))
+        .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
     }
 }
 

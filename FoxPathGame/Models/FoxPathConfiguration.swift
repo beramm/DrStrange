@@ -1,78 +1,86 @@
 import Foundation
 
-/// Per-level gameplay parameters for Follow the Fox. Every value is a `.gameDesign` placeholder
-/// that is subject to clinical review; none of them implies a therapeutic intensity.
+/// Walking and following parameters for Follow the Fox. Every value is a `.gameDesign`
+/// placeholder that is subject to clinical review; none of them implies a therapeutic intensity.
 struct FoxPathSettings: Codable, Equatable {
     /// Walking speed in map units per second. One path tile is 128 units wide.
     var foxSpeed: Double
-    /// How far from the fox (screen points) the gaze may be and still count as following it.
-    /// The radius grows with the fox when the map is zoomed in.
+    /// How far from the character (screen points) the gaze may be and still count as following
+    /// it. The radius grows with the character when the map is zoomed in.
     var followRadius: Double
-    /// Seconds the gaze may leave the fox before the fox stops and the warning shows.
+    /// Seconds the gaze may leave the character before it stops and the warning shows.
     var lookAwayGrace: Double
-    /// Seconds the gaze must rest on the fox again before it walks on.
+    /// Seconds the gaze must rest on the character again before it walks on.
     var refocusDwell: Double
     /// Tiles the path runs straight between two turns.
     var straightRunRange: ClosedRange<Int>
     /// Rows the path climbs or drops in one turn.
     var turnHeightRange: ClosedRange<Int>
 
-    static func defaults(for level: DifficultyLevel) -> FoxPathSettings {
-        switch level {
-        case .beginner:
-            FoxPathSettings(
-                foxSpeed: 48,
-                followRadius: 230,
-                lookAwayGrace: 0.7,
-                refocusDwell: 0.35,
-                straightRunRange: 2...3,
-                turnHeightRange: 1...2
-            )
-        case .intermediate:
-            FoxPathSettings(
-                foxSpeed: 68,
-                followRadius: 190,
-                lookAwayGrace: 0.55,
-                refocusDwell: 0.4,
-                straightRunRange: 2...3,
-                turnHeightRange: 1...3
-            )
-        case .advanced:
-            FoxPathSettings(
-                foxSpeed: 90,
-                followRadius: 160,
-                lookAwayGrace: 0.4,
-                refocusDwell: 0.45,
-                straightRunRange: 1...2,
-                turnHeightRange: 2...4
-            )
-        }
-    }
+    /// The one setting every game uses (there are no levels).
+    static let standard = FoxPathSettings(
+        foxSpeed: 68,
+        followRadius: 190,
+        lookAwayGrace: 0.55,
+        refocusDwell: 0.4,
+        straightRunRange: 2...3,
+        turnHeightRange: 1...3
+    )
+}
+
+/// How the thief behaves. `.gameDesign` placeholders, subject to clinical review.
+struct ThiefSettings: Codable, Equatable {
+    /// Seconds from the start of a walk until the first thief may appear.
+    var firstAppearanceRange: ClosedRange<Double> = 8...14
+    /// Seconds after a thief has left before the next one may appear.
+    var appearanceIntervalRange: ClosedRange<Double> = 10...18
+    /// No new thief appears when fewer seconds than this are left in the game.
+    var minimumTimeLeft: Double = 12
+    /// No new thief appears when the character the child follows is this close to the stall
+    /// (map units), because the thief would be chased off straight away.
+    var minimumWalkLeft: Double = 260
+    /// Seconds the thief takes to come into view from the map edge.
+    var appearDuration: Double = 1.5
+    /// Seconds of not following that take the thief all the way to the vegetables.
+    var approachDuration: Double = 6
+    /// While the child follows, the thief backs away at this fraction of its approach speed.
+    var backOffRate: Double = 0.5
+    /// Seconds the thief stays around without stealing before it gives up and leaves.
+    var patience: Double = 14
+    /// Seconds the thief spends taking vegetables at the stall.
+    var stealDuration: Double = 1.2
+    /// Seconds the thief takes to run back off the map.
+    var retreatDuration: Double = 2
 }
 
 /// Everything needed to start one Follow the Fox game.
 struct FoxPathConfiguration: Codable, Equatable {
-    var level: DifficultyLevel = .beginner
+    /// Every game lasts 2 minutes, counted from the first look at the character (pauses
+    /// excluded). The length of one game, not a recommended play or patching time.
+    static let sessionDuration: TimeInterval = 120
+    /// Hearts at the start of a game. A successful theft costs one.
+    static let initialLives = 3
+
     var soundEnabled: Bool = true
     var hapticsEnabled: Bool = true
     /// Shows a small dot where the tracker thinks the child is looking.
     var showsGazeMarker: Bool = true
-    /// Fixed seed for a reproducible map (research / QA). `nil` draws a new map every game.
+    /// Fixed seed for reproducible maps, roles and thieves (research / QA). `nil` draws new ones
+    /// every game.
     var randomSeed: UInt64?
 
-    func settings(for level: DifficultyLevel) -> FoxPathSettings {
-        FoxPathSettings.defaults(for: level)
-    }
+    var settings: FoxPathSettings { .standard }
+    var thief: ThiefSettings { ThiefSettings() }
 
     static let settingsProvenance = ParameterProvenance.gameDesign
 }
 
 extension FoxPathConfiguration {
     /// Missing keys fall back to defaults, so settings saved by an older version still load.
+    /// The level saved by older versions is ignored.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = FoxPathConfiguration()
-        level = try container.decodeIfPresent(DifficultyLevel.self, forKey: .level) ?? defaults.level
         soundEnabled = try container.decodeIfPresent(Bool.self, forKey: .soundEnabled) ?? defaults.soundEnabled
         hapticsEnabled = try container.decodeIfPresent(Bool.self, forKey: .hapticsEnabled) ?? defaults.hapticsEnabled
         showsGazeMarker = try container.decodeIfPresent(Bool.self, forKey: .showsGazeMarker) ?? defaults.showsGazeMarker

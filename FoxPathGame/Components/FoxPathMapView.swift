@@ -14,7 +14,7 @@ struct FoxPathMapView: View {
             ZStack(alignment: .topLeading) {
                 FoxPathGroundView(map: viewModel.map)
                     .equatable()
-                FoxPathStandingView(sprites: viewModel.map.standingSprites, fox: viewModel.foxPose)
+                FoxPathStandingView(sprites: viewModel.map.standingSprites, fox: viewModel.foxPose, thief: viewModel.thiefPose)
             }
             .frame(width: mapSize.width, height: mapSize.height, alignment: .topLeading)
             .scaleEffect(camera.scale(in: viewport), anchor: .topLeading)
@@ -103,11 +103,12 @@ private struct FoxPathGroundView: View, Equatable {
     }
 }
 
-/// Houses, lamps, the finish stall and the fox, drawn back to front by where they touch the
-/// ground so the fox walks in front of things behind the path.
+/// Houses, lamps, the finish stall and the characters, drawn back to front by where they touch
+/// the ground so a character walks in front of things behind it.
 private struct FoxPathStandingView: View {
     let sprites: [MapSprite]
     let fox: FoxWalkPose
+    let thief: FoxWalkPose?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -115,9 +116,34 @@ private struct FoxPathStandingView: View {
                 MapSpriteView(sprite: sprite)
                     .zIndex(Double(sprite.baseline))
             }
+            GroundMarker(feet: fox.feet, width: fox.frame.width, color: .white)
+                .zIndex(Double(fox.feet.y) - 0.5)
             FoxSpriteView(pose: fox)
                 .zIndex(Double(fox.feet.y))
+            if let thief {
+                GroundMarker(feet: thief.feet, width: thief.frame.width, color: FoxPathPalette.danger)
+                    .zIndex(Double(thief.feet.y) - 0.5)
+                FoxSpriteView(pose: thief)
+                    .zIndex(Double(thief.feet.y))
+                    .transition(.opacity)
+            }
         }
+    }
+}
+
+/// Soft oval on the ground under a character: white under the friend the child follows, red
+/// under the thief, so the two roles are easy to tell apart whoever plays them.
+private struct GroundMarker: View {
+    let feet: CGPoint
+    let width: CGFloat
+    let color: Color
+
+    var body: some View {
+        Ellipse()
+            .fill(color.opacity(0.45))
+            .overlay(Ellipse().strokeBorder(color.opacity(0.8), lineWidth: 3))
+            .frame(width: width * 0.85, height: width * 0.28)
+            .position(feet)
     }
 }
 
@@ -140,6 +166,7 @@ struct FoxSpriteView: View {
         let frame = pose.frame
         Image(pose.assetName)
             .resizable()
+            .scaleEffect(x: pose.isMirrored ? -1 : 1, y: 1)
             .frame(width: frame.width, height: frame.height)
             .position(x: frame.midX, y: frame.midY)
     }

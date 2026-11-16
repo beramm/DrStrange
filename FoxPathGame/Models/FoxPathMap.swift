@@ -55,40 +55,24 @@ enum FoxPathMetrics {
     }
 }
 
-/// The fox's three looks. The provided art has a side view walking right, a front view and a
-/// back view; the path only ever runs right, up or down.
+/// The three ways a character can face. Every character has a side view walking right, a front
+/// view and a back view; the path only ever runs right, up or down.
 enum FoxFacing: Equatable {
     case side
     case front
     case back
 
-    /// Drawn size in map units.
-    var size: CGSize {
-        switch self {
-        case .side: CGSize(width: 119, height: 219)
-        case .front, .back: CGSize(width: 134, height: 218)
-        }
-    }
-
-    /// Where the feet touch the ground, as a fraction of the image.
-    var feetAnchor: CGPoint {
-        switch self {
-        case .side: CGPoint(x: 0.49, y: 0.965)
-        case .front, .back: CGPoint(x: 0.45, y: 0.975)
-        }
-    }
-
-    /// Frame for a walking direction: sideways unless the path is mostly vertical.
+    /// Frame for a walking direction: sideways unless the movement is mostly vertical.
     static func walking(along tangent: CGVector) -> FoxFacing {
         if abs(tangent.dx) >= abs(tangent.dy) { return .side }
         return tangent.dy < 0 ? .back : .front
     }
 }
 
-/// The body area the fox can cover while standing with its feet at `feet`, whichever way it
-/// faces. Used to keep scenery from hiding the fox.
+/// The body area any character can cover while standing with its feet at `feet`, whichever way
+/// it faces. Used to keep scenery from hiding the character the child follows.
 func foxBodyRect(feet: CGPoint) -> CGRect {
-    CGRect(x: feet.x - 70, y: feet.y - 215, width: 140, height: 222)
+    CGRect(x: feet.x - 75, y: feet.y - 226, width: 150, height: 233)
 }
 
 /// Things drawn on the map besides the path.

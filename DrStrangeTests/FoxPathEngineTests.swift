@@ -5,8 +5,16 @@ final class FoxPathEngineTests: XCTestCase {
     private let step = 1.0 / 60
 
     private func makeEngine(routeLength: Double = 1000) -> FoxPathEngine {
-        // Beginner: 48 units per second, 0.7 s grace, 0.35 s refocus dwell.
-        FoxPathEngine(settings: .defaults(for: .beginner), routeLength: routeLength)
+        // 48 units per second, 0.7 s grace, 0.35 s refocus dwell.
+        let settings = FoxPathSettings(
+            foxSpeed: 48,
+            followRadius: 230,
+            lookAwayGrace: 0.7,
+            refocusDwell: 0.35,
+            straightRunRange: 2...3,
+            turnHeightRange: 1...2
+        )
+        return FoxPathEngine(settings: settings, routeLength: routeLength)
     }
 
     /// Feeds the same reading for `seconds` and returns every event.
@@ -25,8 +33,8 @@ final class FoxPathEngineTests: XCTestCase {
         XCTAssertTrue(run(&engine, .unavailable, for: 5).isEmpty)
         XCTAssertEqual(engine.state, .waiting)
         XCTAssertEqual(engine.distance, 0)
-        XCTAssertEqual(engine.result.elapsedTime, 0)
-        XCTAssertEqual(engine.result.offTrackCount, 0)
+        XCTAssertEqual(engine.elapsedTime, 0)
+        XCTAssertEqual(engine.offTrackCount, 0)
     }
 
     func testFoxStartsAfterTheDwell() {
@@ -54,7 +62,7 @@ final class FoxPathEngineTests: XCTestCase {
         // The grace time starts again after every look back.
         XCTAssertTrue(run(&engine, .away, for: 0.5).isEmpty)
         XCTAssertEqual(engine.state, .following)
-        XCTAssertEqual(engine.result.offTrackCount, 0)
+        XCTAssertEqual(engine.offTrackCount, 0)
     }
 
     func testLongLookAwayStopsTheFoxUntilRefocus() {
@@ -67,7 +75,7 @@ final class FoxPathEngineTests: XCTestCase {
         let stoppedAt = engine.distance
         run(&engine, .away, for: 3)
         XCTAssertEqual(engine.distance, stoppedAt)
-        XCTAssertEqual(engine.result.offTrackCount, 1, "one stop counts once however long it lasts")
+        XCTAssertEqual(engine.offTrackCount, 1, "one stop counts once however long it lasts")
 
         XCTAssertEqual(run(&engine, .onFox, for: 0.5), [.refocused])
         XCTAssertEqual(engine.state, .following)
@@ -92,7 +100,7 @@ final class FoxPathEngineTests: XCTestCase {
         XCTAssertTrue(run(&engine, .unavailable, for: 5).isEmpty)
         XCTAssertEqual(engine.state, .following)
         XCTAssertEqual(engine.distance, heldAt)
-        XCTAssertEqual(engine.result.offTrackCount, 0)
+        XCTAssertEqual(engine.offTrackCount, 0)
         XCTAssertTrue(engine.needsPointer)
 
         run(&engine, .onFox, for: 0.1)
@@ -106,21 +114,7 @@ final class FoxPathEngineTests: XCTestCase {
         XCTAssertEqual(events, [.started, .finished])
         XCTAssertEqual(engine.state, .finished)
         XCTAssertEqual(engine.progress, 1)
-        XCTAssertTrue(engine.result.reachedEnd)
-        XCTAssertEqual(engine.result.stars, 3)
-        XCTAssertEqual(engine.result.followingTime, 2, accuracy: 0.05)
+        XCTAssertEqual(engine.followingTime, 2, accuracy: 0.05)
         XCTAssertTrue(run(&engine, .away, for: 2).isEmpty, "nothing happens after the finish")
-    }
-
-    func testStarsOnlyDependOnHowOftenTheFoxWaited() {
-        func stars(_ offTrackCount: Int, reachedEnd: Bool = true) -> Int {
-            FoxPathResult(elapsedTime: 60, followingTime: 40, offTrackCount: offTrackCount, reachedEnd: reachedEnd).stars
-        }
-        XCTAssertEqual(stars(0), 3)
-        XCTAssertEqual(stars(1), 3)
-        XCTAssertEqual(stars(2), 2)
-        XCTAssertEqual(stars(4), 2)
-        XCTAssertEqual(stars(5), 1)
-        XCTAssertEqual(stars(0, reachedEnd: false), 1)
     }
 }

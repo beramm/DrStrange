@@ -2,7 +2,7 @@ import Foundation
 
 /// What the pointer (gaze, or a finger in practice mode) is doing in one frame.
 enum FoxPointerReading: Equatable {
-    /// On or near the fox.
+    /// On or near the character the child follows.
     case onFox
     /// Somewhere else on the screen.
     case away
@@ -11,12 +11,13 @@ enum FoxPointerReading: Equatable {
 }
 
 enum FoxTrackingState: Equatable {
-    /// Before the first look at the fox. The fox waits and nothing is counted yet.
+    /// Before the first look at the character. It waits and nothing is counted yet.
     case waiting
     case following
-    /// The pointer left the fox for longer than the grace time. The fox stands still until
+    /// The pointer left the character for longer than the grace time. It stands still until
     /// the pointer rests on it again.
     case offTrack
+    /// The character reached the stall.
     case finished
 }
 
@@ -27,30 +28,8 @@ enum FoxPathEvent: Equatable {
     case finished
 }
 
-/// Gameplay summary of one walk. These numbers describe the game only; they are not a
-/// measurement of vision and are not stored.
-struct FoxPathResult: Equatable {
-    /// Seconds from the first look at the fox to the finish.
-    let elapsedTime: TimeInterval
-    /// Seconds the fox was walking.
-    let followingTime: TimeInterval
-    /// How many times the fox had to stop and wait.
-    let offTrackCount: Int
-    let reachedEnd: Bool
-
-    /// 1 to 3 stars for the result screen. `.gameDesign` thresholds.
-    var stars: Int {
-        guard reachedEnd else { return 1 }
-        switch offTrackCount {
-        case ...1: return 3
-        case ...4: return 2
-        default: return 1
-        }
-    }
-}
-
-/// Rules of Follow the Fox, driven by a game clock so it can be tested without a screen:
-/// the fox walks along the route while the pointer stays on it and stops when the pointer
+/// Rules of one walk, driven by a game clock so it can be tested without a screen: the
+/// character walks along the route while the pointer stays on it and stops when the pointer
 /// leaves for too long.
 struct FoxPathEngine {
     /// Seconds without a usable reading before the game asks for the eyes to be found again.
@@ -82,6 +61,9 @@ struct FoxPathEngine {
     /// 0 at the start of the path, 1 at the end.
     var progress: Double { min(distance / routeLength, 1) }
 
+    /// Map units left to the stall.
+    var distanceLeft: Double { max(routeLength - distance, 0) }
+
     /// 0...1 while the pointer is settling on a waiting fox; 1 lets it walk.
     var refocusProgress: Double {
         guard state == .waiting || state == .offTrack else { return 0 }
@@ -90,15 +72,6 @@ struct FoxPathEngine {
 
     /// `true` once readings have been missing long enough to tell the player.
     var needsPointer: Bool { unavailableTime >= Self.unavailableHintDelay }
-
-    var result: FoxPathResult {
-        FoxPathResult(
-            elapsedTime: elapsedTime,
-            followingTime: followingTime,
-            offTrackCount: offTrackCount,
-            reachedEnd: state == .finished
-        )
-    }
 
     mutating func advance(by delta: TimeInterval, reading: FoxPointerReading) -> [FoxPathEvent] {
         guard delta > 0, state != .finished else { return [] }
