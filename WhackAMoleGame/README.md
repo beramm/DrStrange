@@ -386,7 +386,7 @@ clinical improvement.
 
 ## Testing
 
-- `DrStrangeTests`: TESTCOUNT unit tests covering:
+- `DrStrangeTests`: 90 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - the 2-minute session end, stop and rest-break reasons, JSON round trip
