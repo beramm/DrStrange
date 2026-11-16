@@ -14,7 +14,12 @@ struct FoxPathMapView: View {
             ZStack(alignment: .topLeading) {
                 FoxPathGroundView(map: viewModel.map)
                     .equatable()
-                FoxPathStandingView(sprites: viewModel.map.standingSprites, fox: viewModel.foxPose, thief: viewModel.thiefPose)
+                FoxPathStandingView(
+                    sprites: viewModel.map.standingSprites,
+                    fox: viewModel.foxPose,
+                    thief: viewModel.thiefPose,
+                    thiefVisibility: viewModel.thiefVisibility
+                )
             }
             .frame(width: mapSize.width, height: mapSize.height, alignment: .topLeading)
             .scaleEffect(camera.scale(in: viewport), anchor: .topLeading)
@@ -103,12 +108,12 @@ private struct FoxPathGroundView: View, Equatable {
     }
 }
 
-/// Houses, lamps, the finish stall and the characters, drawn back to front by where they touch
-/// the ground so a character walks in front of things behind it.
+/// Houses, lamps, gardens, the finish stall and the characters, drawn back to front by where they touch the ground so a character walks in front of things behind it.
 private struct FoxPathStandingView: View {
     let sprites: [MapSprite]
     let fox: FoxWalkPose
     let thief: FoxWalkPose?
+    let thiefVisibility: Double
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -121,11 +126,13 @@ private struct FoxPathStandingView: View {
             FoxSpriteView(pose: fox)
                 .zIndex(Double(fox.feet.y))
             if let thief {
-                GroundMarker(feet: thief.feet, width: thief.frame.width, color: FoxPathPalette.danger)
-                    .zIndex(Double(thief.feet.y) - 0.5)
-                FoxSpriteView(pose: thief)
-                    .zIndex(Double(thief.feet.y))
-                    .transition(.opacity)
+                Group {
+                    GroundMarker(feet: thief.feet, width: thief.frame.width, color: FoxPathPalette.danger)
+                        .zIndex(Double(thief.feet.y) - 0.5)
+                    FoxSpriteView(pose: thief)
+                        .zIndex(Double(thief.feet.y))
+                }
+                .opacity(thiefVisibility)
             }
         }
     }

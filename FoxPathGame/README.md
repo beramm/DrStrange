@@ -2,8 +2,9 @@
 
 A calm, child-friendly iPad game. A friend (the fox, the bunny or the raccoon) walks along a
 winding path through a small village, and the child keeps their eyes on it all the way to the
-veggie stall. Another friend plays the thief and sneaks towards the vegetables whenever the child
-stops following. A game lasts 2 minutes and the child has 3 hearts.
+veggie stall. Another friend plays the thief: it only comes when the child stops following, and
+it sneaks up on the friend to grab its veggies. A game lasts 2 minutes and the
+child has 3 hearts.
 
 The game uses the app's on-device gaze tracker (`GazeInputController`, calibrated with
 `GazeCalibrationView`). A finger can be used instead for practice or on devices without tracking.
@@ -37,8 +38,9 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 - `-FoxPathAutostart`: skips the home screen and starts a game with the saved settings and finger
   input. Useful for checking layouts on different iPad sizes.
 - `-FoxPathSimulatedGaze YES`: moves a pretend pointer that follows the character and looks away
-  five times during the 2 minutes, three of them for 8 seconds, so the warning, the refocus and the
-  thief can be checked and recorded on a simulator.
+  six times during the 2 minutes (two of them long enough for a theft, the others short enough
+  for the thief to be chased off), so the warning, the refocus and the thief can be checked and
+  recorded on a simulator. It is a recording aid only, not gaze tracking.
 
 ## Gameplay
 
@@ -47,9 +49,8 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 2. **Roles.** Each path draws a primary character at random from the fox, the bunny and the
    raccoon, and a thief from the other two. A card shows "Follow Bunny!" and "Raccoon wants the
    veggies!". A white oval on the ground marks the friend to follow and a red one marks the thief.
-3. **Start.** The friend stands at the left end of the path and starts walking when the child has
-   looked at it (or held a finger on it) for a moment. The 2-minute clock starts with the first
-   look of the game.
+3. **Start.** The friend stands at the left end of the path and starts walking when the child has looked at it (or held a finger on it) for a moment. The
+   2-minute clock starts with the first look of the game.
 4. **Follow.** The friend walks right, and up or down around the bends, while the gaze stays within
    the follow radius around it. It faces sideways when walking right, shows its front going down
    and its back going up.
@@ -72,20 +73,30 @@ offers to recalibrate.
 
 ### The thief
 
-Only one thief is ever on the map. It comes at a random time, 8–14 s after a path starts and then
-10–18 s after the previous thief has left, and never when fewer than 12 s are left in the game or
-when the friend is about to reach the stall.
+A thief comes **only because the child stopped following**. There is no timer that sends one,
+and missing gaze readings never bring one. Exactly:
+
+1. The gaze leaves the friend for longer than the look-away grace (0.55 s): the walk goes off
+   track and the attention state becomes `notFollowing`.
+2. If the child is still not following 0.5 s later (`triggerDelay`), one thief comes, provided
+   that no thief is around, the last thief left at least 4 s
+   ago (`cooldown`), at least 3 s of the game are left and the friend is not about to reach the
+   stall. Following again, or a missing reading, starts the 0.5 s over.
+3. Only one thief is ever on the map, so a long stretch of not following brings one thief, not
+   one per frame.
 
 | State | What happens |
 |---|---|
-| `appearing` | The thief walks into view from below the map or from its right edge (1.5 s). |
-| `approaching` | It moves towards the stall only while the child is **not following** (the friend has stopped after the grace time): 6 s of not following take it all the way. While the child follows, it backs off at half that speed. When tracking is unavailable, it waits. After 14 s it gives up and leaves. |
-| `stealing` | At the stall it rummages in the vegetables for 1.2 s. A theft that has started always finishes. |
-| `retreating` | It runs back off the map (2 s). |
+| `appearing` | The thief fades in about 430 map units to the left or right of the friend, on the side with room on the map, and starts walking towards it (1 s). |
+| `approaching` | It walks towards the friend only while the child is **not following**: 4 s of not following take it right beside the friend. While the child follows, it backs off at 0.6 × that speed, and 2.5 s of following without a break chase it away. When tracking is unavailable, it waits where it is. After 14 s it gives up and leaves. |
+| `stealing` | It has reached the friend and stands right beside it, facing it, for 1.2 s. Reaching the friend is the theft; once it has started it always finishes. |
+| `retreating` | It walks back the way it came and fades out (2 s). |
 
-A finished theft costs exactly one heart. When the friend reaches the stall, a thief that has not
-started stealing runs off. The thief always walks along a straight line from out of sight to the
-front of the stall, chosen so it does not walk through a house or a lamp; it never jumps.
+The thief's position is always measured from the friend's feet, so it goes for the friend
+wherever the friend is and never jumps. A finished theft costs exactly one heart, and another
+thief can come once the cooldown is over and the child stops following again. When the friend
+reaches the stall, a thief that has not started stealing runs off. The veggie stall is only the
+finish point of the walk; the thief never goes to it.
 
 ### Hearts and time
 
@@ -93,7 +104,7 @@ front of the stall, chosen so it does not walk through a house or a lamp; it nev
   below zero. With no hearts left the game ends (**Game over**).
 - The top bar counts down from **02:00** (MM:SS). At 00:00 the game ends (**Time's up!**). The
   2 minutes are one game, not a recommended play or patching time, and cannot be changed.
-- When the game ends, everything stops: the walk, the thief, the clock and any thief that was due.
+- When the game ends, everything stops: the walk, the thief and the clock.
 
 ### Zoom
 
@@ -122,7 +133,7 @@ FoxPathGame/
 ├── Models/         FoxPathConfiguration, FoxPathMap (grid, tiles, sprites), FoxRoute,
 │                   FoxWalkPose (walk animation frames), PathCharacter (the three friends, roles)
 ├── Managers/       FoxPathGenerator (random map), FoxPathEngine (one walk), FoxPathSession (clock,
-│                   hearts, roles, thief timing), FoxPathThief (thief rules and way in),
+│                   hearts, roles, when a thief comes), FoxPathThief (thief rules and approach),
 │                   FoxPathCamera (zoom and follow), FoxPathFeedback (sounds and haptics)
 ├── Utilities/      FoxPathPalette (colours)
 └── Resources/      Assets.xcassets (FoxPath/Fox, Bunny, Raccoon, Houses, Tiles, Decorations, app
@@ -158,7 +169,8 @@ Membership**. `README.md` files are excluded from every app.
 
 Every game draws a fresh seed (`FoxPathConfiguration.randomSeed` fixes it for research or QA; it is
 `nil` in normal play). From it come every map, every role draw and every thief time, so the same
-seed replays the same game for the same play.
+seed replays the same game for the same play. Thieves come only from the child's attention, but
+which side they come from is drawn from the same seed.
 
 - **Roles.** The primary character is drawn from all three friends and the thief from the other two,
   again for every new path.
@@ -166,13 +178,22 @@ seed replays the same game for the same play.
   or down, never back. The length of each straight stretch (2–3 tiles) and the height of each turn
   (1–3 rows) are drawn at random, and the path stays in the middle rows so houses fit above and
   below it. The last three tiles are always straight so the finish stall fits above them.
-- **Houses.** Carrot, mushroom and onion houses are shuffled and placed along the path. A house
-  above the path shows its front with the door, and stepping stones lead from the door towards the
-  path. A house below the path shows its back and may be partly cut by the bottom edge.
+- **Houses.** Carrot, mushroom and onion houses are shuffled and spread along the map: each one
+  first tries its own share of the width, so they do not bunch up on one side. A house
+  above the path shows its front with the door, stepping stones lead from the door towards the
+  path (up to five), and two more stones may sit either side of the doorstep. A house below the path shows its back and may be partly cut by the bottom edge. Three to five
+  grey rocks lie on the grass in front of every house.
 - **Finish stall.** The veggie stall stands just above the end of the path, near the right edge,
   and the friend stops in front of the middle of its counter.
-- **Lamps, grass tufts, soil specks and grass patches** are scattered around the path.
-- **Thief's way in** and its timing, as described above.
+- **Lamps** stand beside the path, spread along the whole walk.
+- **Rocks by the path.** Seven to ten grey rocks sit just beside the path, spread along the whole
+  walk on alternating sides, never on the path itself.
+- **Gardens.** After the houses and lamps, the generator keeps finding the emptiest open spot on
+  the grass and puts a small garden there (a bed of onions, a clump of leafy plants, baskets with
+  a crate of vegetables, or plants with a basket), until no spot is more than about 165 map units
+  from scenery. The four garden styles are shuffled so neighbouring gardens differ.
+- **Grass tufts, soil specks and grass patches** are scattered over the remaining grass.
+- **Thief's side**, as described above.
 - **Clearance.** Nothing stands on the path, and nothing that is drawn in front of the friend may
   cover it anywhere along the route (checked against the largest of the three characters).
 
@@ -182,7 +203,7 @@ There are no levels. Every game uses `FoxPathSettings.standard`:
 
 | Setting | Value |
 |---|---|
-| Walking speed (map units per second; one tile is 128 wide) | 68 |
+| Walking speed (map units per second; one tile is 128 wide; was 68) | 100 |
 | Follow radius (screen points at 1× zoom) | 190 |
 | Look-away grace (s) | 0.55 |
 | Refocus dwell (s) | 0.4 |
@@ -190,6 +211,11 @@ There are no levels. Every game uses `FoxPathSettings.standard`:
 | Turn height (rows) | 1–3 |
 | Game length | 2 min |
 | Hearts | 3 |
+
+Thief timings (`ThiefSettings`): trigger delay 0.5 s, cooldown 4 s, no thief
+with less than 3 s left or within 100 map units of the stall, appear 1 s, approach 4 s, back-off
+rate 0.6, chased off after 2.5 s of following, patience 14 s, beside the friend 1.2 s, retreat
+2 s.
 
 ## Result screen
 
@@ -242,40 +268,57 @@ transparency kept.
   - Each side walk plays forward and back in the supplied files, so only the unique pictures are
     in the catalog and `PathCharacter.sideSequence` lists the order they play in. The walk cycle
     advances with the distance walked, so the feet do not slide and a waiting character stands
-    still. The thief uses the side view mirrored when it walks left, and its back view, looping,
-    while it takes vegetables.
+    still. The thief uses the side view mirrored when it walks left, and stands side on, facing
+    the friend, when it has reached it.
+  - The veggies the thief is after are the small basket every character wears on its back in
+    the supplied art.
 - **The House** (`Houses/`): front and back views of the carrot, mushroom and onion houses.
 - **The Path** (`Tiles/`, `Decorations/`): horizontal, vertical and curved path tiles (the curve is
-  rotated and mirrored for all four corners), grass patches, the lamp, stepping stones, grass tufts
-  and soil specks.
+  rotated and mirrored for all four corners), grass patches, the lamp, grass tufts and soil specks.
+- **Street decorations in front of the houses** (`Decorations/SteppingStone`, from
+  `Hiasan jalan depan rumah.png`, which replaces the earlier lower-resolution copy of the same
+  stone) and **road rocks** (`Decorations/PathRock`, from `BATU JALAN.png`). Both are cropped from
+  their canvases and drawn at the tile scale (about 0.22 map units per pixel).
 - **Finish stall** (`Decorations/FinishStall`): the "Veggies" market stall, supplied as a separate
   file (`FINISH.png`).
+- **Cut from the supplied art** (the Drive folder has no separate props or plants):
+  `Decorations/VeggieCrate` (a crate of vegetables from the stall's counter, a garden prop), `Decorations/Baskets` (the baskets in front of the stall),
+  `Decorations/LeafyPlant` (the carrot house's leaves) and `Decorations/OnionSprout` (the top of
+  the onion house, faded into the ground). The stall's poles and counter were removed from the
+  crops.
 - **Drawn in code:** the warning overlay, the focus ring, the role card, the ground ovals under the
   friend and the thief, and the HUD (timer and hearts).
 - **Missing:** dedicated sound effects (built-in system sounds stand in), optional background
-  music, an app icon, and a separate stealing or running animation (the walk cycle stands in).
+  music, an app icon, a separate stealing or running animation (the walk cycle stands in), and
+  dedicated nature props such as trees, bushes or flowers.
 
 ## Testing
 
-- `DrStrangeTests` has 37 unit tests for this game:
-  - `FoxPathSessionTests` (16): every character can be the primary or the thief but never both,
+- `DrStrangeTests` has 45 unit tests for this game:
+  - `FoxPathSessionTests` (22): every character can be the primary or the thief but never both,
     the thief is the other character of the walk, roles are drawn again for each path, the clock
-    starts at the first look and stops at exactly 2 minutes, stopping ends everything, the first
-    thief comes at a random time in range, only one thief at a time, the thief only gets closer
-    while the child is not following and backs off while following, it never jumps, missing gaze
-    never costs a heart, a theft costs exactly one heart, three thefts end the game and nothing
-    happens after, reaching the stall chases the thief away, no thief near the end of the game or
-    of the walk, the thief's way in starts out of sight and ends at the stall, and old saved
-    settings with a level still load
-  - `FoxPathGeneratorTests` (10): seed reproducibility and variety, the path only goes right, up or
-    down and never crosses itself, the route stays on the path tiles, scenery never stands on the
-    path or covers the character, houses do not overlap, every map has houses, lamps and one
-    finish stall, the stall stands behind the end of the route, every picture of all three
-    characters exists in the asset catalog, and every walk cycle follows the distance walked
+    starts at the first look and stops at exactly 2 minutes, time up removes a thief that is still
+    around, stopping ends everything, no thief while the child keeps following (no timer), missing
+    gaze never brings a thief or costs a heart, a thief comes only after a stretch of not
+    following, never a second thief at once, the cooldown, no thief near the end of the game, of
+    the walk or between walks, the thief goes for the character and keeps to it, following again
+    makes it back off and leave, missing gaze makes it wait, it never jumps, reaching the
+    character costs exactly one heart and the next thief comes after the cooldown, three thefts end the game and
+    nothing happens after, reaching the stall chases the thief away, the thief comes into view on
+    the map beside the character, old saved settings with a level still load, and the walk is
+    faster than before
+  - `FoxPathGeneratorTests` (12): seed reproducibility and variety, the path only goes right, up or
+    down and never crosses itself, the route stays on the path tiles, scenery (gardens included)
+    never stands on the path or covers the character, houses do not overlap, every map has houses,
+    lamps and one finish stall, gardens of more than one kind fill the open grass, rocks and
+    stones stay off the path, the stall stands
+    behind the end of the route, every picture exists in the asset catalog, and every walk cycle
+    follows the distance walked
   - `FoxPathEngineTests` (8): nothing counts before the first look, the start dwell, walking speed,
     a short look away is forgiven, a long one stops the walk once, a glance does not refocus, lost
     tracking holds the walk without counting, and the finish fires once
   - `FoxPathCameraTests` (3): the whole map is centred at 1×, zoom limits, and at every zoom the
-    view stays inside the map with the character on screen along the whole route
+    view stays inside the map with the character on screen along the whole route (at the new
+    walking speed)
 - **Not yet checked:** eye control on a real iPad (the simulator has no camera), and pinch zoom on
   a real device.

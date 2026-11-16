@@ -38,6 +38,8 @@ final class FoxPathGameViewModel {
     /// The thief, while one is on the map.
     private(set) var thiefPose: FoxWalkPose?
     private(set) var thiefState: ThiefState = .inactive
+    /// 0...1 while the thief fades in or out.
+    private(set) var thiefVisibility: Double = 0
     private(set) var trackingState: FoxTrackingState = .waiting
     private(set) var attention: PlayerAttentionState = .following
     private(set) var refocusProgress: Double = 0
@@ -71,7 +73,7 @@ final class FoxPathGameViewModel {
     #if DEBUG
     /// QA hook for simulator recordings: `-FoxPathSimulatedGaze YES` moves a pretend pointer
     /// that follows the character and looks away a few times, some of them long enough for a
-    /// thief to reach the vegetables.
+    /// thief to reach the character. It is a recording aid, not gaze tracking.
     @ObservationIgnored private let usesScriptedPointer = UserDefaults.standard.bool(forKey: "FoxPathSimulatedGaze")
     @ObservationIgnored private var scriptClock: TimeInterval = 0
     #endif
@@ -99,8 +101,7 @@ final class FoxPathGameViewModel {
     private static func makeWalk(session: inout FoxPathSession, settings: FoxPathSettings) -> (map: FoxPathMap, engine: FoxPathEngine) {
         let seed = session.nextMapSeed()
         let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
-        var routeGenerator = SeededGenerator(seed: seed ^ 0x7468_6965_665F_7761)
-        session.prepareWalk(thiefRoute: ThiefRoute.make(for: map, using: &routeGenerator))
+        session.prepareWalk()
         return (map, FoxPathEngine(settings: settings, routeLength: Double(map.route.length)))
     }
 
@@ -226,15 +227,18 @@ final class FoxPathGameViewModel {
             if var countdown = nextWalkCountdown {
                 countdown -= delta
                 nextWalkCountdown = countdown
-                applySession(session.advance(by: delta, attention: .following, walkLeft: nil))
+                applySession(session.advance(by: delta, attention: .following, walk: nil))
                 // A thief still running off finishes before the next path appears.
                 if countdown <= 0, session.thief == nil, endCountdown == nil { startNextWalk() }
             } else {
                 applyWalk(engine.advance(by: delta, reading: reading))
                 let current = attention(for: reading)
                 if current != attention { attention = current }
-                let walkLeft = engine.state == .finished ? nil : engine.distanceLeft
-                applySession(session.advance(by: delta, attention: current, walkLeft: walkLeft))
+                let walk = engine.state == .finished ? nil : WalkProgress(
+                    distanceLeft: engine.distanceLeft,
+                    feet: map.route.sample(at: CGFloat(engine.distance)).point
+                )
+                applySession(session.advance(by: delta, attention: current, walk: walk))
             }
             syncFromEngine()
             syncThief()
@@ -328,24 +332,28 @@ final class FoxPathGameViewModel {
         guard let thief = session.thief else {
             if thiefPose != nil { thiefPose = nil }
             if thiefState != .inactive { thiefState = .inactive }
+            if thiefVisibility != 0 { thiefVisibility = 0 }
             thiefDistance = 0
             return
         }
-        let position = thief.position
-        var pose = thiefPose ?? FoxWalkPose.standing(thief.character, at: thief.route.point(at: 0))
+        let position = thief.position(around: foxPose.feet)
+        var pose = thiefPose ?? FoxWalkPose.standing(thief.character, at: position)
         let step = CGVector(dx: position.x - pose.feet.x, dy: position.y - pose.feet.y)
         let moved = hypot(step.dx, step.dy)
         pose.character = thief.character
         if thief.state == .stealing {
-            // Facing the stall and rummaging through the vegetables.
-            pose.facing = .back
-            pose.isMirrored = false
-            pose.assetName = thief.character.backAsset(frame: Int(thief.stateTime / 0.15) % 4 + 1)
+            // Side on, facing the character it has reached.
+            pose.facing = .side
+            pose.isMirrored = thief.approach.side > 0
+            pose.assetName = thief.character.sideAsset(frame: thief.character.sideSequence[0])
         } else if moved > 0.01 {
             thiefDistance += moved
             pose.facing = FoxFacing.walking(along: step)
             pose.isMirrored = pose.facing == .side && step.dx < 0
             pose.assetName = FoxWalkAnimation.assetName(for: thief.character, facing: pose.facing, distance: thiefDistance)
+        } else if pose.facing == .side {
+            // Standing still side on: feet together.
+            pose.assetName = thief.character.sideAsset(frame: thief.character.sideSequence[0])
         } else {
             pose.facing = .front
             pose.isMirrored = false
@@ -354,6 +362,8 @@ final class FoxPathGameViewModel {
         pose.feet = position
         if pose != thiefPose { thiefPose = pose }
         if thief.state != thiefState { thiefState = thief.state }
+        let visibility = (thief.visibility * 20).rounded() / 20
+        if visibility != thiefVisibility { thiefVisibility = visibility }
     }
 
     private func finish() {
@@ -367,9 +377,9 @@ final class FoxPathGameViewModel {
 
     #if DEBUG
     /// Windows of script time (seconds) in which the pretend pointer wanders off. The long ones
-    /// give a thief that is around time to reach the vegetables.
+    /// let a thief reach the character; the short ones bring a thief that is then chased off.
     private static let scriptedLookAways: [ClosedRange<TimeInterval>] = [
-        16...24, 44...45.5, 60...68, 90...92, 104...112,
+        6...13, 30...31.6, 40...44, 58...65, 85...86.5, 100...103,
     ]
 
     private func moveScriptedPointer(by delta: TimeInterval) {

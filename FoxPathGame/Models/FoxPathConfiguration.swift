@@ -19,7 +19,7 @@ struct FoxPathSettings: Codable, Equatable {
 
     /// The one setting every game uses (there are no levels).
     static let standard = FoxPathSettings(
-        foxSpeed: 68,
+        foxSpeed: 100,
         followRadius: 190,
         lookAwayGrace: 0.55,
         refocusDwell: 0.4,
@@ -29,27 +29,33 @@ struct FoxPathSettings: Codable, Equatable {
 }
 
 /// How the thief behaves. `.gameDesign` placeholders, subject to clinical review.
+///
+/// A thief only ever comes because the child stopped following; there is no timer that sends
+/// one. Missing gaze readings never bring a thief.
 struct ThiefSettings: Codable, Equatable {
-    /// Seconds from the start of a walk until the first thief may appear.
-    var firstAppearanceRange: ClosedRange<Double> = 8...14
-    /// Seconds after a thief has left before the next one may appear.
-    var appearanceIntervalRange: ClosedRange<Double> = 10...18
-    /// No new thief appears when fewer seconds than this are left in the game.
-    var minimumTimeLeft: Double = 12
-    /// No new thief appears when the character the child follows is this close to the stall
-    /// (map units), because the thief would be chased off straight away.
-    var minimumWalkLeft: Double = 260
-    /// Seconds the thief takes to come into view from the map edge.
-    var appearDuration: Double = 1.5
-    /// Seconds of not following that take the thief all the way to the vegetables.
-    var approachDuration: Double = 6
+    /// Seconds the child must keep not following (on top of the look-away grace) before a
+    /// thief comes, so a quick glance away does not bring one.
+    var triggerDelay: Double = 0.5
+    /// Seconds after a thief has left before another one can come.
+    var cooldown: Double = 4
+    /// No new thief comes when fewer seconds than this are left in the game.
+    var minimumTimeLeft: Double = 3
+    /// No new thief comes when the character the child follows is this close to the stall
+    /// (map units), because the walk is about to end.
+    var minimumWalkLeft: Double = 100
+    /// Seconds the thief takes to come into view.
+    var appearDuration: Double = 1
+    /// Seconds of not following that take the thief from where it lurks to the character.
+    var approachDuration: Double = 4
     /// While the child follows, the thief backs away at this fraction of its approach speed.
-    var backOffRate: Double = 0.5
+    var backOffRate: Double = 0.6
+    /// Seconds of following without a break that chase a thief off before it steals.
+    var chasedOffAfter: Double = 2.5
     /// Seconds the thief stays around without stealing before it gives up and leaves.
     var patience: Double = 14
-    /// Seconds the thief spends taking vegetables at the stall.
+    /// Seconds the thief spends beside the character, grabbing at its vegetables.
     var stealDuration: Double = 1.2
-    /// Seconds the thief takes to run back off the map.
+    /// Seconds the thief takes to run off.
     var retreatDuration: Double = 2
 }
 

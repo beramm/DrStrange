@@ -24,7 +24,7 @@ final class FoxPathCameraTests: XCTestCase {
     func testWholeMapIsCentredWhenZoomedOut() {
         let map = makeMap()
         var camera = FoxPathCamera(mapSize: map.size)
-        walk(&camera, along: map.route, speed: 68) { camera, _ in
+        walk(&camera, along: map.route, speed: CGFloat(FoxPathSettings.standard.foxSpeed)) { camera, _ in
             XCTAssertEqual(camera.center.x, map.size.width / 2, accuracy: 0.001)
             XCTAssertEqual(camera.center.y, map.size.height / 2, accuracy: 0.001)
         }
@@ -56,11 +56,11 @@ final class FoxPathCameraTests: XCTestCase {
             // Let the zoom settle on the fox's starting point before it walks.
             let (start, tangent) = map.route.sample(at: 0)
             for _ in 0..<180 {
-                camera.update(delta: step, focus: CGPoint(x: start.x, y: start.y - 110), tangent: tangent, foxSpeed: 90, viewport: viewport)
+                camera.update(delta: step, focus: CGPoint(x: start.x, y: start.y - 110), tangent: tangent, foxSpeed: CGFloat(FoxPathSettings.standard.foxSpeed), viewport: viewport)
             }
             XCTAssertEqual(camera.zoom, zoom, accuracy: 0.001)
 
-            walk(&camera, along: map.route, speed: 90) { camera, focus in
+            walk(&camera, along: map.route, speed: CGFloat(FoxPathSettings.standard.foxSpeed)) { camera, focus in
                 let scale = camera.scale(in: viewport)
                 let half = CGSize(width: viewport.width / scale / 2, height: viewport.height / scale / 2)
                 XCTAssertGreaterThanOrEqual(camera.center.x - half.width, -0.001)

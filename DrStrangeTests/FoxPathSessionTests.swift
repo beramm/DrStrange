@@ -3,12 +3,13 @@ import XCTest
 
 final class FoxPathSessionTests: XCTestCase {
     private let step = 1.0 / 60
-    private let route = ThiefRoute(start: CGPoint(x: 1700, y: 1300), target: CGPoint(x: 1400, y: 300))
+    private let feet = CGPoint(x: 700, y: 500)
+    private var walk: WalkProgress { WalkProgress(distanceLeft: 2000, feet: feet) }
 
     /// A session on its first walk, with the clock running.
-    private func makeSession(seed: UInt64 = 5, thief: ThiefSettings = ThiefSettings()) -> FoxPathSession {
-        var session = FoxPathSession(seed: seed, thiefSettings: thief)
-        session.prepareWalk(thiefRoute: route)
+    private func makeSession(seed: UInt64 = 5, thief: ThiefSettings = ThiefSettings(), duration: TimeInterval = 120) -> FoxPathSession {
+        var session = FoxPathSession(seed: seed, thiefSettings: thief, duration: duration)
+        session.prepareWalk()
         session.walkStarted()
         return session
     }
@@ -19,20 +20,29 @@ final class FoxPathSessionTests: XCTestCase {
         _ session: inout FoxPathSession,
         _ attention: PlayerAttentionState,
         for seconds: Double,
-        walkLeft: Double? = 2000
+        walk: WalkProgress?? = nil
     ) -> [FoxPathSessionEvent] {
+        let current = walk ?? self.walk
         var events: [FoxPathSessionEvent] = []
         for _ in 0..<Int((seconds / step).rounded()) {
-            events += session.advance(by: step, attention: attention, walkLeft: walkLeft)
+            events += session.advance(by: step, attention: attention, walk: current)
         }
         return events
     }
 
-    /// Runs until a thief is on the map.
+    /// Stops following until a thief comes.
     private func waitForThief(_ session: inout FoxPathSession) {
         for _ in 0..<Int(60 / step) where session.thief == nil {
-            session.advance(by: step, attention: .following, walkLeft: 2000)
+            session.advance(by: step, attention: .notFollowing, walk: walk)
         }
+    }
+
+    private func appearances(in events: [FoxPathSessionEvent]) -> Int {
+        events.filter { if case .thiefAppeared = $0 { true } else { false } }.count
+    }
+
+    private func livesLost(in events: [FoxPathSessionEvent]) -> [FoxPathSessionEvent] {
+        events.filter { if case .lifeLost = $0 { true } else { false } }
     }
 
     // MARK: - Roles
@@ -66,7 +76,7 @@ final class FoxPathSessionTests: XCTestCase {
         for _ in 0..<30 {
             seen.insert("\(session.roles.primary)-\(session.roles.thief)")
             session.walkFinished()
-            session.prepareWalk(thiefRoute: route)
+            session.prepareWalk()
             session.walkStarted()
         }
         XCTAssertGreaterThan(seen.count, 3, "roles change between walks")
@@ -76,9 +86,9 @@ final class FoxPathSessionTests: XCTestCase {
 
     func testClockStartsAtTheFirstLookAndStopsAfterTwoMinutes() {
         var session = FoxPathSession(seed: 1)
-        session.prepareWalk(thiefRoute: route)
+        session.prepareWalk()
         XCTAssertEqual(session.remainingTime, 120)
-        XCTAssertTrue(run(&session, .following, for: 10).isEmpty, "nothing runs before the first look")
+        XCTAssertTrue(run(&session, .notFollowing, for: 10).isEmpty, "nothing runs before the first look")
         XCTAssertEqual(session.remainingTime, 120)
 
         session.walkStarted()
@@ -88,9 +98,18 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertEqual(session.clock, 120, accuracy: 1e-9)
         XCTAssertEqual(session.remainingTime, 0)
         XCTAssertNil(session.thief, "no thief is left on the map")
-        XCTAssertNil(session.nextThiefAt, "no thief is due")
         XCTAssertTrue(run(&session, .notFollowing, for: 10).isEmpty, "nothing happens after the end")
         XCTAssertEqual(session.result.endReason, .timeUp)
+    }
+
+    func testTimeUpRemovesAThiefThatIsStillAround() {
+        var session = makeSession(duration: 9)
+        run(&session, .notFollowing, for: 8)
+        XCTAssertEqual(session.thefts, 1)
+        XCTAssertNotNil(session.thief, "still running off")
+        let events = run(&session, .notFollowing, for: 4)
+        XCTAssertEqual(events.last, .timeUp)
+        XCTAssertNil(session.thief)
     }
 
     func testStoppingEndsEverything() {
@@ -103,103 +122,175 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertEqual(session.result.endReason, .stopped)
     }
 
-    // MARK: - Thief
+    // MARK: - When a thief comes
 
-    func testFirstThiefComesAtARandomTimeInTheConfiguredRange() {
-        let range = ThiefSettings().firstAppearanceRange
-        var times = Set<Int>()
-        for seed: UInt64 in 1...30 {
-            var session = makeSession(seed: seed)
-            waitForThief(&session)
-            XCTAssertTrue(range.contains(session.clock - step) || range.contains(session.clock), "seed \(seed): \(session.clock)")
-            times.insert(Int(session.clock * 10))
-        }
-        XCTAssertGreaterThan(times.count, 10, "appearance times vary")
+    func testNoThiefWhileTheChildKeepsFollowing() {
+        var session = makeSession()
+        let events = run(&session, .following, for: 115)
+        XCTAssertEqual(appearances(in: events), 0, "no timer ever sends a thief")
+        XCTAssertNil(session.thief)
     }
 
-    func testOnlyOneThiefAtATime() {
+    func testMissingGazeNeverBringsAThiefOrCostsAHeart() {
+        var session = makeSession()
+        let events = run(&session, .trackingUnavailable, for: 60)
+        XCTAssertEqual(appearances(in: events), 0)
+        XCTAssertEqual(session.lives, 3)
+    }
+
+    func testAThiefComesOnlyAfterAStretchOfNotFollowing() {
+        let delay = ThiefSettings().triggerDelay
+        var session = makeSession()
+        XCTAssertEqual(appearances(in: run(&session, .notFollowing, for: delay * 0.8)), 0, "a quick glance away brings no thief")
+        run(&session, .following, for: 1)
+        XCTAssertEqual(appearances(in: run(&session, .notFollowing, for: delay * 0.8)), 0, "following again starts the count over")
+        run(&session, .trackingUnavailable, for: 1)
+        XCTAssertEqual(appearances(in: run(&session, .notFollowing, for: delay * 0.8)), 0, "so does a missing reading")
+        XCTAssertEqual(appearances(in: run(&session, .notFollowing, for: delay * 0.4)), 1)
+        XCTAssertNotNil(session.thief)
+    }
+
+    func testStillNotFollowingNeverBringsASecondThiefAtOnce() {
         var session = makeSession(seed: 9)
         var active = 0
         var appeared = 0
-        for index in 0..<Int(115 / step) {
-            // Alternate between following and not following so thieves come and go.
-            let attention: PlayerAttentionState = (index / 600).isMultiple(of: 2) ? .following : .notFollowing
-            for event in session.advance(by: step, attention: attention, walkLeft: 2000) {
+        for _ in 0..<Int(115 / step) where !session.phase.isOver {
+            for event in session.advance(by: step, attention: .notFollowing, walk: walk) {
                 if case .thiefAppeared = event { active += 1; appeared += 1 }
                 if event == .thiefLeft { active -= 1 }
             }
             XCTAssertLessThanOrEqual(active, 1)
-            if session.phase.isOver { break }
         }
-        XCTAssertGreaterThan(appeared, 1)
+        XCTAssertGreaterThan(appeared, 1, "a new thief can come once the last one has gone")
     }
 
-    func testThiefOnlyGetsCloserWhileTheChildIsNotFollowing() throws {
+    func testNoNewThiefUntilTheCooldownHasPassed() {
         var session = makeSession()
         waitForThief(&session)
-        run(&session, .following, for: 5)
-        let lurking = try XCTUnwrap(session.thief)
-        XCTAssertEqual(lurking.state, .approaching)
-        XCTAssertEqual(lurking.progress, FoxPathThief.lurkProgress, accuracy: 1e-9, "following keeps the thief back")
+        // Following again chases this one off before it steals.
+        var events = run(&session, .following, for: 6)
+        XCTAssertTrue(events.contains(.thiefLeft))
+        events = run(&session, .notFollowing, for: ThiefSettings().cooldown - 1.5)
+        XCTAssertEqual(appearances(in: events), 0, "still cooling down")
+        events = run(&session, .notFollowing, for: 2)
+        XCTAssertEqual(appearances(in: events), 1)
+    }
 
-        run(&session, .notFollowing, for: 2)
+    func testNoThiefCloseToTheEndOfTheGameOrOfTheWalk() {
+        let settings = ThiefSettings()
+        var nearStall = makeSession(thief: settings)
+        run(&nearStall, .notFollowing, for: 5, walk: WalkProgress(distanceLeft: settings.minimumWalkLeft - 1, feet: feet))
+        XCTAssertNil(nearStall.thief)
+
+        var late = makeSession(thief: settings, duration: settings.minimumTimeLeft + 0.2)
+        run(&late, .notFollowing, for: 1)
+        XCTAssertNil(late.thief, "fewer than \(settings.minimumTimeLeft) s left")
+
+        var between = makeSession(thief: settings)
+        run(&between, .notFollowing, for: 5, walk: .some(nil))
+        XCTAssertNil(between.thief, "no thief between walks")
+    }
+
+    // MARK: - What the thief does
+
+    func testThiefGoesForTheCharacterNotTheStall() throws {
+        var session = makeSession()
+        waitForThief(&session)
+        let thief = try XCTUnwrap(session.thief)
+        let start = thief.position(around: feet)
+        XCTAssertEqual(hypot(start.x - feet.x, start.y - feet.y), ThiefApproach.startDistance, accuracy: 160)
+
+        run(&session, .notFollowing, for: ThiefSettings().appearDuration + ThiefSettings().approachDuration - 0.1)
+        let near = try XCTUnwrap(session.thief).position(around: feet)
+        XCTAssertLessThan(hypot(near.x - feet.x, near.y - feet.y), 120, "close beside the character")
+
+        // The thief keeps to the character wherever it goes.
+        let elsewhere = CGPoint(x: 300, y: 260)
+        let moved = try XCTUnwrap(session.thief).position(around: elsewhere)
+        XCTAssertEqual(moved.x - elsewhere.x, near.x - feet.x, accuracy: 1e-9)
+        XCTAssertEqual(moved.y - elsewhere.y, near.y - feet.y, accuracy: 1e-9)
+    }
+
+    func testFollowingAgainMakesTheThiefBackOffAndLeave() throws {
+        var session = makeSession()
+        waitForThief(&session)
+        run(&session, .notFollowing, for: 2.5)
         let closer = try XCTUnwrap(session.thief).progress
-        XCTAssertGreaterThan(closer, lurking.progress)
+        XCTAssertGreaterThan(closer, FoxPathThief.lurkProgress)
 
         run(&session, .following, for: 1)
-        XCTAssertLessThan(try XCTUnwrap(session.thief).progress, closer, "following again makes it back off")
+        XCTAssertLessThan(try XCTUnwrap(session.thief).progress, closer, "it backs off")
+
+        let events = run(&session, .following, for: ThiefSettings().chasedOffAfter + ThiefSettings().retreatDuration)
+        XCTAssertTrue(events.contains(.thiefLeft), "following long enough chases it away")
+        XCTAssertTrue(livesLost(in: events).isEmpty)
+        XCTAssertEqual(session.lives, 3)
+    }
+
+    func testMissingGazeMakesTheThiefWait() throws {
+        var session = makeSession()
+        waitForThief(&session)
+        run(&session, .notFollowing, for: 2)
+        let heldAt = try XCTUnwrap(session.thief).progress
+        let events = run(&session, .trackingUnavailable, for: 8)
+        XCTAssertTrue(livesLost(in: events).isEmpty)
+        XCTAssertEqual(session.lives, 3)
+        let thief = try XCTUnwrap(session.thief)
+        XCTAssertEqual(thief.state, .approaching)
+        XCTAssertEqual(thief.progress, heldAt, accuracy: 1e-9, "the thief holds still while tracking is unavailable")
     }
 
     func testThiefNeverJumps() {
         var session = makeSession()
         waitForThief(&session)
         let settings = ThiefSettings()
-        let fastest = 1 / min(settings.approachDuration, settings.retreatDuration, settings.appearDuration / FoxPathThief.lurkProgress)
+        let fastest = 1 / min(
+            settings.approachDuration / (1 - FoxPathThief.lurkProgress),
+            settings.retreatDuration,
+            settings.appearDuration / FoxPathThief.lurkProgress
+        )
         var last = session.thief?.progress ?? 0
         for _ in 0..<Int(20 / step) {
-            session.advance(by: step, attention: .notFollowing, walkLeft: 2000)
+            session.advance(by: step, attention: .notFollowing, walk: walk)
             guard let thief = session.thief else { break }
             XCTAssertLessThanOrEqual(abs(thief.progress - last), fastest * step + 1e-9)
             last = thief.progress
         }
     }
 
-    func testMissingGazeNeverCostsAHeart() throws {
-        var session = makeSession()
-        waitForThief(&session)
-        run(&session, .notFollowing, for: 2)
-        let heldAt = try XCTUnwrap(session.thief).progress
-        let events = run(&session, .trackingUnavailable, for: 8)
-        XCTAssertFalse(events.contains { if case .lifeLost = $0 { true } else { false } })
-        XCTAssertEqual(session.lives, 3)
-        if let thief = session.thief, thief.state == .approaching {
-            XCTAssertEqual(thief.progress, heldAt, accuracy: 1e-9, "the thief waits while tracking is unavailable")
-        }
-    }
+    // MARK: - Vegetables and hearts
 
-    func testATheftCostsExactlyOneHeart() {
+    func testReachingTheCharacterCostsExactlyOneHeart() throws {
         var session = makeSession()
         waitForThief(&session)
-        let events = run(&session, .notFollowing, for: 12)
-        let lost = events.filter { if case .lifeLost = $0 { true } else { false } }
-        XCTAssertEqual(lost, [.lifeLost(remaining: 2)])
+        var events: [FoxPathSessionEvent] = []
+        var states: [ThiefState] = []
+        for _ in 0..<Int(10 / step) {
+            events += session.advance(by: step, attention: .notFollowing, walk: walk)
+            if let thief = session.thief, states.last != thief.state { states.append(thief.state) }
+        }
+        XCTAssertEqual(states, [.appearing, .approaching, .stealing, .retreating], "it walks up, stops beside the character, then runs off")
+        XCTAssertEqual(livesLost(in: events), [.lifeLost(remaining: 2)])
         XCTAssertTrue(events.contains(.thiefReachedVegetables))
         XCTAssertTrue(events.contains(.thiefLeft))
         XCTAssertEqual(session.lives, 2)
         XCTAssertEqual(session.thefts, 1)
+
+        // Still not following: the next thief comes once the cooldown is over.
+        let next = run(&session, .notFollowing, for: ThiefSettings().cooldown + 1)
+        XCTAssertEqual(appearances(in: next), 1)
     }
 
     func testThreeTheftsEndTheGameAndNothingHappensAfter() {
         var session = makeSession()
         var events: [FoxPathSessionEvent] = []
         for _ in 0..<Int(115 / step) where !session.phase.isOver {
-            events += session.advance(by: step, attention: .notFollowing, walkLeft: 2000)
+            events += session.advance(by: step, attention: .notFollowing, walk: walk)
         }
         XCTAssertEqual(session.phase, .gameOver)
         XCTAssertEqual(session.lives, 0)
-        XCTAssertEqual(events.filter { if case .lifeLost = $0 { true } else { false } }.count, 3)
+        XCTAssertEqual(livesLost(in: events).count, 3)
         XCTAssertEqual(events.filter { $0 == .gameOver }.count, 1)
-        XCTAssertNil(session.nextThiefAt)
         XCTAssertTrue(run(&session, .notFollowing, for: 30).isEmpty)
         XCTAssertEqual(session.lives, 0, "never below zero")
         XCTAssertEqual(session.result.endReason, .noLivesLeft)
@@ -211,41 +302,29 @@ final class FoxPathSessionTests: XCTestCase {
         run(&session, .notFollowing, for: 2)
         session.walkFinished()
         XCTAssertEqual(try XCTUnwrap(session.thief).state, .retreating)
-        let events = run(&session, .notFollowing, for: 5, walkLeft: nil)
-        XCTAssertFalse(events.contains { if case .lifeLost = $0 { true } else { false } })
+        let events = run(&session, .notFollowing, for: 5, walk: .some(nil))
+        XCTAssertTrue(livesLost(in: events).isEmpty)
         XCTAssertNil(session.thief)
-        XCTAssertNil(session.nextThiefAt, "no new thief until the next walk starts")
+        XCTAssertEqual(appearances(in: events), 0, "no new thief until the next walk starts")
         XCTAssertEqual(session.walksCompleted, 1)
     }
 
-    func testNoThiefCloseToTheEndOfTheGameOrOfTheWalk() {
-        var settings = ThiefSettings()
-        settings.firstAppearanceRange = 1...1
-        var nearStall = makeSession(thief: settings)
-        run(&nearStall, .following, for: 3, walkLeft: settings.minimumWalkLeft - 1)
-        XCTAssertNil(nearStall.thief)
+    // MARK: - Way in
 
-        var late = FoxPathSession(seed: 2, thiefSettings: settings, duration: 10)
-        late.prepareWalk(thiefRoute: route)
-        late.walkStarted()
-        run(&late, .following, for: 3)
-        XCTAssertNil(late.thief, "fewer than \(settings.minimumTimeLeft) s left")
-    }
-
-    // MARK: - Thief route
-
-    func testThiefComesFromOffTheMapToTheStall() throws {
-        for seed: UInt64 in 1...40 {
-            let map = FoxPathGenerator.makeMap(seed: seed, settings: .standard)
-            var generator = SeededGenerator(seed: seed)
-            let route = ThiefRoute.make(for: map, using: &generator)
-            let stall = try XCTUnwrap(map.standingSprites.first { $0.kind == .finishStall })
-            XCTAssertGreaterThanOrEqual(route.length, ThiefRoute.minimumLength, "seed \(seed)")
-            XCTAssertFalse(CGRect(origin: .zero, size: map.size).insetBy(dx: -60, dy: -200).contains(route.start), "seed \(seed): starts out of sight")
-            XCTAssertEqual(route.target.y, stall.baseline + 6, accuracy: 0.001)
-            XCTAssertTrue((stall.frame.minX...stall.frame.maxX).contains(route.target.x), "seed \(seed)")
-            // The widest character (146 units) stays on the map at the stall.
-            XCTAssertLessThanOrEqual(route.target.x + 73, map.size.width, "seed \(seed)")
+    func testThiefComesIntoViewOnTheMapBesideTheCharacter() {
+        var generator = SeededGenerator(seed: 4)
+        let size = FoxPathMetrics.mapSize
+        for _ in 0..<300 {
+            let feet = CGPoint(
+                x: CGFloat.random(in: FoxPathMetrics.routeInset...(size.width - FoxPathMetrics.routeEndInset), using: &generator),
+                y: CGFloat.random(in: 240...(size.height - 120), using: &generator)
+            )
+            let approach = ThiefApproach.make(around: feet, mapSize: size, using: &generator)
+            let start = CGPoint(x: feet.x + approach.start.dx, y: feet.y + approach.start.dy)
+            XCTAssertTrue((70...(size.width - 70)).contains(start.x), "\(feet): starts at \(start)")
+            XCTAssertTrue((236...(size.height - 12)).contains(start.y), "\(feet): starts at \(start)")
+            XCTAssertEqual(abs(approach.stand.dx), ThiefApproach.standDistance)
+            XCTAssertEqual(approach.side, approach.start.dx < 0 ? -1 : 1, "it stays on the side it came from")
         }
     }
 
@@ -259,5 +338,10 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertEqual(configuration.settings, .standard)
         XCTAssertEqual(FoxPathConfiguration.sessionDuration, 120)
         XCTAssertEqual(FoxPathConfiguration.initialLives, 3)
+    }
+
+    func testWalkIsFasterThanBefore() {
+        XCTAssertGreaterThan(FoxPathSettings.standard.foxSpeed, 68, "faster than the earlier 68 units/s")
+        XCTAssertLessThanOrEqual(FoxPathSettings.standard.foxSpeed, 120, "still easy to follow")
     }
 }

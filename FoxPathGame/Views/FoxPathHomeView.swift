@@ -66,7 +66,7 @@ struct FoxPathHomeView: View {
             }
             .accessibilityHidden(true)
 
-            Text("Follow your friend to the veggie stall and keep the veggies safe from the thief!")
+            Text("Follow your friend to the veggie stall and keep its veggies safe from the thief!")
                 .font(.system(.title2, design: .rounded).weight(.bold))
                 .foregroundStyle(FoxPathPalette.ink)
                 .multilineTextAlignment(.center)
