@@ -55,7 +55,7 @@ struct WhackAMoleGameView: View {
             playfield
                 .overlayPreferenceValue(FoxAnchorKey.self) { anchors in
                     ZStack {
-                        AttackAnimationView(pose: viewModel.foxPose, anchors: anchors)
+                        AttackAnimationView(pose: viewModel.foxPose, anchors: anchors, helper: viewModel.helper)
                         if let gazeController {
                             GazeInteractionView(
                                 controller: gazeController,

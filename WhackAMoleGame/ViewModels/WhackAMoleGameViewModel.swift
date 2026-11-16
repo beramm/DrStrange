@@ -33,6 +33,8 @@ final class WhackAMoleGameViewModel {
     /// The fox's attack in progress; `nil` while it waits in its window.
     /// Updated every frame during an attack, from game time, so pausing freezes the fox exactly.
     private(set) var foxPose: FoxPose?
+    /// The helper for this game (fox or raccoon), picked at random when the game starts.
+    var helper: HelperCharacter { engine.helper }
     private(set) var interactionState: GameInteractionState = .idle
     /// The holes on the board right now. There are none until a mole is about to appear.
     private(set) var holes: [HoleVisual] = []
@@ -208,7 +210,7 @@ final class WhackAMoleGameViewModel {
         if roundedProgress != progress { progress = roundedProgress }
 
         let pose = engine.attack.flatMap { attack in
-            engine.attackState.map { FoxPose(phase: $0.phase, progress: $0.progress, holeIndex: attack.holeIndex, artIndex: attack.artIndex) }
+            engine.attackState.map { FoxPose(phase: $0.phase, progress: $0.progress, holeIndex: attack.holeIndex, artIndex: attack.artIndex, helper: attack.helper) }
         }
         if pose != foxPose { foxPose = pose }
         let state = engine.interactionState

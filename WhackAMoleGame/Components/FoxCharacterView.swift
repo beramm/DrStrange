@@ -1,10 +1,13 @@
 import SwiftUI
 
-/// The fox from the provided 21-frame hammer swing (`FoxHammer/Frame01…21`).
-/// Frame 1 holds the hammer raised; frame 21 is the moment of impact, low on the fox's left.
+/// The helper's hammer swing: the fox from the provided 21-frame swing (`FoxHammer/Frame01…21`)
+/// or any other `HelperCharacter`, whose frames share the same card placement.
+/// Frame 1 holds the hammer raised; the last frame is the moment of impact, low on the left.
 struct FoxCharacterView: View {
-    /// 1...21.
+    /// 1...helper.frameCount.
     let frame: Int
+    /// Whose artwork is drawn. Everything else is the same for every helper.
+    var helper = HelperCharacter.fox
     /// Flipped so the hammer swings to the right instead of the left.
     var mirrored = false
     /// How much of the image is shown. The hammer sticks out of the card, so it is hidden while the
@@ -19,17 +22,16 @@ struct FoxCharacterView: View {
         case cardAndHammer(Double)
     }
 
-    static let frameCount = 21
-
-    /// Where the hammer head is at the impact frame, as a fraction of the (unmirrored) image.
-    static let impactPoint = CGPoint(x: 0.11, y: 0.62)
-    /// The fox's yellow card in the image (unmirrored), measured from the frames. The hammer
-    /// sticks out to its left.
+    /// The fox's frame count and impact point; see `HelperCharacter` for every helper's own.
+    static let frameCount = HelperCharacter.fox.frameCount
+    static let impactPoint = HelperCharacter.fox.impactPoint
+    /// The card in the image (unmirrored), measured from the fox's frames; every helper's frames
+    /// are aligned to it. The hammer sticks out to its left.
     static let cardRect = CGRect(x: 0.284, y: 0.013, width: 0.707, height: 0.712)
     static let cardCenter = CGPoint(x: cardRect.midX, y: cardRect.midY)
 
     private var image: some View {
-        Image(Self.assetName(frame))
+        Image(Self.assetName(frame, helper: helper))
             .resizable()
             .interpolation(.high)
             .scaledToFit()
@@ -90,14 +92,16 @@ struct FoxCharacterView: View {
         }
     }
 
-    static func assetName(_ frame: Int) -> String {
-        String(format: "FoxHammer/Frame%02d", min(max(frame, 1), frameCount))
+    static func assetName(_ frame: Int, helper: HelperCharacter = .fox) -> String {
+        String(format: "%@/Frame%02d", helper.assetFolder, min(max(frame, 1), helper.frameCount))
     }
 
     /// Animation frame for a point in the attack: hammer raised until the attack, a swing that
     /// speeds up into the impact, held on impact, and lifted back while the fox retracts.
+    /// The same curve for every helper, spread over that helper's own frames.
     static func frame(for pose: FoxPose?) -> Int {
         guard let pose else { return 1 }
+        let frameCount = pose.helper.frameCount
         let swing = Double(frameCount - 1)
         switch pose.phase {
         case .frameAppearing, .foxEmerging, .frameDisappearing: return 1

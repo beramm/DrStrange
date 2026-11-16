@@ -126,6 +126,20 @@ The "frame" is the fox's own yellow card from the artwork (rounded, with an oran
 `FoxWindowView` draws it on its own, using colours and proportions measured from the frames, so
 when the fox image fades in on top the two cards line up exactly.
 
+#### Helper characters
+
+The fox has a stand-in, the raccoon (blue card). `HelperCharacter` lists every helper. When a game
+starts, one helper is picked at random, every helper equally likely, and it stays for the whole
+game: in the corner and in every attack. Each game picks on its own, so the same helper can come
+several games in a row, and nothing makes them take turns.
+
+- Every helper runs exactly the same attack: the same phases, timing, card reveal, placement and
+  frame curve. Only the artwork, the card colours, the number of swing frames and where the hammer
+  head sits at impact differ.
+- The engine picks the helper with its own generator, seeded from the session seed. The pick never
+  changes where or when moles appear.
+- The home and result screens still show the fox.
+
 The sequence always runs in this order:
 
 | State (`GameInteractionState`) | What happens | Duration |
@@ -194,11 +208,11 @@ WhackAMoleGame/
 │                   FoxCharacterView, FoxWindowView, AttackAnimationView
 ├── ViewModels/     WhackAMoleGameViewModel
 ├── Models/         GameConfiguration, PatchingConfiguration, GameCharacter, GameSession,
-│                   FoxAttack (timing, phases, interaction state)
+│                   FoxAttack (timing, phases, interaction state), HelperCharacter
 ├── Managers/       WhackAMoleEngine, SpawnManager, Randomness, GameSessionManager (session,
 │                   settings and high score storage), FeedbackPlayer
 ├── Utilities/      GameConstants (colours)
-└── Resources/      Assets.xcassets (Characters/FoxHammer, app icon and accent colour)
+└── Resources/      Assets.xcassets (Characters/FoxHammer and RaccoonHammer, app icon and accent colour)
 ```
 
 - **Rules:** the engine, spawn manager and difficulty progression are plain Swift with no UI or
@@ -330,6 +344,15 @@ clinical improvement.
   - The frames include the fox's yellow card background, so the fox flies out as a card. A cut-out
     fox without the card would look more natural, if the artist can supply one.
   - The fox also appears on the home and result screens.
+- **Provided (Google Drive, new character folder):** 24 frames (`1`–`24`, 2048 px) of the raccoon
+  swinging a hammer, with a blue card. They are stored in
+  `Resources/Assets.xcassets/Characters/RaccoonHammer/Frame01…24`.
+  - The frames were scaled and placed on a 637 × 640 canvas so that the raccoon's card sits exactly
+    where the fox's card is (`FoxCharacterView.cardRect`). Nothing was redrawn, and transparency
+    is kept.
+  - Frame 1 (hammer raised) is the waiting pose and frame 24 is the impact. The folder has no
+    separate idle, emerging or retracting frames, so the raccoon uses the fox's motion for those,
+    the same way the fox does.
 - **Provided (Google Drive, mole animation folder):** 24 frames (`1`–`24 END`) of the miner mole
   climbing out of a hole, stored in `Resources/Assets.xcassets/Characters/MoleRise/Frame01…24`.
   - The frames were painted with the mole and hole together. The dirt was removed by its colour so
@@ -341,11 +364,13 @@ clinical improvement.
   were cut out from the painted dirt the same way as the rise frames, keeping the small "ouch" ticks
   beside the helmet, and play over `hitReaction` + `exitAnimationDuration` (0.9 s).
   - Awake moles are drawn in full colour; sleeping moles (decoys) in grey with a "z z" bubble.
-- **Provided (Google Drive, background folder):** `Background whackamole.png`, a 4:3 painted meadow
-  with sky, grass and a fence. It is stored as a JPEG in
-  `Resources/Assets.xcassets/GameBackgrounds/Meadow`, fills the screen behind the game, and is cropped
-  slightly at the top and bottom on wider iPads. `GameBackgroundView` holds where the grass is in the
-  painting.
+- **Provided (Google Drive):** the Whack-a-Mole background, a 4:3 painted meadow (2752 × 2064)
+  with sky, clouds, grass and a fence. It replaces the earlier meadow and is stored unchanged as a
+  PNG in `Resources/Assets.xcassets/GameBackgrounds/Meadow`.
+  - It fills the screen behind the game with its aspect ratio kept. On 4:3 iPads nothing is cropped;
+    on wider iPads a little is cropped at the top and bottom.
+  - `GameBackgroundView` holds where the grass is in the painting. The new painting's horizon and
+    fence are still outside that band, so hole positions are unchanged.
 - **Provided (Google Drive, hole folder):** `IMG_0021`–`IMG_0023`, three dirt holes. Each was
   cropped to its visible area and stored in `Resources/Assets.xcassets/Holes/Hole1…3`.
   - The dark opening of each was measured from the art (`HoleArt` in `MoleHoleView.swift`).
@@ -363,7 +388,7 @@ clinical improvement.
 
 ## Testing
 
-- `DrStrangeTests`: 64 unit tests covering:
+- `DrStrangeTests`: 72 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - the 2-minute session end, stop and rest-break reasons, JSON round trip
@@ -380,6 +405,12 @@ clinical improvement.
     - the hammer lands on the tapped character, normal and mirrored
     - the fox stays home when idle or with Reduce Motion
     - settings saved by older versions still load
+  - helper characters:
+    - every helper's frames are in the asset catalog
+    - each helper is equally likely, and the same helper can come in consecutive games
+    - one helper for the whole game, in every attack
+    - helper choice never changes the spawns
+    - the raccoon uses the same swing over its own frames, and its hammer lands on the character
 - Manual checks on the iPad Pro 11-inch simulator:
   - patching setup, including the same-eye warning
   - play and hit animation

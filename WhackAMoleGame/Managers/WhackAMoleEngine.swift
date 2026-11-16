@@ -27,6 +27,9 @@ struct WhackAMoleEngine {
     /// The attack in progress. While set, no new character spawns and further taps are ignored.
     private(set) var attack: FoxAttack?
     private var lastAttackEndedAt: TimeInterval?
+    /// The helper for this whole game: waits in the corner and swings at every tap. Picked at
+    /// random when the game starts, every helper equally likely.
+    let helper: HelperCharacter
     private var holes: [OpenHole] = []
     private var nextHoleID = 0
 
@@ -117,6 +120,9 @@ struct WhackAMoleEngine {
         self.session = GameSessionRecord(configuration: recordedConfiguration, startedAt: startedAt)
         self.spawnManager = SpawnManager(settings: configuration.board, rules: configuration.spawnRules, seed: seed)
         self.nextSpawnAt = configuration.spawnRules.leadInDelay
+        // Its own generator, so the pick never changes where or when moles appear.
+        var helperGenerator = SeededGenerator(seed: seed ^ 0x5EED_4E1F_E12C_0FF5)
+        self.helper = HelperCharacter.random(using: &helperGenerator)
     }
 
     @discardableResult
@@ -178,7 +184,7 @@ struct WhackAMoleEngine {
             targets[index].phase = .targeted
             targets[index].rating = rating
             let artIndex = holes.first { $0.request.holeIndex == target.holeIndex }?.request.artIndex ?? 0
-            attack = FoxAttack(targetID: target.id, holeIndex: target.holeIndex, artIndex: artIndex, startedAt: clock)
+            attack = FoxAttack(targetID: target.id, holeIndex: target.holeIndex, artIndex: artIndex, startedAt: clock, helper: helper)
             record(target, outcome: .hit(responseTime: responseTime))
             return [.hit(targets[index], responseTime: responseTime, rating: rating), .attackStarted(targets[index])]
         case .decoy:
