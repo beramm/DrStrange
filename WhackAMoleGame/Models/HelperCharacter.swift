@@ -10,12 +10,14 @@ import SwiftUI
 enum HelperCharacter: String, CaseIterable, Equatable, Sendable {
     case fox
     case raccoon
+    case bunny
 
     /// Asset folder of the hammer swing frames.
     var assetFolder: String {
         switch self {
         case .fox: "FoxHammer"
         case .raccoon: "RaccoonHammer"
+        case .bunny: "BunnyHammer"
         }
     }
 
@@ -24,6 +26,7 @@ enum HelperCharacter: String, CaseIterable, Equatable, Sendable {
         switch self {
         case .fox: 21
         case .raccoon: 24
+        case .bunny: 9
         }
     }
 
@@ -32,6 +35,7 @@ enum HelperCharacter: String, CaseIterable, Equatable, Sendable {
         switch self {
         case .fox: CGPoint(x: 0.11, y: 0.62)
         case .raccoon: CGPoint(x: 0.153, y: 0.739)
+        case .bunny: CGPoint(x: 0.197, y: 0.435)
         }
     }
 
@@ -40,6 +44,7 @@ enum HelperCharacter: String, CaseIterable, Equatable, Sendable {
         switch self {
         case .fox: Color(red: 0.984, green: 0.800, blue: 0.400)
         case .raccoon: Color(red: 0.525, green: 0.735, blue: 0.909)
+        case .bunny: Color(red: 0.627, green: 0.708, blue: 0.571)
         }
     }
 
@@ -47,6 +52,7 @@ enum HelperCharacter: String, CaseIterable, Equatable, Sendable {
         switch self {
         case .fox: Color(red: 0.957, green: 0.608, blue: 0.227)
         case .raccoon: Color(red: 0.463, green: 0.663, blue: 0.878)
+        case .bunny: Color(red: 0.514, green: 0.578, blue: 0.455)
         }
     }
 

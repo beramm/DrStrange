@@ -125,10 +125,10 @@ when the fox image fades in on top the two cards line up exactly.
 
 #### Helper characters
 
-The fox has a stand-in, the raccoon (blue card). `HelperCharacter` lists every helper. When a game
-starts, one helper is picked at random, every helper equally likely, and it stays for the whole
-game: in the corner and in every attack. Each game picks on its own, so the same helper can come
-several games in a row, and nothing makes them take turns.
+The fox has two stand-ins: the raccoon (blue card) and the bunny (green card). `HelperCharacter`
+lists every helper. When a game starts, one helper is picked at random, every helper equally
+likely, and it stays for the whole game: in the corner and in every attack. Each game picks on its
+own, so the same helper can come several games in a row, and nothing makes them take turns.
 
 - Every helper runs exactly the same attack: the same phases, timing, card reveal, placement and
   frame curve. Only the artwork, the card colours, the number of swing frames and where the hammer
@@ -209,7 +209,7 @@ WhackAMoleGame/
 ├── Managers/       WhackAMoleEngine, SpawnManager, Randomness, GameSessionManager (session,
 │                   settings and high score storage), FeedbackPlayer
 ├── Utilities/      GameConstants (colours)
-└── Resources/      Assets.xcassets (Characters/FoxHammer and RaccoonHammer, app icon and accent colour)
+└── Resources/      Assets.xcassets (Characters/FoxHammer, RaccoonHammer and BunnyHammer, app icon and accent colour)
 ```
 
 - **Rules:** the engine, spawn manager and difficulty progression are plain Swift with no UI or
@@ -351,6 +351,16 @@ clinical improvement.
   - Frame 1 (hammer raised) is the waiting pose and frame 24 is the impact. The folder has no
     separate idle, emerging or retracting frames, so the raccoon uses the fox's motion for those,
     the same way the fox does.
+- **Provided (Google Drive, bunny folder):** 9 frames (`IMG_0200`–`IMG_0204`, `IMG_0224`,
+  `IMG_0206`–`IMG_0208`, 2048 px) of the bunny swinging a hammer, with a green card. They are stored
+  in `Resources/Assets.xcassets/Characters/BunnyHammer/Frame01…09`.
+  - The folder has no `IMG_0205`. `IMG_0224` sits between `IMG_0204` and `IMG_0206` in the swing
+    (measured from the hammer's position), so it is used as frame 6.
+  - The frames were scaled and placed the same way as the raccoon's, so the bunny's card sits exactly
+    where the fox's card is. Nothing was redrawn, and transparency is kept.
+  - Frame 1 (hammer raised) is the waiting pose and frame 9 is the impact. The supplied swing is
+    short (the hammer only tips forward a little), so the bunny strikes from higher up than the fox
+    and the raccoon; the hammer head still lands on the character.
 - **Provided (Google Drive, mole animation folder):** 24 frames (`1`–`24 END`) of the miner mole
   climbing out of a hole, stored in `Resources/Assets.xcassets/Characters/MoleRise/Frame01…24`.
   - The frames were painted with the mole and hole together. The dirt was removed by its colour so
@@ -386,7 +396,7 @@ clinical improvement.
 
 ## Testing
 
-- `DrStrangeTests`: 90 unit tests covering:
+- `DrStrangeTests`: 91 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - the 2-minute session end, stop and rest-break reasons, JSON round trip
@@ -409,7 +419,8 @@ clinical improvement.
     - each helper is equally likely, and the same helper can come in consecutive games
     - one helper for the whole game, in every attack
     - helper choice never changes the spawns
-    - the raccoon uses the same swing over its own frames, and its hammer lands on the character
+    - the raccoon and the bunny use the same swing over their own frames, and every helper's hammer
+      lands on the character
   - one-eye patch-state verification, blink tolerance, removal debounce and re-verification
 - Manual checks on the iPad Pro 11-inch simulator:
   - patching setup, including the same-eye warning
