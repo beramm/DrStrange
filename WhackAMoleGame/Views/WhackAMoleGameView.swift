@@ -3,7 +3,7 @@ import SwiftUI
 /// Full-screen gameplay. Shows the result screen in place when the session ends,
 /// whether time ran out or it was stopped early.
 struct WhackAMoleGameView: View {
-    private static let foxSize: CGFloat = 130
+    private static let foxSize: CGFloat = 180
 
     let configuration: GameConfiguration
     let gazeController: GazeInputController?
