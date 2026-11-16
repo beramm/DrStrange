@@ -63,10 +63,16 @@ struct HoleVisual: Identifiable, Equatable {
 struct MoleVisual: Equatable {
     /// 1 (helmet tip) ... `frameCount` (fully out of the hole).
     var frame: Int
-    /// 0...1 through the reaction to being hit; `nil` when not reacting.
+    /// 0...1 through the hit animation, from the hammer landing until the mole has sunk out of
+    /// sight; `nil` when not hit.
     var hitProgress: Double?
 
     static let frameCount = 24
+
+    /// Which frame of the hit animation to draw, 1 ... `frameCount`; `nil` when not hit.
+    var hitFrame: Int? {
+        hitProgress.map { 1 + Int((Double(Self.frameCount - 1) * $0).rounded()) }
+    }
 }
 
 struct ActiveTarget: Identifiable, Equatable {

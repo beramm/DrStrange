@@ -44,6 +44,9 @@ struct FoxHomeAnchor: View {
 struct AttackAnimationView: View {
     let pose: FoxPose?
     let anchors: [FoxAnchorID: Anchor<CGRect>]
+    /// The helper for this game, in the corner and in every attack. Every helper runs the same
+    /// sequence; only the artwork differs.
+    var helper = HelperCharacter.fox
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -59,7 +62,7 @@ struct AttackAnimationView: View {
                 }
                 // The card sits behind the fox; the fox's own card covers it exactly.
                 if let card = scene.card {
-                    FoxWindowView(reveal: card.reveal, ring: card.ring)
+                    FoxWindowView(reveal: card.reveal, ring: card.ring, helper: helper)
                         .frame(width: card.rect.width, height: card.rect.height)
                         .scaleEffect(card.scale)
                         .position(x: card.rect.midX, y: card.rect.midY)
@@ -68,7 +71,7 @@ struct AttackAnimationView: View {
                 // inside of the drawn card, so the fox appears to come up from the card's bottom edge.
                 if let rising = scene.risingFox, let card = scene.card {
                     let inner = Self.interior(of: card.rect)
-                    FoxCharacterView(frame: FoxCharacterView.frame(for: pose), mirrored: rising.mirrored, visibility: .cardInterior)
+                    FoxCharacterView(frame: FoxCharacterView.frame(for: pose), helper: helper, mirrored: rising.mirrored, visibility: .cardInterior)
                         .frame(width: rising.size, height: rising.size)
                         .position(rising.center)
                         .mask {
@@ -84,7 +87,7 @@ struct AttackAnimationView: View {
     }
 
     private func fox(_ placement: FoxPlacement, frame: Int) -> some View {
-        FoxCharacterView(frame: frame, mirrored: placement.mirrored, visibility: .cardAndHammer(placement.hammerReveal))
+        FoxCharacterView(frame: frame, helper: helper, mirrored: placement.mirrored, visibility: .cardAndHammer(placement.hammerReveal))
             .frame(width: placement.size, height: placement.size)
             .position(placement.center)
             .opacity(placement.opacity)
@@ -149,7 +152,7 @@ struct AttackAnimationView: View {
         var card: CGRect
     }
 
-    static func attackGeometry(holeIndex: Int, artIndex: Int = 0, hole: CGRect, home: CGRect) -> AttackGeometry {
+    static func attackGeometry(holeIndex: Int, artIndex: Int = 0, helper: HelperCharacter = .fox, hole: CGRect, home: CGRect) -> AttackGeometry {
         let character = MoleHoleView.characterRect(artIndex: artIndex, in: hole.size)
             .offsetBy(dx: hole.minX, dy: hole.minY)
         // Hammer lands on the top of the mole's helmet.
@@ -160,10 +163,11 @@ struct AttackAnimationView: View {
         // The fox stands on the side with more room: left of characters in the right-hand column.
         let mirrored = holeIndex % SpawnManager.gridColumns == SpawnManager.gridColumns - 1
         let size = max(character.height * 1.1, homePlacement(in: home).size)
-        let impactX = mirrored ? 1 - FoxCharacterView.impactPoint.x : FoxCharacterView.impactPoint.x
+        let impact = helper.impactPoint
+        let impactX = mirrored ? 1 - impact.x : impact.x
         let strikeCenter = CGPoint(
             x: head.x + (0.5 - impactX) * size,
-            y: head.y + (0.5 - FoxCharacterView.impactPoint.y) * size
+            y: head.y + (0.5 - impact.y) * size
         )
         // Before the swing the fox leans away from the character, then lunges in.
         let lean = size * 0.08 * (mirrored ? -1 : 1)
@@ -188,7 +192,7 @@ struct AttackAnimationView: View {
         let idle = homePlacement(in: home)
         guard let pose, let hole, !reduceMotion else { return Scene(fox: idle) }
 
-        let geometry = attackGeometry(holeIndex: pose.holeIndex, artIndex: pose.artIndex, hole: hole, home: home)
+        let geometry = attackGeometry(holeIndex: pose.holeIndex, artIndex: pose.artIndex, helper: pose.helper, hole: hole, home: home)
         let t = pose.progress
         var hidden = geometry.emerged
         hidden.opacity = 0

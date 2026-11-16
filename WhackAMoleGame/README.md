@@ -43,10 +43,10 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
   - **Patched eye**: left, right or not recorded
   - **Playing eye**: left, right or not recorded. If the same eye is entered for both, the app
     shows a warning.
-  - **Session length**: the play time the eye doctor advised, entered by the caregiver (1–60 min).
-    The default of 2 minutes only makes the game playable out of the box; it is not a
-    recommendation.
   - Start and end time are recorded automatically.
+- Every game lasts **2 minutes** of play (pauses excluded). This is the length of one round, a
+  gameplay choice. It is not a recommended patching or play time, and it cannot be changed in the
+  app.
 - The app never works out which eye is amblyopic or suggests patch wear time. Its on-device camera
   heuristic requires the selected right eye to remain visible while the other eye is obscured; it
   cannot confirm the patch material, fit, or prescription.
@@ -65,15 +65,19 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 
 ## Gameplay
 
+**Calibrate & Play** on the home screen runs the gaze calibration and then plays with eye control:
+the child looks at a mole to hit it. The moles do not respond to touch.
+
 1. The game starts on an empty painted meadow, with no holes showing. A hole opens at a random spot and a
    mole climbs out of it, frame by frame.
-2. The child finds it and taps it. The whole hole area counts, so taps do not need to be precise.
+2. The child finds it and keeps looking at it until the gaze dwell completes.
 3. The fox's yellow card opens beside that mole: it grows from its centre as a rounded square with
    a slight spring, and a square ring ripples out. Meanwhile the fox fades out of its corner.
 4. The fox rises up from the bottom of the card and swings. Its hammer slides out from behind the
-   card and lands on the mole's helmet. The mole squashes, its head wobbles, a few stars circle its
-   helmet and "+10" floats up. There is no flashing and the motion is short.
-5. The mole's climb plays backwards, taking it down into the hole. The hammer slides back behind
+   card and lands on the mole's helmet. The mole screws up its face, plays its 24-frame hit
+   animation sinking back down the hole, and the points float up in an illustrated bubble
+   (Perfect, Good or OK). There is no flashing and the motion is short.
+5. The hammer slides back behind
    the card, the fox sinks down out of its bottom, the empty card shrinks away and the fox is back
    in its corner.
 6. The hole closes. After a short pause another hole opens somewhere else.
@@ -83,9 +87,31 @@ out of dirt holes drawn by the artist (three variations, used evenly).
 A mole climbs out of the dark opening and stands in it up to its shirt; the hole's front edge hides
 the rest. The fox's hammer lands on the helmet. Moles that are not tapped go back down the same way.
 
-Missed moles only sink back: there is no sound, penalty or score loss for a miss. At the advanced
-level some moles are **asleep**: drawn in grey with a "z z" bubble. The child should leave these
-alone; tapping one is recorded but never penalised, and the fox does not attack it.
+Missed moles only sink back: there is no sound, penalty or score loss for a miss. The game can also
+show **sleeping** moles (grey, with a "z z" bubble) that the child should leave alone, but the
+standard board has none (`decoyProbability` 0). Tapping one is recorded but never penalised, and
+the fox does not attack it.
+
+### Scoring
+
+Each gaze hit scores by how close the child's gaze stayed to the centre of the mole during the
+dwell (`GazeProximityTier`, the median distance divided by the outer activation radius):
+
+| Bubble | Gaze distance from the centre | Points |
+|---|---|---|
+| Perfect | up to 0.35 | 60 |
+| Good | up to 0.70 | 30 |
+| OK | further out, still inside the activation radius | 20 |
+
+A hit without a gaze tier (for example in sessions saved before proximity scoring) counts 10
+points. Misses and sleeping-mole taps cost nothing. The points appear when the hammer lands; a hit
+made just before the game ends still counts.
+
+### High score
+
+The home screen shows the best score on this iPad, and the result screen shows "New high score!"
+when a game beats it (a tie does not). Only that one number is kept, in `UserDefaults`
+(`whackAMole.highScore`). Games that were stopped early count too.
 
 ### The fox attack
 
@@ -97,17 +123,31 @@ The "frame" is the fox's own yellow card from the artwork (rounded, with an oran
 `FoxWindowView` draws it on its own, using colours and proportions measured from the frames, so
 when the fox image fades in on top the two cards line up exactly.
 
+#### Helper characters
+
+The fox has a stand-in, the raccoon (blue card). `HelperCharacter` lists every helper. When a game
+starts, one helper is picked at random, every helper equally likely, and it stays for the whole
+game: in the corner and in every attack. Each game picks on its own, so the same helper can come
+several games in a row, and nothing makes them take turns.
+
+- Every helper runs exactly the same attack: the same phases, timing, card reveal, placement and
+  frame curve. Only the artwork, the card colours, the number of swing frames and where the hammer
+  head sits at impact differ.
+- The engine picks the helper with its own generator, seeded from the session seed. The pick never
+  changes where or when moles appear.
+- The home and result screens still show the fox.
+
 The sequence always runs in this order:
 
 | State (`GameInteractionState`) | What happens | Duration |
 |---|---|---|
 | `idle` | No character on the board; the fox waits in its corner. | – |
 | `targetAppearing` | A mole is climbing out of its hole (24 frames). | 0.55 s |
-| `targetActive` | A character is up and can be tapped; the fox waits with its hammer raised. | per level |
+| `targetActive` | A character is up and can be selected; the fox waits with its hammer raised. | 5.2 s ±10 % |
 | `frameAppearing` | After a valid tap, the yellow card opens beside the character: the whole card, border included, grows from its centre as a rounded square with a slight spring, and a square ring ripples out. The corner fox fades away. | 0.34 s |
 | `foxEmerging` | The fox rises up from the bottom of the card, clipped to the inside of the card, with its hammer hidden. | 0.36 s |
 | `foxAttacking` | The fox leans in and swings (frames 1→21, speeding up) while the hammer slides out from behind the card. It ends at impact. | 0.36 s |
-| `targetHit` | The hammer is on the helmet (frame 21). The mole squashes, its head wobbles, stars circle the helmet and "+10" floats up. | 0.45 s |
+| `targetHit` | The hammer is on the helmet (frame 21). The mole's hit animation starts and the points bubble floats up. | 0.45 s |
 | `foxRetracting` | The mole's climb plays backwards (0.45 s, carrying on into the next step). The hammer slides back behind the card, then the fox sinks down out of the card's bottom. | 0.36 s |
 | `frameDisappearing` | The empty card shrinks back to its centre; the fox fades back in at its corner. | 0.28 s |
 | `nextTarget` | A short pause before the next character may appear. | 0.3 s |
@@ -161,15 +201,15 @@ WhackAMoleGame/
 ├── App/            WhackAMoleGameApp (@main, standalone only), GameEntryView
 ├── Views/          GameHomeView, PatchingSetupView, WhackAMoleGameView, GameBoardView,
 │                   GameHUDView, GameResultView
-├── Components/     CharacterView (target), MoleHoleView, ScoreView, FeedbackView (stars),
+├── Components/     CharacterView (target), MoleHoleView, ScoreView, FeedbackView (points bubble),
 │                   FoxCharacterView, FoxWindowView, AttackAnimationView
 ├── ViewModels/     WhackAMoleGameViewModel
 ├── Models/         GameConfiguration, PatchingConfiguration, GameCharacter, GameSession,
-│                   FoxAttack (timing, phases, interaction state)
-├── Managers/       WhackAMoleEngine, SpawnManager, DifficultyProgression, Randomness,
-│                   GameSessionManager (session and settings storage), FeedbackPlayer
+│                   FoxAttack (timing, phases, interaction state), HelperCharacter
+├── Managers/       WhackAMoleEngine, SpawnManager, Randomness, GameSessionManager (session,
+│                   settings and high score storage), FeedbackPlayer
 ├── Utilities/      GameConstants (colours)
-└── Resources/      Assets.xcassets (Characters/FoxHammer, app icon and accent colour)
+└── Resources/      Assets.xcassets (Characters/FoxHammer and RaccoonHammer, app icon and accent colour)
 ```
 
 - **Rules:** the engine, spawn manager and difficulty progression are plain Swift with no UI or
@@ -205,55 +245,58 @@ placed in two steps: first a zone of a hidden 3 x 3 grid, then a random spot ins
 |---|---|---|
 | Zone | A free, allowed zone not used in the last `noRepeatWindow` (2) spawns, at least `minimumGridDistance` (1 zone) and at most `maximumGridDistance` (2.3 zones) from the previous one. Rules relax one at a time until at least two zones qualify. Among those, weight `1 / (1 + times used)`. | Spreads moles over the board without a pattern. No corner-to-corner jumps, which keeps eye movements comfortable. |
 | Spot | A random point inside the zone, at least `minimumHoleSeparation` (0.42 of the area used) from other open holes and, where possible, from the previous hole. Clearing open holes comes first. Holes open only on the painted grass, below the horizon and above the fence. | Positions are continuous, not a fixed set, and holes do not overlap. |
-| Board area | `boardSpread` limits holes to the central 75 % / 90 % / 100 % of the board by level. Room is kept above the highest holes for the fox's card. | Shorter eye movements for beginners; the fox never covers the top bar. |
-| Interval | Uniform in the level's `spawnIntervalRange`. | Varied but never rushed. |
+| Board area | `boardSpread` limits holes to the central 90 % of the board. Room is kept above the highest holes for the fox's card. | Keeps eye movements comfortable; the fox never covers the top bar. |
+| Interval | Uniform in the board's `spawnIntervalRange`. | Varied but never rushed. |
 | Visible time | `visibleDuration × (1 ± jitter)`, counted from when the mole starts to appear. | Enough time to find and tap. |
-| At once | At most `maxSimultaneousTargets` (1 at beginner, 2 later). | Limits visual load. |
+| At once | At most `maxSimultaneousTargets` (2). | Limits visual load. |
 | Hole image | Shuffle bag over the three images. | Each is used equally often. |
-| Look | Shuffle bag over the level's looks: each appears equally often. | Consistent looks within a level, and no look dominates. |
-| Decoy | Advanced only, 25 %, never more than two in a row. | Adds identification without long waits. |
+| Look | Shuffle bag over the board's looks: each appears equally often. | No look dominates. |
+| Decoy | `decoyProbability` (0 on the standard board), never more than two in a row. | Adds identification without long waits, if switched on. |
 
 A hole takes 0.28 s to open before its mole starts climbing, and 0.25 s to close after the mole has
 gone. Each trial in the session file records the spot where its hole opened (`position`).
 
 This randomization is a gameplay design. It is not a clinically validated protocol.
 
-## Difficulty
+## Board
 
-| | Beginner | Intermediate | Advanced |
-|---|---|---|---|
-| Zones where holes can open | 3 (one row) | 6 (two rows) | 9 |
-| Board area used | central 75 % | central 90 % | all |
-| Hole and mole size | 100 % | 84 % | 72 % |
-| Spawn interval (s) | 2.6–3.6 | 1.9–2.9 | 1.5–2.5 |
-| Visible for (s) | 3.2 ±10 % | 2.6 ±10 % | 2.2 ±15 % |
-| Max up at once | 1 | 2 | 2 |
-| Character looks (all the same mole art for now) | 1 | 3 | 4 |
-| Sleeping moles (decoys) | none | none | 25 % |
+There are no levels: every game uses the same board (`DifficultySettings.standard`).
 
-The hole and mole scale together, so the mole always fits its hole as drawn.
+| Setting | Value |
+|---|---|
+| Zones where holes can open | 6 (two rows) |
+| Board area used | central 90 % |
+| Hole and mole size | 84 % of the largest size |
+| Spawn interval (s) | 1.9–2.9 |
+| Visible for (s) | 5.2 ±10 % (long enough for a gaze dwell) |
+| Max up at once | 2 |
+| Character looks (all the same mole art for now) | 3 |
+| Sleeping moles (decoys) | none |
 
-**Adjust level from performance** (on by default, can be switched off): after 10 real targets
-(decoys excluded), accuracy ≥ 85 % moves up one level and ≤ 50 % moves down one level. Time spent
-playing never changes the level. All values in this section are gameplay placeholders for review.
-A higher level is a harder game, not a better or stronger treatment.
+The hole and mole scale together, so the mole always fits its hole as drawn. The board and the
+scoring limits always come from the current defaults, even if older settings were saved on the
+device. All values in this section are gameplay placeholders for review.
 
 ## Session metrics
 
 The summary screen shows:
 
-- an encouraging message
+- an encouraging message, the score, and the high score (or "New high score!")
 - characters, hits, missed, accuracy and average response time
-- play time, level, session length
+- play time
 - a session record: start and end time, why it ended, patched eye and playing eye
 
 Every session is also saved as JSON in `Application Support/Sessions/WhackAMole/<id>.json`
 (`GameSessionRecord`). Each file contains:
 
-- the configuration, with the patching record and random seed
+- the configuration, with the board, the patching record and the random seed
 - the end reason
-- per-character trials: hole, look, role, level, appear time and outcome
-- level changes and off-target taps
+- per-character trials: hole, look, role, appear time, outcome and the points awarded (the score is
+  their sum)
+- off-target taps
+
+Records saved by older versions, with levels and session length, still load; those fields are
+ignored.
 
 The format is meant for a future progress dashboard.
 
@@ -261,6 +304,8 @@ The format is meant for a future progress dashboard.
 - **Response time** is measured from when the character starts to appear to the tap, in game time
   (pauses excluded), with about 16 ms resolution. It is a gameplay timing, not a clinical reaction
   time.
+- **Points** come from gaze proximity during the dwell. They are a gameplay score, not a measure of
+  fixation or vision.
 
 These are gameplay metrics only. They are not visual acuity measurements and not evidence of
 clinical improvement.
@@ -272,7 +317,8 @@ clinical improvement.
 - It does not decide or check which eye is amblyopic, and does not recommend patch wear time,
   session length or frequency.
 - Game time is not a substitute for prescribed patching hours or for check-ups.
-- Difficulty and spawn settings are gameplay choices that have not been validated clinically. Any
+- The 2-minute round, the board, the spawn settings and the scoring limits are gameplay choices
+  that have not been validated clinically. Any
   therapeutic use, and every placeholder above, needs review by an ophthalmologist or orthoptist.
 - The app has no detection of fatigue or discomfort. Adults should watch for it and use Rest my
   eyes.
@@ -282,8 +328,9 @@ clinical improvement.
 | Parameter | Default | Status |
 |---|---|---|
 | `PatchingConfiguration.patchedEye` / `playingEye` | not recorded | Entered by caregiver from the prescription (documentation only) |
-| `GameConfiguration.sessionDuration` | 120 s | Entered by caregiver to match the eye doctor's advice |
-| Difficulty tables, spawn rules, adaptive thresholds | see above | Gameplay design; needs clinical review |
+| `GameConfiguration.sessionDuration` | 120 s, fixed | Gameplay design (one round); not a recommended play time |
+| `DifficultySettings.standard`, `SpawnRules` | see above | Gameplay design; needs clinical review |
+| `GazeProximityTier` (Perfect 60 / Good 30 / OK 20, limits 0.35 and 0.70) | see above | Gameplay design; needs clinical review |
 
 ## Assets
 
@@ -295,18 +342,33 @@ clinical improvement.
   - The frames include the fox's yellow card background, so the fox flies out as a card. A cut-out
     fox without the card would look more natural, if the artist can supply one.
   - The fox also appears on the home and result screens.
+- **Provided (Google Drive, new character folder):** 24 frames (`1`–`24`, 2048 px) of the raccoon
+  swinging a hammer, with a blue card. They are stored in
+  `Resources/Assets.xcassets/Characters/RaccoonHammer/Frame01…24`.
+  - The frames were scaled and placed on a 637 × 640 canvas so that the raccoon's card sits exactly
+    where the fox's card is (`FoxCharacterView.cardRect`). Nothing was redrawn, and transparency
+    is kept.
+  - Frame 1 (hammer raised) is the waiting pose and frame 24 is the impact. The folder has no
+    separate idle, emerging or retracting frames, so the raccoon uses the fox's motion for those,
+    the same way the fox does.
 - **Provided (Google Drive, mole animation folder):** 24 frames (`1`–`24 END`) of the miner mole
   climbing out of a hole, stored in `Resources/Assets.xcassets/Characters/MoleRise/Frame01…24`.
   - The frames were painted with the mole and hole together. The dirt was removed by its colour so
     the moles can sit in the three separate hole images, and each frame still ends along the hole's
     front edge. All 24 frames share one crop.
   - `MoleArt` in `MoleHoleView.swift` records where the frames sit relative to the hole's front edge.
+- **Provided (Google Drive, mole hit folder):** 24 frames (`1`–`24`) of the mole being punched and
+  sinking into its hole, stored in `Resources/Assets.xcassets/Characters/MoleHit/Frame01…24`. They
+  were cut out from the painted dirt the same way as the rise frames, keeping the small "ouch" ticks
+  beside the helmet, and play over `hitReaction` + `exitAnimationDuration` (0.9 s).
   - Awake moles are drawn in full colour; sleeping moles (decoys) in grey with a "z z" bubble.
-- **Provided (Google Drive, background folder):** `Background whackamole.png`, a 4:3 painted meadow
-  with sky, grass and a fence. It is stored as a JPEG in
-  `Resources/Assets.xcassets/GameBackgrounds/Meadow`, fills the screen behind the game, and is cropped
-  slightly at the top and bottom on wider iPads. `GameBackgroundView` holds where the grass is in the
-  painting.
+- **Provided (Google Drive):** the Whack-a-Mole background, a 4:3 painted meadow (2752 × 2064)
+  with sky, clouds, grass and a fence. It replaces the earlier meadow and is stored unchanged as a
+  PNG in `Resources/Assets.xcassets/GameBackgrounds/Meadow`.
+  - It fills the screen behind the game with its aspect ratio kept. On 4:3 iPads nothing is cropped;
+    on wider iPads a little is cropped at the top and bottom.
+  - `GameBackgroundView` holds where the grass is in the painting. The new painting's horizon and
+    fence are still outside that band, so hole positions are unchanged.
 - **Provided (Google Drive, hole folder):** `IMG_0021`–`IMG_0023`, three dirt holes. Each was
   cropped to its visible area and stored in `Resources/Assets.xcassets/Holes/Hole1…3`.
   - The dark opening of each was measured from the art (`HoleArt` in `MoleHoleView.swift`).
@@ -316,18 +378,20 @@ clinical improvement.
   - The hole images are small (400–443 px wide), so they can look slightly soft on the largest
     iPads. Larger exports would fix that.
 - **Missing:**
-  - **More mole art.** There is a single mole animation, so the per-level "character looks" all
+  - **More mole art.** There is a single mole animation, so the "character looks" all
     show the same mole. A sleeping mole (eyes closed) would make decoys clearer than the grey
-    version with a bubble. A hit or dizzy pose would also help.
+    version with a bubble.
   - Gentle sound effects (built-in system sounds stand in), optional background music,
     and an app icon.
 
 ## Testing
 
-- `DrStrangeTests`: 83 unit tests covering:
+- `DrStrangeTests`: 90 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
-  - session end, stop and rest-break reasons, adaptive levels, JSON round trip
+  - the 2-minute session end, stop and rest-break reasons, JSON round trip
+  - scoring: awarded points add up, no points for misses, the high score keeps only a better
+    score, and saved settings always use the current board
   - patching record validation, and that gameplay is identical whichever eye is patched
   - interaction-layer gaze smoothing, including jitter damping and tracking-loss reset
   - the fox attack:
@@ -340,6 +404,12 @@ clinical improvement.
     - the hammer lands on the tapped character, normal and mirrored
     - the fox stays home when idle or with Reduce Motion
     - settings saved by older versions still load
+  - helper characters:
+    - every helper's frames are in the asset catalog
+    - each helper is equally likely, and the same helper can come in consecutive games
+    - one helper for the whole game, in every attack
+    - helper choice never changes the spawns
+    - the raccoon uses the same swing over its own frames, and its hammer lands on the character
   - one-eye patch-state verification, blink tolerance, removal debounce and re-verification
 - Manual checks on the iPad Pro 11-inch simulator:
   - patching setup, including the same-eye warning
@@ -349,10 +419,9 @@ clinical improvement.
   - DrStrange app navigation into the game
 - The fox attack, checked in slow motion with autoplay at 20 % speed:
   - the sequence: the fox emerges and flies to the character, the hammer lands on its head at the
-    same moment as the squash and "+10", the character sinks, the fox returns, and the next
+    same moment as the squash and the points, the character sinks, the fox returns, and the next
     character appears after the pause
   - pausing mid-attack freezes the fox, and resuming finishes it
-- Advanced level (9 holes, decoys) checked on iPad Pro 11-inch and iPad mini.
 - Layout checked by screenshot on iPad mini and iPad Pro 13-inch.
 
 ## Changes from the first (dichoptic) version
