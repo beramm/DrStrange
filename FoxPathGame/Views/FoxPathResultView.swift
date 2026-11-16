@@ -65,7 +65,7 @@ struct FoxPathResultView: View {
     private var message: String {
         switch result.endReason {
         case .timeUp:
-            result.thefts == 0 ? "You kept every veggie safe!" : "Great following! Let's guard the veggies again."
+            result.catches == 0 ? "You kept every veggie safe!" : "Great following! Let's guard the veggies again."
         case .noLivesLeft:
             "The veggies are gone this time. Try again!"
         case .stopped:

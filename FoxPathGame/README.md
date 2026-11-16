@@ -3,8 +3,8 @@
 A calm, child-friendly iPad game. A friend (the fox, the bunny or the raccoon) walks along a
 winding path through a small village, and the child keeps their eyes on it all the way to the
 veggie stall. Another friend plays the thief: it only comes when the child stops following, and
-it sneaks up on the friend to grab its veggies. A game lasts 2 minutes and the
-child has 3 hearts.
+it rushes at the friend. If it gets close enough, the child loses a heart. A game lasts 2 minutes
+and the child has 3 hearts.
 
 The game uses the app's on-device gaze tracker (`GazeInputController`, calibrated with
 `GazeCalibrationView`). A finger can be used instead for practice or on devices without tracking.
@@ -38,7 +38,7 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 - `-FoxPathAutostart`: skips the home screen and starts a game with the saved settings and finger
   input. Useful for checking layouts on different iPad sizes.
 - `-FoxPathSimulatedGaze YES`: moves a pretend pointer that follows the character and looks away
-  six times during the 2 minutes (two of them long enough for a theft, the others short enough
+  six times during the 2 minutes (two of them long enough for the thief to reach the friend, the others short enough
   for the thief to be chased off), so the warning, the refocus and the thief can be checked and
   recorded on a simulator. It is a recording aid only, not gaze tracking.
 
@@ -88,19 +88,22 @@ and missing gaze readings never bring one. Exactly:
 | State | What happens |
 |---|---|
 | `appearing` | The thief fades in about 430 map units to the left or right of the friend, on the side with room on the map, and starts walking towards it (1 s). |
-| `approaching` | It walks towards the friend only while the child is **not following**: 4 s of not following take it right beside the friend. While the child follows, it backs off at 0.6 × that speed, and 2.5 s of following without a break chase it away. When tracking is unavailable, it waits where it is. After 14 s it gives up and leaves. |
-| `stealing` | It has reached the friend and stands right beside it, facing it, for 1.2 s. Reaching the friend is the theft; once it has started it always finishes. |
+| `approaching` | It rushes at the friend only while the child is **not following**: 1 s of not following takes it from where it lurks to the friend. While the child follows, it backs off at 0.6 × that speed, and 2.5 s of following without a break chase it away. When tracking is unavailable, it waits where it is. After 14 s it gives up and leaves. |
 | `retreating` | It walks back the way it came and fades out (2 s). |
 
+As soon as the thief is within `ThiefApproach.catchDistance` (92 map units, feet to feet) of the
+friend, the child loses one heart and the thief runs off straight away. There is no stealing
+step: the thief never carries, takes or touches the veggies.
+
 The thief's position is always measured from the friend's feet, so it goes for the friend
-wherever the friend is and never jumps. A finished theft costs exactly one heart, and another
+wherever the friend is and never jumps. Each thief can cost at most one heart, and another
 thief can come once the cooldown is over and the child stops following again. When the friend
-reaches the stall, a thief that has not started stealing runs off. The veggie stall is only the
+reaches the stall, a thief that has not reached the friend runs off. The veggie stall is only the
 finish point of the walk; the thief never goes to it.
 
 ### Hearts and time
 
-- The game starts with **3 hearts**, shown in the top bar. Each theft takes one; hearts never go
+- The game starts with **3 hearts**, shown in the top bar. Each time a thief reaches the friend takes one; hearts never go
   below zero. With no hearts left the game ends (**Game over**).
 - The top bar counts down from **02:00** (MM:SS). At 00:00 the game ends (**Time's up!**). The
   2 minutes are one game, not a recommended play or patching time, and cannot be changed.
@@ -213,9 +216,9 @@ There are no levels. Every game uses `FoxPathSettings.standard`:
 | Hearts | 3 |
 
 Thief timings (`ThiefSettings`): trigger delay 0.5 s, cooldown 4 s, no thief
-with less than 3 s left or within 100 map units of the stall, appear 1 s, approach 4 s, back-off
-rate 0.6, chased off after 2.5 s of following, patience 14 s, beside the friend 1.2 s, retreat
-2 s.
+with less than 3 s left or within 100 map units of the stall, appear 1 s, approach 1 s, back-off
+rate 0.6, chased off after 2.5 s of following, patience 14 s, retreat 2 s. A heart is lost at
+92 map units (`ThiefApproach.catchDistance`).
 
 ## Result screen
 
@@ -237,7 +240,7 @@ device.
   and does not check whether a patch is worn.
 - Gaze tracking is a front-camera estimate with limited accuracy. "On the fox" means "within the
   follow radius according to the tracker", so a wait can be caused by the tracker as well as by the
-  child. The wait count, the hearts and the thefts must not be read as a measure of smooth pursuit
+  child. The wait count, the hearts and the catches must not be read as a measure of smooth pursuit
   or attention.
 - "Not following" means only that the gaze estimate stayed outside the follow radius for longer
   than the grace time. Missing gaze readings are never treated as not following.
@@ -289,13 +292,13 @@ transparency kept.
 - **Drawn in code:** the warning overlay, the focus ring, the role card, the ground ovals under the
   friend and the thief, and the HUD (timer and hearts).
 - **Missing:** dedicated sound effects (built-in system sounds stand in), optional background
-  music, an app icon, a separate stealing or running animation (the walk cycle stands in), and
+  music, an app icon, a separate running animation (the walk cycle stands in), and
   dedicated nature props such as trees, bushes or flowers.
 
 ## Testing
 
-- `DrStrangeTests` has 45 unit tests for this game:
-  - `FoxPathSessionTests` (22): every character can be the primary or the thief but never both,
+- `DrStrangeTests` has 46 unit tests for this game:
+  - `FoxPathSessionTests` (23): every character can be the primary or the thief but never both,
     the thief is the other character of the walk, roles are drawn again for each path, the clock
     starts at the first look and stops at exactly 2 minutes, time up removes a thief that is still
     around, stopping ends everything, no thief while the child keeps following (no timer), missing
@@ -303,8 +306,9 @@ transparency kept.
     following, never a second thief at once, the cooldown, no thief near the end of the game, of
     the walk or between walks, the thief goes for the character and keeps to it, following again
     makes it back off and leave, missing gaze makes it wait, it never jumps, reaching the
-    character costs exactly one heart and the next thief comes after the cooldown, three thefts end the game and
-    nothing happens after, reaching the stall chases the thief away, the thief comes into view on
+    character costs exactly one heart (with no stealing step) and the next thief comes after the
+    cooldown, the heart is lost the moment the thief is close enough, three catches end the game
+    and nothing happens after, reaching the stall chases the thief away, the thief comes into view on
     the map beside the character, old saved settings with a level still load, and the walk is
     faster than before
   - `FoxPathGeneratorTests` (12): seed reproducibility and variety, the path only goes right, up or

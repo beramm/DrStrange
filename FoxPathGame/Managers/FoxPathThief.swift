@@ -15,20 +15,17 @@ enum ThiefState: Equatable {
     case inactive
     /// Coming into view a little way from the character.
     case appearing
-    /// Near the character: creeps closer while the child is not following and backs off
-    /// while the child follows.
+    /// Rushes at the character while the child is not following and backs off while the child
+    /// follows.
     case approaching
-    /// Right beside the character, grabbing at its vegetables. Once started, a theft always
-    /// completes.
-    case stealing
     /// Running away.
     case retreating
 }
 
 enum ThiefEvent: Equatable {
-    case reachedVegetables
-    /// The theft is complete. Sent exactly once per thief.
-    case stole
+    /// The thief got within `ThiefApproach.catchDistance` of the character: one heart is lost.
+    /// Sent at most once per thief, which then runs off.
+    case caughtCharacter
     /// The thief is out of sight again.
     case left
 }
@@ -38,13 +35,14 @@ enum ThiefEvent: Equatable {
 struct ThiefApproach: Equatable {
     /// Where the thief comes into view.
     let start: CGVector
-    /// Where it stands when it reaches the character, right beside it.
+    /// Where it is when it reaches the character, `catchDistance` beside it.
     let stand: CGVector
 
     /// How far from the character the thief comes into view (map units).
     static let startDistance: CGFloat = 430
-    /// Distance between the two characters' feet when the thief has reached the character.
-    static let standDistance: CGFloat = 92
+    /// Distance between the two characters' feet at which the thief has reached the character
+    /// and a heart is lost.
+    static let catchDistance: CGFloat = 92
 
     /// Which side the thief comes from: -1 from the left, 1 from the right.
     var side: CGFloat { stand.dx < 0 ? -1 : 1 }
@@ -67,7 +65,7 @@ struct ThiefApproach: Equatable {
         let drop = min(max(CGFloat.random(in: -20...150, using: &generator), highest), max(lowest, highest))
         return ThiefApproach(
             start: CGVector(dx: side * startDistance, dy: drop),
-            stand: CGVector(dx: side * standDistance, dy: 4)
+            stand: CGVector(dx: side * catchDistance, dy: 4)
         )
     }
 }
@@ -91,8 +89,8 @@ struct FoxPathThief: Equatable {
     private(set) var stateTime: TimeInterval = 0
     /// Seconds the child has been following without a break while the thief is near.
     private(set) var followingTime: TimeInterval = 0
-    /// `true` once the theft is complete.
-    private(set) var hasStolen = false
+    /// `true` once the thief has reached the character.
+    private(set) var hasCaught = false
     private var retreatFrom: Double = 0
 
     init(character: PathCharacter, approach: ThiefApproach, settings: ThiefSettings) {
@@ -112,7 +110,7 @@ struct FoxPathThief: Equatable {
         switch state {
         case .inactive: 0
         case .appearing: min(stateTime / max(settings.appearDuration, 0.01), 1)
-        case .approaching, .stealing: 1
+        case .approaching: 1
         case .retreating: min((1 - retreatFraction) / 0.3, 1)
         }
     }
@@ -147,17 +145,15 @@ struct FoxPathThief: Equatable {
                 break
             }
             if progress >= 1 {
-                enter(.stealing)
-                return [.reachedVegetables]
+                // Close enough: the heart is lost at once and the thief runs off. There is no
+                // stealing animation.
+                hasCaught = true
+                retreat()
+                return [.caughtCharacter]
             }
             // Following again chases the thief off; so does waiting too long.
             if followingTime >= settings.chasedOffAfter || age >= settings.patience { retreat() }
             return []
-        case .stealing:
-            guard stateTime >= settings.stealDuration else { return [] }
-            hasStolen = true
-            retreat()
-            return [.stole]
         case .retreating:
             progress = retreatFrom * (1 - retreatFraction)
             guard retreatFraction >= 1 else { return [] }
@@ -166,8 +162,8 @@ struct FoxPathThief: Equatable {
         }
     }
 
-    /// The character the child follows reached the stall: a thief that has not started
-    /// stealing runs off.
+    /// The character the child follows reached the stall: a thief that has not reached it yet
+    /// runs off.
     mutating func chaseAway() {
         guard state == .appearing || state == .approaching else { return }
         retreat()

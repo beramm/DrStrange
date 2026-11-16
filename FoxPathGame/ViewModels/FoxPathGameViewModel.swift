@@ -278,7 +278,7 @@ final class FoxPathGameViewModel {
             switch event {
             case .thiefAppeared:
                 feedback.thiefAppeared()
-            case .thiefReachedVegetables, .thiefLeft:
+            case .thiefLeft:
                 break
             case let .lifeLost(remaining):
                 lives = remaining
@@ -341,12 +341,7 @@ final class FoxPathGameViewModel {
         let step = CGVector(dx: position.x - pose.feet.x, dy: position.y - pose.feet.y)
         let moved = hypot(step.dx, step.dy)
         pose.character = thief.character
-        if thief.state == .stealing {
-            // Side on, facing the character it has reached.
-            pose.facing = .side
-            pose.isMirrored = thief.approach.side > 0
-            pose.assetName = thief.character.sideAsset(frame: thief.character.sideSequence[0])
-        } else if moved > 0.01 {
+        if moved > 0.01 {
             thiefDistance += moved
             pose.facing = FoxFacing.walking(along: step)
             pose.isMirrored = pose.facing == .side && step.dx < 0
@@ -379,7 +374,7 @@ final class FoxPathGameViewModel {
     /// Windows of script time (seconds) in which the pretend pointer wanders off. The long ones
     /// let a thief reach the character; the short ones bring a thief that is then chased off.
     private static let scriptedLookAways: [ClosedRange<TimeInterval>] = [
-        6...13, 30...31.6, 40...44, 58...65, 85...86.5, 100...103,
+        6...13, 30...31.6, 40...42.3, 58...65, 85...86.5, 100...102.3,
     ]
 
     private func moveScriptedPointer(by delta: TimeInterval) {

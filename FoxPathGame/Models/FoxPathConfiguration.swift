@@ -45,16 +45,17 @@ struct ThiefSettings: Codable, Equatable {
     var minimumWalkLeft: Double = 100
     /// Seconds the thief takes to come into view.
     var appearDuration: Double = 1
-    /// Seconds of not following that take the thief from where it lurks to the character.
-    var approachDuration: Double = 4
+    /// Seconds of not following that take the thief from where it lurks to the character. Short,
+    /// so the thief rushes in.
+    var approachDuration: Double = 1
     /// While the child follows, the thief backs away at this fraction of its approach speed.
     var backOffRate: Double = 0.6
-    /// Seconds of following without a break that chase a thief off before it steals.
+    /// Seconds of following without a break that chase a thief off before it reaches the
+    /// character.
     var chasedOffAfter: Double = 2.5
-    /// Seconds the thief stays around without stealing before it gives up and leaves.
+    /// Seconds the thief stays around without reaching the character before it gives up and
+    /// leaves.
     var patience: Double = 14
-    /// Seconds the thief spends beside the character, grabbing at its vegetables.
-    var stealDuration: Double = 1.2
     /// Seconds the thief takes to run off.
     var retreatDuration: Double = 2
 }

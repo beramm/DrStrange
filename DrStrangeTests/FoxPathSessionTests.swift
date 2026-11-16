@@ -104,10 +104,12 @@ final class FoxPathSessionTests: XCTestCase {
 
     func testTimeUpRemovesAThiefThatIsStillAround() {
         var session = makeSession(duration: 9)
-        run(&session, .notFollowing, for: 8)
-        XCTAssertEqual(session.thefts, 1)
-        XCTAssertNotNil(session.thief, "still running off")
-        let events = run(&session, .notFollowing, for: 4)
+        while session.catches == 0, !session.phase.isOver {
+            session.advance(by: step, attention: .notFollowing, walk: walk)
+        }
+        XCTAssertEqual(session.catches, 1)
+        XCTAssertEqual(session.thief?.state, .retreating, "still running off")
+        let events = run(&session, .notFollowing, for: 9)
         XCTAssertEqual(events.last, .timeUp)
         XCTAssertNil(session.thief)
     }
@@ -167,7 +169,7 @@ final class FoxPathSessionTests: XCTestCase {
     func testNoNewThiefUntilTheCooldownHasPassed() {
         var session = makeSession()
         waitForThief(&session)
-        // Following again chases this one off before it steals.
+        // Following again chases this one off before it reaches the character.
         var events = run(&session, .following, for: 6)
         XCTAssertTrue(events.contains(.thiefLeft))
         events = run(&session, .notFollowing, for: ThiefSettings().cooldown - 1.5)
@@ -200,7 +202,8 @@ final class FoxPathSessionTests: XCTestCase {
         let start = thief.position(around: feet)
         XCTAssertEqual(hypot(start.x - feet.x, start.y - feet.y), ThiefApproach.startDistance, accuracy: 160)
 
-        run(&session, .notFollowing, for: ThiefSettings().appearDuration + ThiefSettings().approachDuration - 0.1)
+        run(&session, .notFollowing, for: ThiefSettings().appearDuration + ThiefSettings().approachDuration - 0.05)
+        XCTAssertEqual(session.thief?.state, .approaching)
         let near = try XCTUnwrap(session.thief).position(around: feet)
         XCTAssertLessThan(hypot(near.x - feet.x, near.y - feet.y), 120, "close beside the character")
 
@@ -214,7 +217,7 @@ final class FoxPathSessionTests: XCTestCase {
     func testFollowingAgainMakesTheThiefBackOffAndLeave() throws {
         var session = makeSession()
         waitForThief(&session)
-        run(&session, .notFollowing, for: 2.5)
+        run(&session, .notFollowing, for: 1.3)
         let closer = try XCTUnwrap(session.thief).progress
         XCTAssertGreaterThan(closer, FoxPathThief.lurkProgress)
 
@@ -230,7 +233,7 @@ final class FoxPathSessionTests: XCTestCase {
     func testMissingGazeMakesTheThiefWait() throws {
         var session = makeSession()
         waitForThief(&session)
-        run(&session, .notFollowing, for: 2)
+        run(&session, .notFollowing, for: 1.3)
         let heldAt = try XCTUnwrap(session.thief).progress
         let events = run(&session, .trackingUnavailable, for: 8)
         XCTAssertTrue(livesLost(in: events).isEmpty)
@@ -258,30 +261,54 @@ final class FoxPathSessionTests: XCTestCase {
         }
     }
 
-    // MARK: - Vegetables and hearts
+    // MARK: - Hearts
 
     func testReachingTheCharacterCostsExactlyOneHeart() throws {
         var session = makeSession()
         waitForThief(&session)
         var events: [FoxPathSessionEvent] = []
         var states: [ThiefState] = []
-        for _ in 0..<Int(10 / step) {
+        // Until this thief has gone.
+        for _ in 0..<Int(10 / step) where !events.contains(.thiefLeft) {
             events += session.advance(by: step, attention: .notFollowing, walk: walk)
             if let thief = session.thief, states.last != thief.state { states.append(thief.state) }
         }
-        XCTAssertEqual(states, [.appearing, .approaching, .stealing, .retreating], "it walks up, stops beside the character, then runs off")
+        XCTAssertEqual(states, [.appearing, .approaching, .retreating], "it rushes up, then runs off; no stealing")
         XCTAssertEqual(livesLost(in: events), [.lifeLost(remaining: 2)])
-        XCTAssertTrue(events.contains(.thiefReachedVegetables))
         XCTAssertTrue(events.contains(.thiefLeft))
         XCTAssertEqual(session.lives, 2)
-        XCTAssertEqual(session.thefts, 1)
+        XCTAssertEqual(session.catches, 1)
 
         // Still not following: the next thief comes once the cooldown is over.
         let next = run(&session, .notFollowing, for: ThiefSettings().cooldown + 1)
         XCTAssertEqual(appearances(in: next), 1)
     }
 
-    func testThreeTheftsEndTheGameAndNothingHappensAfter() {
+    func testHeartIsLostTheMomentTheThiefIsCloseEnough() throws {
+        var session = makeSession()
+        waitForThief(&session)
+        let settings = ThiefSettings()
+        var elapsed: TimeInterval = 0
+        var caughtAt: TimeInterval?
+        var progressAtCatch: Double?
+        while caughtAt == nil, elapsed < 10 {
+            let before = session.thief?.progress ?? 0
+            let events = session.advance(by: step, attention: .notFollowing, walk: walk)
+            elapsed += step
+            if !livesLost(in: events).isEmpty {
+                caughtAt = elapsed
+                progressAtCatch = before
+            }
+        }
+        let caught = try XCTUnwrap(caughtAt)
+        // Fade in, then a quick rush: the heart goes as soon as the thief arrives.
+        XCTAssertLessThanOrEqual(caught, settings.appearDuration + settings.approachDuration + 2 * step)
+        XCTAssertGreaterThan(try XCTUnwrap(progressAtCatch), 0.9, "lost on arrival, not before")
+        XCTAssertEqual(session.thief?.state, .retreating)
+        XCTAssertTrue(try XCTUnwrap(session.thief).hasCaught)
+    }
+
+    func testThreeCatchesEndTheGameAndNothingHappensAfter() {
         var session = makeSession()
         var events: [FoxPathSessionEvent] = []
         for _ in 0..<Int(115 / step) where !session.phase.isOver {
@@ -299,7 +326,8 @@ final class FoxPathSessionTests: XCTestCase {
     func testReachingTheStallChasesTheThiefAway() throws {
         var session = makeSession()
         waitForThief(&session)
-        run(&session, .notFollowing, for: 2)
+        run(&session, .notFollowing, for: 1.2)
+        XCTAssertEqual(session.lives, 3, "not reached yet")
         session.walkFinished()
         XCTAssertEqual(try XCTUnwrap(session.thief).state, .retreating)
         let events = run(&session, .notFollowing, for: 5, walk: .some(nil))
@@ -323,7 +351,7 @@ final class FoxPathSessionTests: XCTestCase {
             let start = CGPoint(x: feet.x + approach.start.dx, y: feet.y + approach.start.dy)
             XCTAssertTrue((70...(size.width - 70)).contains(start.x), "\(feet): starts at \(start)")
             XCTAssertTrue((236...(size.height - 12)).contains(start.y), "\(feet): starts at \(start)")
-            XCTAssertEqual(abs(approach.stand.dx), ThiefApproach.standDistance)
+            XCTAssertEqual(abs(approach.stand.dx), ThiefApproach.catchDistance)
             XCTAssertEqual(approach.side, approach.start.dx < 0 ? -1 : 1, "it stays on the side it came from")
         }
     }

@@ -17,7 +17,6 @@ enum FoxPathSessionPhase: Equatable {
 
 enum FoxPathSessionEvent: Equatable {
     case thiefAppeared(PathCharacter)
-    case thiefReachedVegetables
     case lifeLost(remaining: Int)
     case thiefLeft
     case timeUp
@@ -49,7 +48,8 @@ struct FoxPathResult: Equatable {
     let walksCompleted: Int
     /// How many times the character had to stop and wait.
     let offTrackCount: Int
-    let thefts: Int
+    /// Times a thief reached the character (one heart each).
+    let catches: Int
 }
 
 /// The game around the walks: the 2-minute clock, the hearts, who plays which role, and when a
@@ -71,7 +71,7 @@ struct FoxPathSession {
     private(set) var thief: FoxPathThief?
     private(set) var walksCompleted = 0
     private(set) var offTrackCount = 0
-    private(set) var thefts = 0
+    private(set) var catches = 0
     /// Seconds the child has been not following without a break, while no thief is around.
     private(set) var notFollowingTime: TimeInterval = 0
     /// Clock time before which no new thief can come.
@@ -105,7 +105,7 @@ struct FoxPathSession {
             livesLeft: lives,
             walksCompleted: walksCompleted,
             offTrackCount: offTrackCount,
-            thefts: thefts
+            catches: catches
         )
     }
 
@@ -161,10 +161,8 @@ struct FoxPathSession {
         if var current = thief {
             for event in current.advance(by: delta, attention: attention) {
                 switch event {
-                case .reachedVegetables:
-                    events.append(.thiefReachedVegetables)
-                case .stole:
-                    thefts += 1
+                case .caughtCharacter:
+                    catches += 1
                     lives = max(lives - 1, 0)
                     events.append(.lifeLost(remaining: lives))
                 case .left:
