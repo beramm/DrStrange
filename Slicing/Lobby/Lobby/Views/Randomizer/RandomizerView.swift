@@ -4,9 +4,10 @@
 //  A highlight hops across the three game cards. The highlighted card pops up
 //  to full size while the others shrink back. It slows down, stops on the
 //  chosen game, and after a short pause opens that game by itself.
-//  While it picks by itself, the screen is locked: no back or settings button.
+//  While it picks by itself, the screen is locked: no back button.
 //
-//  With "Random game" off in Setting, the cards are buttons and the child picks.
+//  With "Random game" off in Setting, the cards are buttons and the child picks,
+//  and a back button is shown. There is no settings button on this screen.
 //  With "Lock games" on (testing), only Whack a Mole can be picked or played.
 //
 //  Every position below is taken from the 1194 × 834 Figma frame and then
@@ -18,8 +19,6 @@ import SwiftUI
 struct RandomizerView: View {
     /// Called with the chosen game once the highlight has stopped.
     let onChosen: (MiniGame) -> Void
-    /// Called when the settings button is tapped.
-    let onSettings: () -> Void
 
     /// The last game picked, saved so the same game isn't picked twice in a row.
     @AppStorage(MiniGame.lastGameStorageKey) private var lastGameID = ""
@@ -52,8 +51,8 @@ struct RandomizerView: View {
             ZStack {
                 LobbyScenery()
 
-                // Top bar: back, title, settings. When the game is picked at random,
-                // the screen is locked, so there is no back or settings button.
+                // Top bar: back and title. When the game is picked at random,
+                // the screen is locked, so there is no back button.
                 if !randomSpinEnabled {
                     RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62 * s) {
                         dismiss()
@@ -67,11 +66,6 @@ struct RandomizerView: View {
                     .foregroundStyle(Color.titleBrown)
                     .position(x: 598 * sx, y: 80 * sy)
                     .accessibilityAddTraits(.isHeader)
-
-                if !randomSpinEnabled {
-                    RoundIconButton(systemImage: "gearshape.fill", label: "Settings", size: 62 * s, action: onSettings)
-                        .position(x: 1128 * sx, y: 83 * sy)
-                }
 
                 // The three game cards. The highlighted one is full size and in front.
                 ForEach(Array(MiniGame.allCases.enumerated()), id: \.element) { index, game in
@@ -165,5 +159,5 @@ struct RandomizerView: View {
 }
 
 #Preview("Game map", traits: .landscapeLeft) {
-    RandomizerView(onChosen: { _ in }, onSettings: {})
+    RandomizerView(onChosen: { _ in })
 }

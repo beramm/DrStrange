@@ -11,9 +11,6 @@ struct ContentView: View {
     @State private var path: [LobbyRoute] = []
     /// True while the Setting pop-up is open (it can open over any screen).
     @State private var showsSettings = false
-    /// A game the Game Map picked while the Setting pop-up was open.
-    /// It opens when the pop-up closes.
-    @State private var waitingGame: MiniGame?
     /// Setting "Random game": the Game Map picks the game by itself.
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
 
@@ -32,10 +29,7 @@ struct ContentView: View {
                         onSettings: { showsSettings = true }
                     )
                 case .randomizer:
-                    RandomizerView(
-                        onChosen: openGame,
-                        onSettings: { showsSettings = true }
-                    )
+                    RandomizerView(onChosen: { game in path.append(.game(game)) })
                 case .game(let game):
                     SelectedGameView(game: game, onExit: leaveGame)
                 }
@@ -51,14 +45,6 @@ struct ContentView: View {
         .animation(.easeOut(duration: 0.2), value: showsSettings)
     }
 
-    private func openGame(_ game: MiniGame) {
-        if showsSettings {
-            waitingGame = game
-        } else {
-            path.append(.game(game))
-        }
-    }
-
     /// Leaving a game. With "Random game" on, going back to the Game Map would
     /// just pick and open a game again (a never-ending loop), so go back to the
     /// start screen. With it off, go back to the Game Map to choose another game.
@@ -72,10 +58,6 @@ struct ContentView: View {
 
     private func closeSettings() {
         showsSettings = false
-        if let game = waitingGame {
-            waitingGame = nil
-            path.append(.game(game))
-        }
     }
 }
 
