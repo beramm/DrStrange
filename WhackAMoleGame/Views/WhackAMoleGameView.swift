@@ -66,6 +66,7 @@ struct WhackAMoleGameView: View {
             if let gazeController {
                 GazeCalibrationView(
                     controller: gazeController,
+                    isRecalibration: true,
                     onCalibrated: finishRecalibration,
                     onCancel: { isPresentingRecalibration = false }
                 )

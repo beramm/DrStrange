@@ -17,6 +17,7 @@ final class GazeInputController {
     private(set) var cameraStatus = "ARKit input pending"
     private(set) var cameraStarted = false
     private(set) var isPreparingCalibration = false
+    private(set) var calibrationCountdown = 0
     private(set) var patchWearState: PatchWearState = .checking
     private(set) var oneEyeEnforcerEnabled = true
     private(set) var isSceneTooDark = false
@@ -118,30 +119,38 @@ final class GazeInputController {
         }
     }
 
-    func startCalibration() {
+    func startCalibration(preparationSeconds: Int = 6) {
         guard isReadyToCalibrate, !transitionPending else { return }
+        let preparationSeconds = max(preparationSeconds, 1)
         calibrationTask?.cancel()
         transitionPending = true
         isPreparingCalibration = true
+        calibrationCountdown = preparationSeconds
         activeCalibrationTarget = nil
-        status = "Hold still — calibration begins in 8 seconds"
+        status = "Hold still — calibration begins in \(preparationSeconds) seconds"
 
         do {
             try tracker.beginCalibration(layout: Self.calibrationLayout)
         } catch {
             transitionPending = false
             isPreparingCalibration = false
+            calibrationCountdown = 0
             status = "Calibration blocked: \(error)"
             return
         }
 
         calibrationTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(8))
+            for remaining in stride(from: preparationSeconds, through: 1, by: -1) {
+                guard let self, !Task.isCancelled else { return }
+                calibrationCountdown = remaining
+                try? await Task.sleep(for: .seconds(1))
+            }
             guard let self, !Task.isCancelled else { return }
             calibrationTargets = Self.calibrationLayout.targets
             targetIndex = 0
             transitionPending = false
             isPreparingCalibration = false
+            calibrationCountdown = 0
             presentCalibrationTarget()
         }
     }
@@ -153,6 +162,7 @@ final class GazeInputController {
         cameraStarted = false
         transitionPending = false
         isPreparingCalibration = false
+        calibrationCountdown = 0
         activeCalibrationTarget = nil
         patchWearMonitor.reset()
         patchWearState = oneEyeEnforcerEnabled ? .checking : .verified
@@ -206,6 +216,7 @@ final class GazeInputController {
             calibrationTask = nil
             transitionPending = false
             isPreparingCalibration = false
+            calibrationCountdown = 0
             activeCalibrationTarget = nil
             calibrationTargets.removeAll(keepingCapacity: true)
             targetIndex = 0

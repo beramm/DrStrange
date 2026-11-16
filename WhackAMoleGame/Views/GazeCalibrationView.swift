@@ -5,11 +5,24 @@ import UIKit
 /// Pre-game calibration using whichever prescribed eye remains uncovered.
 struct GazeCalibrationView: View {
     let controller: GazeInputController
+    let isRecalibration: Bool
     let onCalibrated: () -> Void
     let onCancel: () -> Void
 
     @State private var didComplete = false
     @Environment(\.scenePhase) private var scenePhase
+
+    init(
+        controller: GazeInputController,
+        isRecalibration: Bool = false,
+        onCalibrated: @escaping () -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.controller = controller
+        self.isRecalibration = isRecalibration
+        self.onCalibrated = onCalibrated
+        self.onCancel = onCancel
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -71,17 +84,12 @@ struct GazeCalibrationView: View {
                 .font(.system(.title2, design: .rounded).weight(.semibold))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 680)
-            ProgressView()
-                .controlSize(.large)
-                .tint(.orange)
-            Text("The first dot will appear in a moment.")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            Button("Cancel") {
-                controller.stop()
-                onCancel()
-            }
-            .buttonStyle(.bordered)
+            Text("\(controller.calibrationCountdown)")
+                .font(.system(size: 88, weight: .heavy, design: .rounded))
+                .foregroundStyle(.orange)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.snappy, value: controller.calibrationCountdown)
+                .accessibilityLabel("First dot in \(controller.calibrationCountdown) seconds")
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -137,7 +145,7 @@ struct GazeCalibrationView: View {
             }
 
             Button(controller.isPreparingCalibration ? "Get ready…" : "Let's start!") {
-                controller.startCalibration()
+                controller.startCalibration(preparationSeconds: isRecalibration ? 3 : 6)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
