@@ -37,6 +37,8 @@ struct GazeCalibrationView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 32)
                     }
+                } else if controller.isPreparingCalibration {
+                    calibrationInstructions
                 } else {
                     setupPanel
                 }
@@ -54,6 +56,38 @@ struct GazeCalibrationView: View {
             if phase == .active { controller.resumeForActiveScene() }
             else { controller.pauseForInactiveScene() }
         }
+    }
+
+    private var calibrationInstructions: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            Image(systemName: "scope")
+                .font(.system(size: 88, weight: .bold))
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text("Get ready for the first dot")
+                .font(.system(size: 42, weight: .heavy, design: .rounded))
+            Text("Focus on the centre of each dot with your eye. Keep your head and the iPad still.")
+                .font(.system(.title2, design: .rounded).weight(.semibold))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 680)
+            ProgressView()
+                .controlSize(.large)
+                .tint(.orange)
+            Text("The first dot will appear in a moment.")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Button("Cancel") {
+                controller.stop()
+                onCancel()
+            }
+            .buttonStyle(.bordered)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
+        .foregroundStyle(.black)
+        .accessibilityElement(children: .contain)
     }
 
     private var setupPanel: some View {
@@ -198,6 +232,14 @@ struct GazeCalibrationView: View {
                 systemImage: "arrow.right.circle.fill",
                 tone: .warning
             )
+        case .movingTooMuch:
+            return .init(
+                id: "movement",
+                title: "Too much movement",
+                message: "Keep your head and the iPad still.",
+                systemImage: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
         case .stabilizing:
             return .init(
                 id: "stable",
@@ -340,6 +382,7 @@ private struct FacePositionGuide: View {
 
     private var label: String {
         if isReady { return "Ready!" }
+        if state == .movingTooMuch { return "Too much movement" }
         if state == .stabilizing || isCheckingPatch { return "Hold still…" }
         return "Your face"
     }

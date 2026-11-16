@@ -317,6 +317,16 @@ public final class GazeTracker: GazeTracking, @unchecked Sendable {
         let engineOutput: Phase3CalibrationEngine.Output
         let tracking: TrackingState
         lock.lock()
+        if state.setupState == .movingTooMuch {
+            switch machine.calibrationState {
+            case .readyForTarget, .collecting, .targetAccepted, .retryTarget, .calibrated:
+                calibrationEngine.invalidate()
+                validationSession = Phase3ValidationSession()
+                machine.invalidateCalibration()
+            case .notCalibrated, .invalid, .failed:
+                break
+            }
+        }
         if state.trackingState == .lost {
             faceWasLost = true
         } else if let ray = state.selectedEyeRay {

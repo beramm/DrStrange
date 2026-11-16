@@ -124,7 +124,7 @@ final class GazeInputController {
         transitionPending = true
         isPreparingCalibration = true
         activeCalibrationTarget = nil
-        status = "Hold still — calibration begins in 3 seconds"
+        status = "Hold still — calibration begins in 8 seconds"
 
         do {
             try tracker.beginCalibration(layout: Self.calibrationLayout)
@@ -136,7 +136,7 @@ final class GazeInputController {
         }
 
         calibrationTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(8))
             guard let self, !Task.isCancelled else { return }
             calibrationTargets = Self.calibrationLayout.targets
             targetIndex = 0
@@ -201,6 +201,20 @@ final class GazeInputController {
     }
 
     private func processCalibrationState() {
+        if sample.calibrationState == .invalid {
+            calibrationTask?.cancel()
+            calibrationTask = nil
+            transitionPending = false
+            isPreparingCalibration = false
+            activeCalibrationTarget = nil
+            calibrationTargets.removeAll(keepingCapacity: true)
+            targetIndex = 0
+            status = sample.setupState == .movingTooMuch
+                ? "Too much movement — hold still, then restart calibration"
+                : "Calibration was lost — return and recalibrate"
+            return
+        }
+
         if cameraStarted, activeCalibrationTarget == nil, !isPreparingCalibration, !isCalibrated {
             status = switch (sample.setupState, sample.eyeAvailability, oneEyeEnforcerEnabled) {
             case (.tooClose, _, _): "Move farther from the front camera"
@@ -210,6 +224,7 @@ final class GazeInputController {
             case (.lookDown, _, _): "Look down a little"
             case (.turnLeft, _, _): "Turn left a little"
             case (.turnRight, _, _): "Turn right a little"
+            case (.movingTooMuch, _, _): "Too much movement — hold still"
             case (.stabilizing, _, _): "Hold still"
             case (.ready, .both, false): "Testing mode — start calibration"
             case (.ready, .both, true): "Put on the prescribed eye patch and keep your face still"
@@ -236,8 +251,7 @@ final class GazeInputController {
             activeCalibrationTarget = nil
             status = "Calibration complete — ready to play"
         case .invalid:
-            activeCalibrationTarget = nil
-            status = "Calibration was lost — return and recalibrate"
+            break
         case .failed:
             activeCalibrationTarget = nil
             status = "Calibration failed — try again"

@@ -13,6 +13,7 @@ struct FaceSetupMonitor {
     }
 
     private var samples: [Sample] = []
+    private var isRecoveringFromExcessiveMovement = false
 
     // Keep the child in a near-camera sweet spot. Forty centimetres is the
     // hard near edge; the narrow ten-centimetre ready band encourages them to
@@ -68,17 +69,20 @@ struct FaceSetupMonitor {
         guard translationRange <= maximumTranslationRangeMeters,
               directionRange <= maximumDirectionRangeDegrees else {
             samples = [samples[samples.count - 1]]
-            return .stabilizing
+            isRecoveringFromExcessiveMovement = true
+            return .movingTooMuch
         }
 
         guard timestamp - first.timestamp >= stabilizationDurationSeconds else {
-            return .stabilizing
+            return isRecoveringFromExcessiveMovement ? .movingTooMuch : .stabilizing
         }
+        isRecoveringFromExcessiveMovement = false
         return .ready
     }
 
     mutating func reset() {
         samples.removeAll(keepingCapacity: true)
+        isRecoveringFromExcessiveMovement = false
     }
 
     private func staticState(

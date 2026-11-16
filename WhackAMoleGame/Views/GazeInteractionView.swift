@@ -41,16 +41,6 @@ struct GazeInteractionView: View {
                     .position(point)
                     .shadow(radius: 3)
                 }
-
-                if !controller.isCalibrated {
-                    Text("Eye control needs recalibration")
-                        .font(.headline)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(.black.opacity(0.75), in: Capsule())
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                        .padding(.bottom, 18)
-                }
             }
             .onChange(of: controller.sample.timestamp) { _, _ in
                 consumeSample(in: proxy)

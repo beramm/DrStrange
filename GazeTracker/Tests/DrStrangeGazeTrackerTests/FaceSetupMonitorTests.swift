@@ -120,7 +120,7 @@ final class FaceSetupMonitorTests: XCTestCase {
         )
     }
 
-    func testMovementPausesReadinessUntilPostureRecovers() {
+    func testMovementAboveToleranceWarnsUntilPostureRecovers() {
         var monitor = FaceSetupMonitor()
         let direction = SIMD3<Double>(0, 0, 1)
 
@@ -143,7 +143,15 @@ final class FaceSetupMonitorTests: XCTestCase {
                 faceTranslation: SIMD3(0.04, 0, -0.45),
                 headDirection: direction
             ),
-            .stabilizing
+            .movingTooMuch
+        )
+        XCTAssertEqual(
+            monitor.evaluate(
+                timestamp: 20.60,
+                faceTranslation: SIMD3(0.04, 0, -0.45),
+                headDirection: direction
+            ),
+            .movingTooMuch
         )
         XCTAssertEqual(
             monitor.evaluate(
