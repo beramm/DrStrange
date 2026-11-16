@@ -1,7 +1,7 @@
 # Gaze Tracker Tasks
 
 Status: Phase 3 host running on exact iPad — controlled physical measurements pending
-Last updated: 2026-11-03
+Last updated: 2026-11-09
 Current phase: Phase 3 — implementation verified; exact-device measurements pending
 Next permitted work: Phase 3 only — run the nine-versus-13 calibration and three-validation protocol now displayed on `iPad14,10`
 
@@ -283,6 +283,16 @@ Phase 6 evidence: not started.
 Phase 7 evidence: not started.
 
 ## Session log
+
+### 2026-11-09 — Pretrained ML/DL gaze candidate assessment
+
+- Created branch `codex/ml-gaze-assessment` from the current local `main`, preserving the four commits already ahead of `origin/main`.
+- Searched current Hugging Face and GitHub models and primary papers/repositories. Compared WebEyeTrack/BlazeGaze, MacGaze's Core ML conversion, Qualcomm EyeGaze, MobileGaze, LightGazeNet, and UniGaze against iPad deployment, direct screen output, size, calibration, licensing, and one-eye patch requirements.
+- Selected WebEyeTrack/BlazeGaze only for an isolated shadow experiment. No model binary, third-party runtime, camera-frame path, or production behavior was added.
+- Inspected the pinned Keras checkpoint and MacGaze release artifact. The released Core ML model is non-updatable and requires iOS 18, so it cannot be dropped into the iPadOS 17 target and does not reproduce WebEyeTrack's MAML personalization.
+- Ran a host-only synthetic Core ML sanity benchmark on Apple M5: 20 warmed model-only calls measured 1.14 ms median and 2.36 ms p90. This is not target-iPad, preprocessing, patched-eye, end-to-end latency, or accuracy evidence.
+- Recorded source commits, artifact hashes, coordinate/preprocessing risks, checkpoint-rights caveat, exact-device protocol, and unchanged 4.0 cm p90 gate in `09-ml-deep-learning-assessment.md`.
+- Stop reason: lookup and feasibility assessment are complete. Physical-device ML implementation is a separate Phase 3 experiment and must not begin by silently replacing the integrated ARKit tracker.
 
 ### 2026-11-05 — Provisional Whack-a-Mole gaze integration installed
 

@@ -41,6 +41,17 @@ final class WhackAMoleEngineTests: XCTestCase {
         XCTAssertEqual(engine.session.averageResponseTime ?? 0, 0.8, accuracy: 1e-6)
     }
 
+    func testProximityPointsAreRecordedInSessionScore() throws {
+        var engine = WhackAMoleEngine(configuration: makeConfiguration())
+        let target = try XCTUnwrap(advanceToSpawn(&engine))
+
+        _ = engine.tapHole(target.holeIndex, awardedPoints: 30)
+
+        XCTAssertEqual(engine.session.score, 30)
+        XCTAssertEqual(engine.session.trials.last?.pointsAwarded, 30)
+        XCTAssertEqual(engine.targets.first(where: { $0.id == target.id })?.pointsAwarded, 30)
+    }
+
     func testCharacterCannotBeHitTwice() throws {
         var engine = WhackAMoleEngine(configuration: makeConfiguration())
         let target = try XCTUnwrap(advanceToSpawn(&engine))

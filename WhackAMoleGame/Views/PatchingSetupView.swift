@@ -3,7 +3,8 @@ import SwiftUI
 /// Optional patching session record, filled in by a parent or caregiver.
 ///
 /// Documentation only: the game plays the same whichever eye is patched. The app does not decide
-/// which eye is amblyopic, does not check the patch, and does not recommend wear or play time.
+/// which eye is amblyopic or recommend wear or play time. Its live camera check is a separate,
+/// non-diagnostic heuristic and does not change this caregiver-entered record.
 struct PatchingSetupView: View {
     @Binding var configuration: GameConfiguration
 

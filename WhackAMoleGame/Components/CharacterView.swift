@@ -1,102 +1,64 @@
 import SwiftUI
 import UIKit
 
-/// One pop-up character: awake with a star (tap it) or sleepy (leave it).
-///
-/// Uses `Character<Name>` / `Character<Name>Sleepy` from the asset catalog when present.
-/// Until that artwork exists, a vector placeholder is drawn instead.
+/// One mole, drawn from the provided 24-frame rise animation (`Characters/MoleRise/Frame01…24`).
+/// The frames play forwards as it climbs out and backwards as it goes down. Sleeping moles (decoys)
+/// are drawn in grey with a "z z" bubble.
 struct CharacterView: View {
     let target: ActiveTarget
+    let visual: MoleVisual
+
+    /// Where the hammer lands, as a fraction of the fully risen mole: the top of its helmet.
+    static let strikePoint = CGPoint(x: 0.5, y: 0.1)
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var isHit: Bool {
-        if case .hit = target.phase { true } else { false }
+    static func assetName(_ frame: Int) -> String {
+        String(format: "MoleRise/Frame%02d", min(max(frame, 1), MoleVisual.frameCount))
     }
 
-    var body: some View {
-        artwork
-            .scaleEffect(x: isHit ? 1.12 : 1, y: isHit ? 0.82 : 1, anchor: .bottom)
-            .rotationEffect(.degrees(isHit && !reduceMotion ? -4 : 0), anchor: .bottom)
-            .animation(.spring(response: 0.25, dampingFraction: 0.5), value: isHit)
+    private var isAsleep: Bool { target.role == .decoy }
+
+    /// Squash on impact, then a head wobble that dies away.
+    private var reaction: (squash: Double, wobble: Double) {
+        guard let progress = visual.hitProgress, !reduceMotion else { return (0, 0) }
+        let squash = sin(min(progress / 0.3, 1) * .pi)
+        let wobble = sin(progress * .pi * 4) * (1 - progress)
+        return (squash, wobble)
     }
-
-    @ViewBuilder
-    private var artwork: some View {
-        let assetName = target.variant.assetName(for: target.role)
-        if UIImage(named: assetName) != nil {
-            Image(assetName)
-                .resizable()
-                .scaledToFit()
-        } else {
-            ZStack {
-                PlaceholderCritterBody().fill(WhackAMolePalette.body(target.variant))
-                PlaceholderCritterFeatures(
-                    isAwake: target.role == .target,
-                    isHit: isHit,
-                    ink: WhackAMolePalette.ink,
-                    starInk: WhackAMolePalette.star
-                )
-            }
-        }
-    }
-}
-
-// MARK: - Placeholder artwork (replace with real target assets)
-
-/// Placeholder silhouette: round head with ears and a body. Unit square coordinates.
-struct PlaceholderCritterBody: Shape {
-    func path(in rect: CGRect) -> Path {
-        let w = rect.width, h = rect.height
-        var path = Path()
-        path.addEllipse(in: CGRect(x: rect.minX + w * 0.18, y: rect.minY + h * 0.06, width: w * 0.22, height: w * 0.22))
-        path.addEllipse(in: CGRect(x: rect.minX + w * 0.60, y: rect.minY + h * 0.06, width: w * 0.22, height: w * 0.22))
-        path.addEllipse(in: CGRect(x: rect.minX + w * 0.15, y: rect.minY + h * 0.12, width: w * 0.70, height: h * 0.58))
-        path.addRoundedRect(
-            in: CGRect(x: rect.minX + w * 0.2, y: rect.minY + h * 0.5, width: w * 0.6, height: h * 0.5),
-            cornerSize: CGSize(width: w * 0.2, height: w * 0.2)
-        )
-        return path
-    }
-}
-
-/// Placeholder features: open eyes, smile and a belly star when awake; closed eyes when sleepy.
-struct PlaceholderCritterFeatures: View {
-    let isAwake: Bool
-    let isHit: Bool
-    let ink: Color
-    let starInk: Color
 
     var body: some View {
         GeometryReader { proxy in
-            let w = proxy.size.width, h = proxy.size.height
-            ZStack {
-                if isAwake && !isHit {
-                    Circle().fill(ink).frame(width: w * 0.1).position(x: w * 0.38, y: h * 0.38)
-                    Circle().fill(ink).frame(width: w * 0.1).position(x: w * 0.62, y: h * 0.38)
-                } else {
-                    // Closed or squeezed eyes.
-                    Capsule().fill(ink).frame(width: w * 0.12, height: w * 0.035).position(x: w * 0.38, y: h * 0.39)
-                    Capsule().fill(ink).frame(width: w * 0.12, height: w * 0.035).position(x: w * 0.62, y: h * 0.39)
+            // With Reduce Motion the mole fades in and out instead of climbing.
+            Image(Self.assetName(reduceMotion ? MoleVisual.frameCount : visual.frame))
+                .resizable()
+                .interpolation(.high)
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .grayscale(isAsleep ? 1 : 0)
+                .opacity(reduceMotion ? Double(visual.frame) / Double(MoleVisual.frameCount) : 1)
+                .overlay(alignment: .topTrailing) {
+                    if isAsleep && visual.frame >= MoleVisual.frameCount - 2 {
+                        SleepBubble()
+                            .frame(width: proxy.size.width * 0.38, height: proxy.size.width * 0.26)
+                    }
                 }
-                SmileShape()
-                    .stroke(ink, style: StrokeStyle(lineWidth: w * 0.03, lineCap: .round))
-                    .frame(width: w * 0.18, height: h * 0.06)
-                    .position(x: w * 0.5, y: h * 0.5)
-                if isAwake {
-                    StarShape().fill(starInk).frame(width: w * 0.26, height: w * 0.26).position(x: w * 0.5, y: h * 0.76)
-                }
-            }
         }
+        .scaleEffect(x: 1 + 0.12 * reaction.squash, y: 1 - 0.16 * reaction.squash, anchor: .bottom)
+        .rotationEffect(.degrees(9 * reaction.wobble), anchor: .bottom)
+        .accessibilityHidden(true)
     }
 }
 
-struct SmileShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY), control: CGPoint(x: rect.midX, y: rect.maxY * 2))
-        return path
+/// "z z" bubble shown next to a sleeping mole.
+private struct SleepBubble: View {
+    var body: some View {
+        GeometryReader { proxy in
+            Text("z z")
+                .font(.system(size: proxy.size.height * 0.62, weight: .heavy, design: .rounded))
+                .foregroundStyle(WhackAMolePalette.ink.opacity(0.75))
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .background(Capsule().fill(WhackAMolePalette.cream.opacity(0.9)))
+        }
     }
 }
 

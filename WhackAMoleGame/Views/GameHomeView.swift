@@ -23,10 +23,16 @@ struct GameHomeView: View {
                 .frame(width: 440)
         }
         .background(WhackAMolePalette.meadow.ignoresSafeArea())
-        .navigationTitle("Whack-a-Mole")
+        .navigationTitle("Paddy")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: configuration) { _, newValue in
             ConfigurationStore.standard.save(newValue)
+        }
+        .onAppear {
+            gazeController.setOneEyeEnforcerEnabled(configuration.oneEyeEnforcerEnabled)
+        }
+        .onChange(of: configuration.oneEyeEnforcerEnabled) { _, enabled in
+            gazeController.setOneEyeEnforcerEnabled(enabled)
         }
         .fullScreenCover(item: $presentedScreen) { screen in
             switch screen {
@@ -103,6 +109,14 @@ struct GameHomeView: View {
                 Toggle("Adjust level from performance", isOn: $configuration.adaptiveDifficulty.isEnabled)
                 Toggle("Sound", isOn: $configuration.soundEnabled)
                 Toggle("Haptics", isOn: $configuration.hapticsEnabled)
+            }
+
+            Section {
+                Toggle("One-eye enforcer", isOn: $configuration.oneEyeEnforcerEnabled)
+            } header: {
+                Text("Gaze testing")
+            } footer: {
+                Text("Testing only. Turn this off to calibrate and play with both eyes visible. Patch-loss pauses will also be disabled.")
             }
         }
         .scrollContentBackground(.hidden)

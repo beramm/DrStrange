@@ -20,7 +20,7 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Whack-a-Mole")
                                 .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                            Text("Tap the friends with a star")
+                            Text("Tap the moles")
                                 .font(.title3)
                                 .foregroundStyle(.secondary)
                         }
