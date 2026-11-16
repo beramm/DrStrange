@@ -19,7 +19,7 @@ struct MoleView: View {
     private let frameCount = 24
     private let framesPerSecond = 24.0
     /// Seconds between moles.
-    private let waitRange = 8.0...12.0
+    private let waitRange = 2.0...4.0
     /// Seconds the mole stays up.
     private let staySeconds = 2.0
 

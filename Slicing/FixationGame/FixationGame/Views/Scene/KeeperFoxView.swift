@@ -19,8 +19,8 @@ struct KeeperFoxView: View {
                 .resizable()
                 .scaledToFit()
         } else {
-            // Redraws on a timer to step through the sleeping pictures.
-            TimelineView(.periodic(from: .now, by: secondsPerSleepFrame)) { context in
+            // Redraws on a steady clock to step through the sleeping pictures.
+            TimelineView(.animation(minimumInterval: 0.1)) { context in
                 let step = Int(context.date.timeIntervalSinceReferenceDate / secondsPerSleepFrame)
                 Image(sleepFrames[step % sleepFrames.count])
                     .resizable()

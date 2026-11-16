@@ -278,8 +278,10 @@ struct FixationGameView: View {
                     thiefIsHere = true
                     try await Task.sleep(for: .seconds(thiefSeconds))
                     veggiesLeft -= 1
+                    // The thief walks back with the veggies, then comes up under the next crate.
+                    thiefIsHere = false
+                    try await Task.sleep(for: .seconds(1.6))
                 }
-                thiefIsHere = false
                 phase = .finished(stoppedEarly: false)
             }
         } catch {
