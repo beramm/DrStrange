@@ -68,14 +68,14 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 **Calibrate & Play** on the home screen runs the gaze calibration and then plays with eye control:
 the child looks at a mole to hit it. The moles do not respond to touch.
 
-1. The game starts on an empty painted meadow, with no holes showing. A hole opens at a random spot and a
-   mole climbs out of it, frame by frame.
+1. The game starts on an empty painted meadow, with no holes showing and two clouds drifting slowly
+   across the sky. A hole opens at a random spot and a mole slides up out of it.
 2. The child finds it and keeps looking at it until the gaze dwell completes.
 3. The fox's yellow card opens beside that mole: it grows from its centre as a rounded square with
    a slight spring, and a square ring ripples out. Meanwhile the fox fades out of its corner.
 4. The fox rises up from the bottom of the card and swings. Its hammer slides out from behind the
-   card and lands on the mole's helmet. The mole screws up its face, plays its 24-frame hit
-   animation sinking back down the hole, and the points float up in an illustrated bubble
+   card and lands on the mole's helmet. The mole turns into the sad mole picture, squashes a little,
+   then slides back down the hole, and the points float up in an illustrated bubble
    (Perfect, Good or OK). There is no flashing and the motion is short.
 5. The hammer slides back behind
    the card, the fox sinks down out of its bottom, the empty card shrinks away and the fox is back
@@ -142,13 +142,13 @@ The sequence always runs in this order:
 | State (`GameInteractionState`) | What happens | Duration |
 |---|---|---|
 | `idle` | No character on the board; the fox waits in its corner. | – |
-| `targetAppearing` | A mole is climbing out of its hole (24 frames). | 0.55 s |
+| `targetAppearing` | A mole is sliding up out of its hole. | 0.55 s |
 | `targetActive` | A character is up and can be selected; the fox waits with its hammer raised. | 5.2 s ±10 % |
 | `frameAppearing` | After a valid tap, the yellow card opens beside the character: the whole card, border included, grows from its centre as a rounded square with a slight spring, and a square ring ripples out. The corner fox fades away. | 0.34 s |
 | `foxEmerging` | The fox rises up from the bottom of the card, clipped to the inside of the card, with its hammer hidden. | 0.36 s |
 | `foxAttacking` | The fox leans in and swings (frames 1→21, speeding up) while the hammer slides out from behind the card. It ends at impact. | 0.36 s |
 | `targetHit` | The hammer is on the helmet (frame 21). The mole's hit animation starts and the points bubble floats up. | 0.45 s |
-| `foxRetracting` | The mole's climb plays backwards (0.45 s, carrying on into the next step). The hammer slides back behind the card, then the fox sinks down out of the card's bottom. | 0.36 s |
+| `foxRetracting` | The sad mole slides back down its hole (0.45 s, carrying on into the next step). The hammer slides back behind the card, then the fox sinks down out of the card's bottom. | 0.36 s |
 | `frameDisappearing` | The empty card shrinks back to its centre; the fox fades back in at its corner. | 0.28 s |
 | `nextTarget` | A short pause before the next character may appear. | 0.3 s |
 
@@ -187,8 +187,9 @@ How the animation is driven:
 - The hammer sticks out of the card in the artwork. It is kept hidden until the swing starts, then
   the part of the image beside the card slides out from behind the card's edge. It slides back the
   same way afterwards, so it never pops in outside the frame.
-- Mole frames also come from the game clock (`WhackAMoleEngine.moleVisual(for:)`), so pausing
-  freezes them too.
+- How far each mole is out of its hole, and whether it is the sad picture, also come from the game
+  clock (`WhackAMoleEngine.moleVisual(for:)`), so pausing freezes them too. The clouds are only
+  decoration and keep drifting.
 - One phase starts only when the previous one has finished, because every phase comes from the
   same attack clock. There are no separate timers or delays to drift apart.
 - With Reduce Motion on, the fox stays in its corner and swings there, no card opens, and moles
@@ -361,24 +362,35 @@ clinical improvement.
   - Frame 1 (hammer raised) is the waiting pose and frame 9 is the impact. The supplied swing is
     short (the hammer only tips forward a little), so the bunny strikes from higher up than the fox
     and the raccoon; the hammer head still lands on the character.
-- **Provided (Google Drive, mole animation folder):** 24 frames (`1`–`24 END`) of the miner mole
-  climbing out of a hole, stored in `Resources/Assets.xcassets/Characters/MoleRise/Frame01…24`.
-  - The frames were painted with the mole and hole together. The dirt was removed by its colour so
-    the moles can sit in the three separate hole images, and each frame still ends along the hole's
-    front edge. All 24 frames share one crop.
-  - `MoleArt` in `MoleHoleView.swift` records where the frames sit relative to the hole's front edge.
-- **Provided (Google Drive, mole hit folder):** 24 frames (`1`–`24`) of the mole being punched and
-  sinking into its hole, stored in `Resources/Assets.xcassets/Characters/MoleHit/Frame01…24`. They
-  were cut out from the painted dirt the same way as the rise frames, keeping the small "ouch" ticks
-  beside the helmet, and play over `hitReaction` + `exitAnimationDuration` (0.9 s).
+- **Provided (Google Drive):** two mole pictures, replacing the earlier 24-frame rise and hit
+  animations so no frame sequence has to load.
+  - `IMG_0024` (1119 × 1434), the happy miner mole, stored as `Characters/Mole/Appear`. It is shown
+    while the mole climbs out and waits.
+  - `Tikus sedih` (674 × 643), the sad mole, stored as `Characters/Mole/Disappear`. It is shown from
+    the moment the hammer lands until the mole has sunk back into its hole.
+  - Both are stored unchanged. `MoleArt` in `MoleHoleView.swift` records where the helmet is in each
+    picture; both are scaled and placed so the helmet is the same size and in the same spot, so the
+    swap to the sad mole does not jump.
+  - The picture slides up and down, and the hole hides everything below its front edge: when fully
+    out, the head and the top of the striped shirt show and the legs stay in the hole.
+  - The sad mole stays up for `hitReaction`, then sinks over `exitAnimationDuration`. With Reduce
+    Motion the moles fade in and out instead of sliding, with no squash.
   - Awake moles are drawn in full colour; sleeping moles (decoys) in grey with a "z z" bubble.
-- **Provided (Google Drive):** the Whack-a-Mole background, a 4:3 painted meadow (2752 × 2064)
-  with sky, clouds, grass and a fence. It replaces the earlier meadow and is stored unchanged as a
-  PNG in `Resources/Assets.xcassets/GameBackgrounds/Meadow`.
+- **Provided (Google Drive, `BG LAMA`):** the Whack-a-Mole background, a 4:3 painted meadow
+  (2752 × 2064) with sky, grass and a fence and no clouds. It is stored unchanged as a PNG in
+  `Resources/Assets.xcassets/GameBackgrounds/Meadow`.
   - It fills the screen behind the game with its aspect ratio kept. On 4:3 iPads nothing is cropped;
     on wider iPads a little is cropped at the top and bottom.
-  - `GameBackgroundView` holds where the grass is in the painting. The new painting's horizon and
-    fence are still outside that band, so hole positions are unchanged.
+  - `GameBackgroundView` holds where the grass is in the painting (37 %–80 % of its height). The
+    horizon and fence of this painting are outside that band, so hole positions are unchanged.
+- **Provided (Google Drive, `AWAN 1`, `AWAN 2`):** two clouds, painted on canvases the size of the
+  background. Each was cropped to its visible area and stored as
+  `GameBackgrounds/MeadowCloud1` and `MeadowCloud2`.
+  - `DriftingCloud` in `GameBoardView.swift` scales them with the painting, keeps them in the sky,
+    and moves them slowly from left to right (a crossing takes one to one and a half minutes); when
+    one leaves the screen on the right it comes back in on the left.
+  - They move with real time, not the game clock, and never affect play. With Reduce Motion they
+    stay still.
 - **Provided (Google Drive, hole folder):** `IMG_0021`–`IMG_0023`, three dirt holes. Each was
   cropped to its visible area and stored in `Resources/Assets.xcassets/Holes/Hole1…3`.
   - The dark opening of each was measured from the art (`HoleArt` in `MoleHoleView.swift`).
@@ -388,15 +400,15 @@ clinical improvement.
   - The hole images are small (400–443 px wide), so they can look slightly soft on the largest
     iPads. Larger exports would fix that.
 - **Missing:**
-  - **More mole art.** There is a single mole animation, so the "character looks" all
-    show the same mole. A sleeping mole (eyes closed) would make decoys clearer than the grey
+  - **More mole art.** There is a single mole, so the "character looks" all show the same
+    mole. A sleeping mole (eyes closed) would make decoys clearer than the grey
     version with a bubble.
   - Gentle sound effects (built-in system sounds stand in), optional background music,
     and an app icon.
 
 ## Testing
 
-- `DrStrangeTests`: 91 unit tests covering:
+- `DrStrangeTests`: 93 unit tests covering:
   - spawn rules: no repeats, spacing, no corner jumps, balance, no fixed cycles, seed reproducibility
   - timing, decoys, hits, misses, double taps, the limit on characters up at once
   - the 2-minute session end, stop and rest-break reasons, JSON round trip
@@ -414,6 +426,9 @@ clinical improvement.
     - the hammer lands on the tapped character, normal and mirrored
     - the fox stays home when idle or with Reduce Motion
     - settings saved by older versions still load
+  - the mole pictures: the mole slides up and back down, turns sad only when hit, stays up while it
+    reacts, and both pictures line up on the helmet so the hammer lands on it
+  - the clouds stay in the sky and drift slowly to the right, wrapping round
   - helper characters:
     - every helper's frames are in the asset catalog
     - each helper is equally likely, and the same helper can come in consecutive games

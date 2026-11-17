@@ -61,18 +61,13 @@ struct HoleVisual: Identifiable, Equatable {
 
 /// What a mole looks like right now.
 struct MoleVisual: Equatable {
-    /// 1 (helmet tip) ... `frameCount` (fully out of the hole).
-    var frame: Int
-    /// 0...1 through the hit animation, from the hammer landing until the mole has sunk out of
-    /// sight; `nil` when not hit.
+    /// How far the mole is out of its hole: 0 = hidden, 1 = fully out.
+    var rise: Double
+    /// 0...1 from the hammer landing until the mole has sunk out of sight; `nil` when not hit.
+    /// While it is set the sad mole picture is drawn.
     var hitProgress: Double?
 
-    static let frameCount = 24
-
-    /// Which frame of the hit animation to draw, 1 ... `frameCount`; `nil` when not hit.
-    var hitFrame: Int? {
-        hitProgress.map { 1 + Int((Double(Self.frameCount - 1) * $0).rounded()) }
-    }
+    var isHit: Bool { hitProgress != nil }
 }
 
 struct ActiveTarget: Identifiable, Equatable {

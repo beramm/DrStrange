@@ -72,25 +72,28 @@ struct WhackAMoleEngine {
     /// freezes the animation.
     func moleVisual(for target: ActiveTarget) -> MoleVisual {
         let rules = configuration.spawnRules
-        let count = MoleVisual.frameCount
-        func riseFrame(at time: TimeInterval) -> Int {
-            let progress = min(max((time - target.spawnedAt) / max(rules.moleRiseDuration, 0.001), 0), 1)
-            return 1 + Int((Double(count - 1) * progress).rounded())
+        func clamped(_ value: Double) -> Double { min(max(value, 0), 1) }
+        func rise(at time: TimeInterval) -> Double {
+            clamped((time - target.spawnedAt) / max(rules.moleRiseDuration, 0.001))
         }
-        func sinkFrame(from start: TimeInterval) -> Int {
-            let startFrame = riseFrame(at: start)
-            let progress = min(max((clock - start) / max(rules.exitAnimationDuration, 0.001), 0), 1)
-            return startFrame - Int((Double(startFrame - 1) * progress).rounded())
+        /// Sinks from `height` back into the hole, starting `delay` after `start`.
+        func sink(from start: TimeInterval, height: Double, delay: TimeInterval = 0) -> Double {
+            height * (1 - clamped((clock - start - delay) / max(rules.exitAnimationDuration, 0.001)))
         }
         switch target.phase {
         case .up, .targeted:
-            return MoleVisual(frame: riseFrame(at: clock))
+            return MoleVisual(rise: rise(at: clock))
         case let .leaving(at):
-            return MoleVisual(frame: sinkFrame(from: at))
+            return MoleVisual(rise: sink(from: at, height: rise(at: at)))
         case let .hit(at):
-            guard target.role == .target else { return MoleVisual(frame: sinkFrame(from: at)) }
-            let duration = configuration.foxAttack.hitReaction + rules.exitAnimationDuration
-            return MoleVisual(frame: count, hitProgress: min(max((clock - at) / max(duration, 0.001), 0), 1))
+            guard target.role == .target else { return MoleVisual(rise: sink(from: at, height: rise(at: at))) }
+            // The sad mole stays up while it reacts to the hammer, then goes back down.
+            let reaction = configuration.foxAttack.hitReaction
+            let duration = reaction + rules.exitAnimationDuration
+            return MoleVisual(
+                rise: sink(from: at, height: 1, delay: reaction),
+                hitProgress: clamped((clock - at) / max(duration, 0.001))
+            )
         }
     }
 
