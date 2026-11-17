@@ -295,9 +295,10 @@ transparency kept.
   file (`FINISH.png`).
 - **Signpost** (`Decorations/Signpost`, from `petunjuk`) and **tree stump** (`Decorations/TreeStump`,
   from `kayu`), each cropped from its 2752 × 2064 canvas.
-- **Top bar** (`HUD/`): the carrot lives panel in four states (`Carrots3` full, then `Carrots2`,
-  `Carrots1` and `Carrots0` with one, two and three grey carrots), cropped from the four supplied
-  pictures (`FULL`, `-1`, `-2`, `-3`), and the painted wooden pause button. The carrots, the time
+- **Top bar** (`HUD/`): the three carrots for the lives in four states (`Carrots3` full, then
+  `Carrots2`, `Carrots1` and `Carrots0` with one, two and three grey carrots from the right),
+  cropped from the four supplied pictures (`full`, `-1`, `-2`, `-3`; the second version, with no
+  panel behind the carrots), and the painted wooden pause button. The carrots, the time
   bar and the button share one height (64 points).
 - Only the supplied pictures are used on the map. Nothing is cut out of other pictures or
   drawn as extra scenery.

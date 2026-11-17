@@ -29,8 +29,8 @@ struct FoxPathHUDView: View {
     }
 }
 
-/// The painted carrot panel (`FoxPath/Carrots0…3`): one orange carrot per life left, grey for
-/// the ones lost.
+/// The painted carrots (`FoxPath/Carrots0…3`), with no panel behind them: one orange carrot per
+/// life left, grey for the ones lost.
 private struct CarrotLivesView: View {
     let lives: Int
     let total: Int
