@@ -18,6 +18,8 @@ struct CharacterSelectView: View {
     /// The chosen character, saved on the device so it survives app restarts.
     @AppStorage(GameCharacter.storageKey) private var selectedID = GameCharacter.fox.id
     @Environment(\.dismiss) private var dismiss
+    /// Which way the character on the podium spins: right for next, left for previous.
+    @State private var turnsRight = true
 
     private var selected: GameCharacter { GameCharacter.with(id: selectedID) }
 
@@ -58,21 +60,21 @@ struct CharacterSelectView: View {
                     .frame(width: 374 * s, height: 161 * s)
                     .position(x: 339 * sx, y: 643 * sy)
 
-                // The character image has empty space around the drawing, so this frame
-                // is bigger than the character itself.
-                Image(selected.imageName)
-                    .resizable()
-                    .scaledToFit()
+                // The character walks on the spot, and turns around when the arrows
+                // change it. The pictures have empty space around the drawing, so this
+                // frame is bigger than the character itself.
+                TurningCharacterView(character: selected, turnsRight: turnsRight)
                     .frame(width: 574 * s, height: 574 * s)
                     .position(x: 343 * sx, y: 426 * sy)
-                    .accessibilityLabel(selected.name)
 
                 ArrowButton(direction: .previous, size: 76 * s) {
+                    turnsRight = false
                     selectedID = selected.neighbour(-1).id
                 }
                 .position(x: 97 * sx, y: 450 * sy)
 
                 ArrowButton(direction: .next, size: 76 * s) {
+                    turnsRight = true
                     selectedID = selected.neighbour(1).id
                 }
                 .position(x: 576 * sx, y: 450 * sy)

@@ -1,7 +1,7 @@
 //
 //  SettingsPopup.swift
-//  The Setting pop-up, from the final design: a faded brown layer over the
-//  screen, with the Setting card on top.
+//  The Settings pop-up, from the final design: a faded brown layer over the
+//  screen, with the Settings card on top.
 //
 //  Changes are only kept when the player taps SAVE. The X closes the card and
 //  forgets the changes.
@@ -16,16 +16,16 @@ struct SettingsPopup: View {
     let onClose: () -> Void
 
     @AppStorage(AppSettings.languageKey) private var savedLanguage = AppLanguage.english
-    @AppStorage(AppSettings.backgroundSoundKey) private var savedBackgroundSound = true
-    @AppStorage(AppSettings.soundEffectsKey) private var savedSoundEffects = true
+    @AppStorage(AppSettings.backgroundVolumeKey) private var savedBackgroundVolume = 1.0
+    @AppStorage(AppSettings.soundEffectsVolumeKey) private var savedSoundEffectsVolume = 1.0
     @AppStorage(AppSettings.wearsEyePatchKey) private var savedWearsEyePatch = true
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var savedRandomSpin = true
     @AppStorage(AppSettings.gamesLockedKey) private var savedGamesLocked = true
 
     // The choices on the card, before they are saved.
     @State private var language = AppLanguage.english
-    @State private var backgroundSound = true
-    @State private var soundEffects = true
+    @State private var backgroundVolume = 1.0
+    @State private var soundEffectsVolume = 1.0
     @State private var wearsEyePatch = true
     @State private var randomSpin = true
     @State private var gamesLocked = true
@@ -59,10 +59,15 @@ struct SettingsPopup: View {
         let pillHeight = h * 0.075
 
         return ZStack(alignment: .topLeading) {
-            // The card picture already shows the "SETTING" title.
             Image("SettingsCard")
                 .resizable()
-                .accessibilityLabel("Setting")
+                .accessibilityHidden(true)
+
+            Text("Settings")
+                .textCase(.uppercase)
+                .doodleText(size: h * 0.115)
+                .foregroundStyle(Color.pillOutline)
+                .position(x: w * 0.5, y: h * 0.105)
                 .accessibilityAddTraits(.isHeader)
 
             Button(action: onClose) {
@@ -85,11 +90,11 @@ struct SettingsPopup: View {
             }
 
             row("Background sound", y: 0.345, width: w, height: h) {
-                onOffPills(isOn: $backgroundSound, pillHeight: pillHeight, width: w)
+                VolumeSlider(value: $backgroundVolume, width: w * 0.34, height: pillHeight)
             }
 
             row("Sound effect", y: 0.445, width: w, height: h) {
-                onOffPills(isOn: $soundEffects, pillHeight: pillHeight, width: w)
+                VolumeSlider(value: $soundEffectsVolume, width: w * 0.34, height: pillHeight)
             }
 
             // Testing option: NO lets someone play with both eyes open.
@@ -167,8 +172,8 @@ struct SettingsPopup: View {
     /// Shows the saved settings on the card.
     private func loadSaved() {
         language = savedLanguage
-        backgroundSound = savedBackgroundSound
-        soundEffects = savedSoundEffects
+        backgroundVolume = savedBackgroundVolume
+        soundEffectsVolume = savedSoundEffectsVolume
         wearsEyePatch = savedWearsEyePatch
         randomSpin = savedRandomSpin
         gamesLocked = savedGamesLocked
@@ -181,8 +186,8 @@ struct SettingsPopup: View {
     /// Keeps the choices on the card, then closes it.
     private func save() {
         savedLanguage = language
-        savedBackgroundSound = backgroundSound
-        savedSoundEffects = soundEffects
+        savedBackgroundVolume = backgroundVolume
+        savedSoundEffectsVolume = soundEffectsVolume
         savedWearsEyePatch = wearsEyePatch
         savedRandomSpin = randomSpin
         savedGamesLocked = gamesLocked

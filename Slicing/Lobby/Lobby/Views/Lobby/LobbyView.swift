@@ -1,7 +1,8 @@
 //
 //  LobbyView.swift
 //  The lobby, from the final design: PADDY logo, Bea, Doomie and Coonie on the
-//  grass, little houses and a lamp, and the hanging Start / Setting signs.
+//  grass, little houses and a lamp, the hanging START sign, and a round settings
+//  button in the top right corner.
 //
 //  The design's pictures are all drawn on one 4:3 canvas (2752 × 2064). Each piece
 //  is placed with its rectangle on that canvas, as fractions (0–1) of the width
@@ -15,6 +16,9 @@ struct LobbyView: View {
     let onStart: () -> Void
     let onSettings: () -> Void
 
+    /// How far the START sign is lifted from the design's spot (fraction of the height).
+    private let signLift: CGFloat = 0.06
+
     var body: some View {
         Color.sky
             .overlay {
@@ -25,6 +29,15 @@ struct LobbyView: View {
             }
             .clipped()
             .ignoresSafeArea()
+            // Settings button in the top right corner, the same as on the other screens.
+            .overlay {
+                GeometryReader { geo in
+                    let s = min(geo.size.width / 1194, geo.size.height / 834)
+                    RoundIconButton(systemImage: "gearshape.fill", label: "Settings", size: 62 * s, action: onSettings)
+                        .position(x: geo.size.width * 1128 / 1194, y: geo.size.height * 83 / 834)
+                }
+                .ignoresSafeArea()
+            }
     }
 
     private func stage(size: CGSize) -> some View {
@@ -39,31 +52,23 @@ struct LobbyView: View {
             piece("LobbyHouseOnion", x0: 0.8387, y0: 0.7160, x1: 0.9520, y1: 0.8814, in: size)
             piece("LobbyLamp", x0: 0.8081, y0: 0.5759, x1: 0.8692, y1: 0.9367, in: size)
 
-            // The ropes the signs hang from.
+            // The ropes the sign hangs from.
             piece("LobbyRope", x0: 0.6225, y0: 0.0000, x1: 0.8943, y1: 0.3572, in: size)
 
-            // The signs are buttons. `board` is where the wooden board is inside the
-            // picture (the rest is vines): only the board can be tapped, and the
-            // word is written in its middle.
+            // The START sign is a button. `board` is where the wooden board is inside
+            // the picture (the rest is vines): only the board can be tapped, and the
+            // word is written in its middle. It hangs where the lower board of the
+            // design is; the upper board is left out.
             LobbySignButton(
-                imageName: "LobbySignTop",
+                imageName: "LobbySignBottom",
                 title: "Start",
-                board: CGRect(x: 0.01, y: 0.03, width: 0.98, height: 0.81),
+                board: CGRect(x: 0.01, y: 0.43, width: 0.98, height: 0.55),
                 fontSize: size.height * 0.105,
                 action: onStart
             )
-            .frame(width: size.width * (0.9658 - 0.5494), height: size.height * (0.3000 - 0.0793))
-            .position(x: size.width * (0.5494 + 0.9658) / 2, y: size.height * (0.0793 + 0.3000) / 2)
-
-            LobbySignButton(
-                imageName: "LobbySignBottom",
-                title: "Setting",
-                board: CGRect(x: 0.01, y: 0.43, width: 0.98, height: 0.55),
-                fontSize: size.height * 0.105,
-                action: onSettings
-            )
             .frame(width: size.width * (0.9637 - 0.5665), height: size.height * (0.4929 - 0.1612))
-            .position(x: size.width * (0.5665 + 0.9637) / 2, y: size.height * (0.1612 + 0.4929) / 2)
+            // Lifted a little from the design spot. The ropes still end behind the board.
+            .position(x: size.width * (0.5665 + 0.9637) / 2, y: size.height * ((0.1612 + 0.4929) / 2 - signLift))
 
             Image("LobbyLogo")
                 .resizable()

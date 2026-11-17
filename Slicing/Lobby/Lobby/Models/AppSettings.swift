@@ -1,6 +1,6 @@
 //
 //  AppSettings.swift
-//  The choices on the Setting pop-up, and the keys they are saved under on the device.
+//  The choices on the Settings pop-up, and the keys they are saved under on the device.
 //  Any screen can read a setting with @AppStorage and the key below.
 //
 
@@ -14,10 +14,10 @@ nonisolated enum AppLanguage: String, CaseIterable {
 nonisolated enum AppSettings {
     /// English or Bahasa Indonesia. (The texts are not translated yet.)
     static let languageKey = "appLanguage"
-    /// Background music on or off.
-    static let backgroundSoundKey = "backgroundSoundOn"
-    /// Sound effects on or off.
-    static let soundEffectsKey = "soundEffectsOn"
+    /// How loud the background music is, from 0 (silent) to 1 (full).
+    static let backgroundVolumeKey = "backgroundSoundVolume"
+    /// How loud the sound effects are, from 0 (silent) to 1 (full).
+    static let soundEffectsVolumeKey = "soundEffectsVolume"
     /// Whether the player wears an eye patch. Testing option: turn it off to play
     /// with both eyes open (for example a child without amblyopia). The games then
     /// skip the "one eye only" patch check.

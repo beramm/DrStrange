@@ -1,6 +1,6 @@
 //
 //  ChoicePill.swift
-//  One choice on the Setting pop-up (ENGLISH, ON, OFF…): a rounded button with a
+//  One choice on the Settings pop-up (ENGLISH, ON, OFF…): a rounded button with a
 //  dark brown outline. The chosen one is filled yellow.
 //
 

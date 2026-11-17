@@ -39,6 +39,13 @@ nonisolated struct GameCharacter: Identifiable, Hashable {
     /// The taglines of Bea and Coonie are placeholders and can still change.
     static let all: [GameCharacter] = [fox, bunny, raccoon]
 
+    /// Walking towards the player: four pictures, played again and again.
+    var walkImageNames: [String] { (1...4).map { "\(imageName)Walk\($0)" } }
+    /// Seen from the side, facing right (used while turning around).
+    var sideImageName: String { "\(imageName)Side" }
+    /// Seen from the back (used while turning around).
+    var backImageName: String { "\(imageName)Back" }
+
     /// Key used to save the chosen character on the device.
     static let storageKey = "selectedCharacterID"
 
