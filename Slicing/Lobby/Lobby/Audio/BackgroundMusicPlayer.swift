@@ -17,17 +17,15 @@ final class BackgroundMusicPlayer {
     }
 
     static let shared = BackgroundMusicPlayer()
-    static let enabledStorageKey = AppSettings.backgroundSoundKey
 
     private let fadeDuration: TimeInterval = 0.35
-    private let playbackVolume: Float = 0.65
+    private var playbackVolume: Float = 1
 
     private var player: AVAudioPlayer?
     private var outgoingPlayer: AVAudioPlayer?
     private var fadeCleanupTask: Task<Void, Never>?
     private var currentTrack: Track?
     private var requestedTrack: Track?
-    private var isEnabled = true
     private var isSceneActive = true
 
     private init() {
@@ -36,7 +34,7 @@ final class BackgroundMusicPlayer {
 
     func play(_ track: Track) {
         requestedTrack = track
-        guard isEnabled, isSceneActive else { return }
+        guard isSceneActive else { return }
 
         if currentTrack == track, let player {
             if !player.isPlaying { player.play() }
@@ -79,15 +77,9 @@ final class BackgroundMusicPlayer {
         }
     }
 
-    func setEnabled(_ enabled: Bool) {
-        guard isEnabled != enabled else { return }
-        isEnabled = enabled
-
-        if enabled {
-            if let requestedTrack { play(requestedTrack) }
-        } else {
-            stopPlayers()
-        }
+    func setVolume(_ volume: Double) {
+        playbackVolume = Float(min(max(volume, 0), 1))
+        player?.setVolume(playbackVolume, fadeDuration: fadeDuration)
     }
 
     func setSceneActive(_ active: Bool) {
@@ -102,16 +94,6 @@ final class BackgroundMusicPlayer {
             outgoingPlayer = nil
             player?.pause()
         }
-    }
-
-    private func stopPlayers() {
-        fadeCleanupTask?.cancel()
-        fadeCleanupTask = nil
-        outgoingPlayer?.stop()
-        outgoingPlayer = nil
-        player?.stop()
-        player = nil
-        currentTrack = nil
     }
 
     private func configureAudioSession() {

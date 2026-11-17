@@ -13,7 +13,7 @@ struct ContentView: View {
     @State private var showsSettings = false
     /// Setting "Random game": the Game Map picks the game by itself.
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
-    @AppStorage(AppSettings.backgroundSoundKey) private var backgroundMusicEnabled = true
+    @AppStorage(AppSettings.backgroundVolumeKey) private var backgroundMusicVolume = 1.0
     @Environment(\.scenePhase) private var scenePhase
 
     private let music = BackgroundMusicPlayer.shared
@@ -48,15 +48,15 @@ struct ContentView: View {
         }
         .animation(.easeOut(duration: 0.2), value: showsSettings)
         .onAppear {
-            music.setEnabled(backgroundMusicEnabled)
+            music.setVolume(backgroundMusicVolume)
             music.setSceneActive(scenePhase == .active)
             updateBackgroundMusic()
         }
         .onChange(of: path) {
             updateBackgroundMusic()
         }
-        .onChange(of: backgroundMusicEnabled) { _, enabled in
-            music.setEnabled(enabled)
+        .onChange(of: backgroundMusicVolume) { _, volume in
+            music.setVolume(volume)
         }
         .onChange(of: scenePhase) { _, phase in
             music.setSceneActive(phase == .active)
