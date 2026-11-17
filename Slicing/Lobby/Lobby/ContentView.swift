@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var path: [LobbyRoute] = []
-    /// True while the Setting pop-up is open (it can open over any screen).
+    /// True while the Settings pop-up is open (it can open over any screen).
     @State private var showsSettings = false
     /// Setting "Random game": the Game Map picks the game by itself.
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
@@ -35,7 +35,7 @@ struct ContentView: View {
                 }
             }
         }
-        // The Setting pop-up sits on top of whichever screen is showing.
+        // The Settings pop-up sits on top of whichever screen is showing.
         .overlay {
             if showsSettings {
                 SettingsPopup(onClose: closeSettings)
