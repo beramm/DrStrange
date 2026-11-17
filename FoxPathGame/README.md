@@ -123,6 +123,9 @@ finish point of the walk; the thief never goes to it.
   automatically; the camera starts again on return and the game waits for **Resume**.
 - The pause screen has **Rest my eyes**, which ends the game straight away and shows the result.
   It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
+- With eye control, if both eyes stay visible for 1 second the game pauses behind the shared
+  patch reminder (`WhackAMoleGame/Views/PatchReminderScreen.swift`). When the one-eye check
+  passes again the reminder closes and the game carries on without a tap.
 
 ## Folder structure
 
