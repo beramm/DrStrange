@@ -83,6 +83,7 @@ struct FixationGameView: View {
         ZStack {
             if case let .finished(stoppedEarly) = phase {
                 FixationGameResultView(
+                    character: character,
                     veggiesSaved: veggiesLeft,
                     totalVeggies: totalVeggies,
                     stoppedEarly: stoppedEarly,

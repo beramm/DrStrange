@@ -19,6 +19,17 @@ final class HelperCharacterTests: XCTestCase {
         return nil
     }
 
+    func testThePlayersCharacterIsTheHelper() {
+        var configuration = GameConfiguration()
+        configuration.board = .testSingleRow
+        for helper in HelperCharacter.allCases {
+            for seed: UInt64 in 1...20 {
+                configuration.randomSeed = seed
+                XCTAssertEqual(WhackAMoleEngine(configuration: configuration, helper: helper).helper, helper)
+            }
+        }
+    }
+
     func testFoxRaccoonAndBunnyAreInThePool() {
         XCTAssertEqual(HelperCharacter.allCases, [.fox, .raccoon, .bunny])
     }

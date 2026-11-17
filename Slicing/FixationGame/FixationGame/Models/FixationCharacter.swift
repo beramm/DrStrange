@@ -3,8 +3,8 @@
 //  The three characters. The one the player picks keeps the stall;
 //  the other two are the thieves.
 //
-//  For now the player picks on the start screen (for testing). Later the choice
-//  will come from onboarding ("Choose your character").
+//  The choice comes from onboarding ("Choose your character") and is passed in
+//  through GameStartView.
 //
 
 import CoreGraphics

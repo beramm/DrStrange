@@ -90,9 +90,10 @@ struct CharacterRoles: Equatable {
     }
 
     /// Any character can be either role: the primary is drawn from all three and the thief from
-    /// the other two.
-    static func random(using generator: inout SeededGenerator) -> CharacterRoles {
-        let primary = PathCharacter.allCases.randomElement(using: &generator) ?? .fox
+    /// the other two. When `primary` is given (the player's own character, chosen in onboarding),
+    /// it is always the one followed and only the thief is drawn.
+    static func random(primary chosen: PathCharacter? = nil, using generator: inout SeededGenerator) -> CharacterRoles {
+        let primary = chosen ?? PathCharacter.allCases.randomElement(using: &generator) ?? .fox
         let others = PathCharacter.allCases.filter { $0 != primary }
         return CharacterRoles(primary: primary, thief: others.randomElement(using: &generator) ?? others[0])
     }

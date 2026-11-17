@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Entry screen for Follow the Fox: the three friends and a big Play button for the child, and a
-/// panel with game options for the adult.
+/// Entry screen for Follow the Fox: the player's character (or all three friends in the standalone
+/// app) and a big Play button for the child, and a panel with game options for the adult.
 struct FoxPathHomeView: View {
     private enum PresentedScreen: String, Identifiable {
         case calibration
@@ -16,8 +16,12 @@ struct FoxPathHomeView: View {
     @State private var presentedScreen: PresentedScreen?
     /// Leaves the host app's game flow. Nil in the standalone Follow the Fox app.
     let onExit: (() -> Void)?
+    /// The player's character from onboarding: always the one followed; the thief is one of the
+    /// other two. Nil in the standalone app, where all three swap roles at random.
+    let player: PathCharacter?
 
-    init(onExit: (() -> Void)? = nil) {
+    init(player: PathCharacter? = nil, onExit: (() -> Void)? = nil) {
+        self.player = player
         self.onExit = onExit
     }
 
@@ -60,12 +64,12 @@ struct FoxPathHomeView: View {
                     }
                 )
             case .gazeGame:
-                FoxPathGameView(configuration: configuration, input: .gaze(gazeController)) {
+                FoxPathGameView(configuration: configuration, input: .gaze(gazeController), player: player) {
                     gazeController.stop()
                     presentedScreen = nil
                 }
             case .touchGame:
-                FoxPathGameView(configuration: configuration, input: .touch) {
+                FoxPathGameView(configuration: configuration, input: .touch, player: player) {
                     presentedScreen = nil
                 }
             }
@@ -77,7 +81,7 @@ struct FoxPathHomeView: View {
     private var childPanel: some View {
         VStack(spacing: 28) {
             HStack(alignment: .bottom, spacing: 18) {
-                ForEach(PathCharacter.allCases) { character in
+                ForEach(player.map { [$0] } ?? PathCharacter.allCases) { character in
                     Image(character.standingAsset)
                         .resizable()
                         .scaledToFit()
@@ -132,7 +136,9 @@ struct FoxPathHomeView: View {
             } header: {
                 Text("Game")
             } footer: {
-                Text("Every path is new, and the fox, the bunny and the raccoon swap roles at random. Pinch the map or use the magnifier buttons to zoom.")
+                Text(player == nil
+                     ? "Every path is new, and the fox, the bunny and the raccoon swap roles at random. Pinch the map or use the magnifier buttons to zoom."
+                     : "Every path is new. The child follows their own character; the thief is one of the other two. Pinch the map or use the magnifier buttons to zoom.")
             }
 
             Section {
