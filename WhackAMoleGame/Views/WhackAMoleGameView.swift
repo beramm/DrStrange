@@ -10,7 +10,6 @@ struct WhackAMoleGameView: View {
     let onClose: () -> Void
 
     @State private var viewModel: WhackAMoleGameViewModel
-    @State private var isConfirmingStop = false
     @State private var isPausedForMissingPatch = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -78,10 +77,6 @@ struct WhackAMoleGameView: View {
 
             overlay
         }
-        .confirmationDialog("Stop the game?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
-            Button("Stop and see my stars") { viewModel.finishEarly(reason: .stopped) }
-            Button("Keep playing", role: .cancel) { resumeAfterStopDialog() }
-        }
     }
 
     /// Board plus the fox's corner spot. The holes and the corner report their positions so the
@@ -105,7 +100,7 @@ struct WhackAMoleGameView: View {
     private func playfieldContent(screenSize: CGSize) -> some View {
         ZStack {
             VStack(spacing: 0) {
-                GameHUDView(viewModel: viewModel, onExit: requestStop)
+                GameHUDView(viewModel: viewModel)
                 // Side margins keep the fox's corner clear of the moles on every iPad size.
                 GameBoardView(viewModel: viewModel, screenSize: screenSize)
                     .padding(.horizontal, Self.foxSize + 24)
@@ -129,7 +124,7 @@ struct WhackAMoleGameView: View {
                 .contentTransition(.numericText(countsDown: true))
                 .animation(.snappy, value: number)
                 .accessibilityLabel("Starting in \(number)")
-        case .paused where !isConfirmingStop:
+        case .paused:
             if isPausedForMissingPatch, let gazeController {
                 MissingPatchPauseOverlay(
                     isPatchVerified: gazeController.isPatchVerified,
@@ -145,11 +140,6 @@ struct WhackAMoleGameView: View {
         default:
             EmptyView()
         }
-    }
-
-    private func requestStop() {
-        viewModel.pause()
-        isConfirmingStop = true
     }
 
     private func restart() {
@@ -175,14 +165,6 @@ struct WhackAMoleGameView: View {
     private func resumeAfterPatchCheck() {
         guard gazeController?.isPatchVerified == true else { return }
         isPausedForMissingPatch = false
-        viewModel.resume()
-    }
-
-    private func resumeAfterStopDialog() {
-        if isPausedForMissingPatch {
-            guard gazeController?.isPatchVerified == true else { return }
-            isPausedForMissingPatch = false
-        }
         viewModel.resume()
     }
 }

@@ -55,12 +55,12 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 
 ### Comfort and stopping
 
-- **Pause** (top right) freezes the game clock. Leaving the app pauses automatically.
+- The top bar shows only the stars, the time bar and the painted **pause** button (top right).
+  Pause freezes the game clock. Leaving the app pauses automatically.
 - If both eyes remain visible for 1 second, the game pauses. Play stays disabled until only the
   selected right eye has been consistently visible again for 1.5 seconds.
 - The pause screen has **Rest my eyes**, which ends the session straight away and shows the
   summary. It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
-- **✕** (top left) asks "Stop the game?" and then also shows the summary.
 - Each saved session records why it ended: `timeUp`, `stopped` or `restBreak`.
 
 ## Gameplay
@@ -399,6 +399,12 @@ clinical improvement.
     disappears behind the front edge.
   - The hole images are small (400–443 px wide), so they can look slightly soft on the largest
     iPads. Larger exports would fix that.
+- **Provided (Google Drive):** the painted wooden pause button, cropped from its 1024 × 1024
+  canvas and stored as `PauseButton`. It replaces the system pause icon in the top bar; the exit
+  (✕) and sound buttons were removed from the bar (sound is still set on the home screen).
+- **Provided (Google Drive):** the painted star, cropped from its 2752 × 2064 canvas, scaled to
+  375 × 370 and stored as `ScoreStar`. It replaces the system star next to the score in the top
+  bar, at the same size (51 pt, as wide as the old icon).
 - **Missing:**
   - **More mole art.** There is a single mole, so the "character looks" all show the same
     mole. A sleeping mole (eyes closed) would make decoys clearer than the grey
@@ -440,7 +446,7 @@ clinical improvement.
 - Manual checks on the iPad Pro 11-inch simulator:
   - patching setup, including the same-eye warning
   - play and hit animation
-  - pause, Rest my eyes, ✕ then stop
+  - pause and Rest my eyes
   - result screen and Play again
   - DrStrange app navigation into the game
 - The fox attack, checked in slow motion with autoplay at 20 % speed:
