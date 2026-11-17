@@ -198,10 +198,12 @@ which side they come from is drawn from the same seed.
 - **Lamps** stand beside the path, spread along the whole walk.
 - **Signpost.** Every map has exactly one "Veggies Stall / Farm" signpost, on the grass beside a
   level part of the path in the first part of the walk. Above the path it stands just behind the
-  fox; below it, it stands far enough down that it never covers the fox. A map with no room for it
+  fox; below it, it stands far enough down that its top stays on the grass and it never covers
+  the fox. It is a little larger than the lamps (205 × 202 map units). A map with no room for it
   is drawn again, like a map with too few houses or lamps.
 - **Tree stumps.** Two to four stumps stand at random spots on the grass, some mirrored and in
   slightly different sizes, away from the path and from everything else. They change with every map.
+- The signpost and the stumps keep clear of the top strip of the map, where the top bar sits.
 - **Rocks by the path.** Seven to ten grey rocks sit just beside the path, spread along the whole
   walk on alternating sides, never on the path itself.
 - **Grass tufts, soil specks and grass patches** are scattered over the remaining grass.

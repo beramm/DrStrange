@@ -539,6 +539,10 @@ private struct SceneryBuilder {
 
     // MARK: Signpost and tree stumps
 
+    /// The top bar covers about this much of the top of the map at 1×, so the signpost and the
+    /// stumps stay below it.
+    private let topBarClearance: CGFloat = 96
+
     /// The one signpost stands on the grass beside the first part of the path, pointing the way
     /// to the veggie stall.
     mutating func placeSignpost() {
@@ -549,16 +553,17 @@ private struct SceneryBuilder {
             let (point, tangent) = route.sample(at: route.length * along)
             // Only beside a level stretch: next to a climb the sign would stand in front of the fox.
             guard abs(tangent.dx) > 0.9 else { continue }
-            // Above the path it stands just behind the fox; below it, it must stand far enough down
-            // that it never covers the fox's feet.
+            // Above the path it stands just behind the fox; below it, it stands far enough down that
+            // its top stays on the grass and never covers the fox's feet.
             let isAbove = Bool.random(using: &generator)
             let gap = isAbove
                 ? pathHalfWidth + CGFloat.random(in: 12...80, using: &generator)
-                : size.height + CGFloat.random(in: 12...50, using: &generator)
+                : size.height + pathHalfWidth + CGFloat.random(in: 6...40, using: &generator)
             let base = CGPoint(x: point.x, y: point.y + (isAbove ? -gap : gap))
             let frame = CGRect(x: base.x - size.width / 2, y: base.y - size.height, width: size.width, height: size.height)
             let sign = makeSprite(.signpost, frame: frame)
-            guard frame.minX >= 8, frame.maxX <= mapSize.width - 8, frame.minY >= 0, frame.maxY <= mapSize.height - 4,
+            guard frame.minX >= 8, frame.maxX <= mapSize.width - 8, frame.minY >= topBarClearance,
+                  frame.maxY <= mapSize.height - 4,
                   FoxPathGenerator.isClear(sign, of: pathPoints),
                   !overlapsStanding(frame.insetBy(dx: -16, dy: -8)),
                   !ground.contains(where: { $0.frame.intersects(sign.footprint) }) else { continue }
@@ -577,7 +582,7 @@ private struct SceneryBuilder {
             let width = size.width * scale, height = size.height * scale
             let base = CGPoint(
                 x: CGFloat.random(in: (width / 2 + 8)...(mapSize.width - width / 2 - 8), using: &generator),
-                y: CGFloat.random(in: (height + 4)...(mapSize.height - 4), using: &generator)
+                y: CGFloat.random(in: (topBarClearance + height)...(mapSize.height - 4), using: &generator)
             )
             let frame = CGRect(x: base.x - width / 2, y: base.y - height, width: width, height: height)
             let stump = makeSprite(.treeStump, frame: frame, isMirrored: Bool.random(using: &generator))

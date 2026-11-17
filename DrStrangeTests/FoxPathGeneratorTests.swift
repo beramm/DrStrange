@@ -128,6 +128,7 @@ final class FoxPathGeneratorTests: XCTestCase {
             for sprite in signs + stumps {
                 XCTAssertTrue(FoxPathGenerator.isClear(sprite, of: pathPoints), "seed \(seed) \(sprite.kind)")
                 XCTAssertTrue(CGRect(origin: .zero, size: map.size).contains(sprite.frame), "seed \(seed) \(sprite.kind)")
+                XCTAssertGreaterThanOrEqual(sprite.frame.minY, 96, "seed \(seed) \(sprite.kind): under the top bar")
                 let others = map.standingSprites.filter { $0.id != sprite.id }
                 XCTAssertFalse(others.contains { $0.frame.intersects(sprite.frame) }, "seed \(seed) \(sprite.kind)")
             }

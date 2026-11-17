@@ -122,7 +122,7 @@ enum MapSpriteKind: String, CaseIterable {
         case .lamp: CGSize(width: 37, height: 192)
         case .finishStall: CGSize(width: 300, height: 250)
         case .steppingStone: CGSize(width: 85, height: 28)
-        case .signpost: CGSize(width: 152, height: 150)
+        case .signpost: CGSize(width: 205, height: 202)
         case .treeStump: CGSize(width: 88, height: 38)
         case .pathRock: CGSize(width: 50, height: 22)
         case .grassTuft1: CGSize(width: 16.5, height: 22)
