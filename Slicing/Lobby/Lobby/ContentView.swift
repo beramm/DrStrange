@@ -15,9 +15,11 @@ struct ContentView: View {
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
     @AppStorage(AppSettings.backgroundVolumeKey)
     private var backgroundMusicVolume = AppSettings.migratedBackgroundVolume()
+    @AppStorage(AppSettings.soundEffectsVolumeKey) private var soundEffectsVolume = 1.0
     @Environment(\.scenePhase) private var scenePhase
 
     private let music = BackgroundMusicPlayer.shared
+    private let soundEffects = SoundEffectPlayer.shared
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -50,6 +52,7 @@ struct ContentView: View {
         .animation(.easeOut(duration: 0.2), value: showsSettings)
         .onAppear {
             music.setVolume(backgroundMusicVolume)
+            soundEffects.setVolume(soundEffectsVolume)
             music.setSceneActive(scenePhase == .active)
             updateBackgroundMusic()
         }
@@ -58,6 +61,9 @@ struct ContentView: View {
         }
         .onChange(of: backgroundMusicVolume) { _, volume in
             music.setVolume(volume)
+        }
+        .onChange(of: soundEffectsVolume) { _, volume in
+            soundEffects.setVolume(volume)
         }
         .onChange(of: scenePhase) { _, phase in
             music.setSceneActive(phase == .active)
