@@ -14,7 +14,9 @@ struct MoleHoleView: View {
             let height = proxy.size.height
             let art = HoleArt.all[hole.artIndex % HoleArt.all.count]
             let image = art.imageRect(fittingMouth: Self.mouthRect(in: proxy.size))
-            let moleFrame = Self.moleImageRect(artIndex: hole.artIndex, in: proxy.size)
+            let moleFrame = visual?.hitFrame == nil
+                ? Self.moleImageRect(artIndex: hole.artIndex, in: proxy.size)
+                : Self.moleHitImageRect(artIndex: hole.artIndex, in: proxy.size)
 
             ZStack(alignment: .topLeading) {
                 Image(art.assetName)
@@ -84,6 +86,11 @@ struct MoleHoleView: View {
         rectFromLip(MoleArt.imageRect, artIndex: artIndex, in: size)
     }
 
+    /// Frame for the hit images in a hole cell of `size`.
+    static func moleHitImageRect(artIndex: Int, in size: CGSize) -> CGRect {
+        rectFromLip(MoleArt.hitImageRect, artIndex: artIndex, in: size)
+    }
+
     /// The fully risen mole inside a hole cell of `size`. Shared with the fox's attack so the
     /// hammer lands on the mole.
     static func characterRect(artIndex: Int, in size: CGSize) -> CGRect {
@@ -101,8 +108,9 @@ struct MoleHoleView: View {
 enum MoleArt {
     private static let openingWidth: CGFloat = 290
     private static let lip = CGPoint(x: 333, y: 598)
+    private static let hitLip = CGPoint(x: 285, y: 370)
 
-    private static func relative(_ rect: CGRect) -> CGRect {
+    private static func relative(_ rect: CGRect, lip: CGPoint = lip) -> CGRect {
         CGRect(x: (rect.minX - lip.x) / openingWidth, y: (rect.minY - lip.y) / openingWidth, width: rect.width / openingWidth, height: rect.height / openingWidth)
     }
 
@@ -110,6 +118,8 @@ enum MoleArt {
     static let imageRect = relative(CGRect(x: 209, y: 278, width: 265, height: 330))
     /// The mole when fully out of the hole (last frame).
     static let fullMoleRect = relative(CGRect(x: 212, y: 281, width: 259, height: 324))
+    /// The cropped hit frame images.
+    static let hitImageRect = relative(CGRect(x: 162, y: 48, width: 265, height: 332), lip: hitLip)
 }
 
 /// The provided hole artwork (`Holes/Hole1…3`), with where the dark opening sits in each image,

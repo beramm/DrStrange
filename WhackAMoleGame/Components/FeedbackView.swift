@@ -96,8 +96,31 @@ struct HitFeedbackView: View {
                         .position(x: width * 0.5, y: helmetY - height * (0.14 + 0.16 * progress))
                 }
             }
+            .foregroundStyle(WhackAMolePalette.ink)
+            .fixedSize()
+            .position(x: width * 0.5, y: helmetY - height * (0.2 + 0.16 * progress))
             .opacity(progress < 0.7 ? 1 : (1 - progress) / 0.3)
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// Small star for the dizzy reaction around the helmet.
+struct StarShape: Shape {
+    var points = 5
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let outer = min(rect.width, rect.height) / 2
+        let inner = outer * 0.45
+        var path = Path()
+        for index in 0..<(points * 2) {
+            let radius = index.isMultiple(of: 2) ? outer : inner
+            let angle = Double(index) * .pi / Double(points) - .pi / 2
+            let point = CGPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
+            index == 0 ? path.move(to: point) : path.addLine(to: point)
+        }
+        path.closeSubpath()
+        return path
     }
 }

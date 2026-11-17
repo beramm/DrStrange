@@ -14,6 +14,12 @@ struct FoxPathHomeView: View {
     @State private var configuration = FoxPathConfigurationStore.standard.load()
     @State private var gazeController = GazeInputController()
     @State private var presentedScreen: PresentedScreen?
+    /// Leaves the host app's game flow. Nil in the standalone Follow the Fox app.
+    let onExit: (() -> Void)?
+
+    init(onExit: (() -> Void)? = nil) {
+        self.onExit = onExit
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -23,6 +29,20 @@ struct FoxPathHomeView: View {
                 .frame(width: 440)
         }
         .background(WhackAMolePalette.meadow.ignoresSafeArea())
+        .overlay(alignment: .topLeading) {
+            if let onExit {
+                Button(action: onExit) {
+                    Label("Back", systemImage: "chevron.backward")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 28, weight: .heavy))
+                        .frame(width: 56, height: 56)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(FoxPathPalette.accent)
+                .clipShape(Circle())
+                .padding(24)
+            }
+        }
         .navigationTitle("Follow the Fox")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: configuration) { _, newValue in

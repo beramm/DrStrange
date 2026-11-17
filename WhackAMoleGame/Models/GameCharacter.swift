@@ -61,12 +61,37 @@ struct HoleVisual: Identifiable, Equatable {
 
 /// What a mole looks like right now.
 struct MoleVisual: Equatable {
+    struct FrameBlend: Equatable {
+        let current: Int
+        let next: Int
+        /// 0...1 from `current` to `next`.
+        let fraction: Double
+    }
+
     /// 1 (helmet tip) ... `frameCount` (fully out of the hole).
     var frame: Int
-    /// 0...1 through the reaction to being hit; `nil` when not reacting.
+    /// 0...1 through the hit animation, from the hammer landing until the mole has sunk out of
+    /// sight; `nil` when not hit.
     var hitProgress: Double?
 
     static let frameCount = 24
+
+    /// Adjacent hit frames and their continuous blend. The engine still supplies one smooth
+    /// progress value; blending here avoids holding each of the 24 drawings for several display
+    /// refreshes during the longer hit animation.
+    var hitFrameBlend: FrameBlend? {
+        hitProgress.map { progress in
+            let position = 1 + Double(Self.frameCount - 1) * min(max(progress, 0), 1)
+            let current = Int(position.rounded(.down))
+            let next = min(current + 1, Self.frameCount)
+            return FrameBlend(current: current, next: next, fraction: position - Double(current))
+        }
+    }
+
+    /// Which frame of the hit animation to draw, 1 ... `frameCount`; `nil` when not hit.
+    var hitFrame: Int? {
+        hitFrameBlend.map { $0.fraction < 0.5 ? $0.current : $0.next }
+    }
 }
 
 struct ActiveTarget: Identifiable, Equatable {
@@ -79,7 +104,7 @@ struct ActiveTarget: Identifiable, Equatable {
     var phase: TargetPhase = .up
     /// Set for a real target when an input is accepted. Gaze hits may award more for proximity.
     var pointsAwarded: Int?
-    /// When the character hides if not tapped. Pushed back while the fox is attacking another
+    /// When the character hides if not tapped. Pushed back while a helper is attacking another
     /// character, so the child is never penalised for watching the animation.
     var expiresAt: TimeInterval
 

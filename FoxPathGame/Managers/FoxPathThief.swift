@@ -121,6 +121,9 @@ struct FoxPathThief: Equatable {
 
     mutating func advance(by delta: TimeInterval, attention: PlayerAttentionState) -> [ThiefEvent] {
         guard delta > 0, state != .inactive else { return [] }
+        // A missing reading is nobody's fault. Freeze the whole visit, including appearance,
+        // patience and retreat timers, until tracking is usable again.
+        guard attention != .trackingUnavailable else { return [] }
         age += delta
         stateTime += delta
 
@@ -141,8 +144,7 @@ struct FoxPathThief: Equatable {
                 followingTime += delta
                 progress = max(progress - delta * speed * settings.backOffRate, Self.lurkProgress)
             case .trackingUnavailable:
-                // Missing gaze is nobody's fault: the thief waits.
-                break
+                break // Handled before any timers advance.
             }
             if progress >= 1 {
                 // Close enough: the heart is lost at once and the thief runs off. There is no

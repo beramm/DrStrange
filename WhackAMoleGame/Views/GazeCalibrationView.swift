@@ -5,11 +5,24 @@ import UIKit
 /// Pre-game calibration using whichever prescribed eye remains uncovered.
 struct GazeCalibrationView: View {
     let controller: GazeInputController
+    let isRecalibration: Bool
     let onCalibrated: () -> Void
     let onCancel: () -> Void
 
     @State private var didComplete = false
     @Environment(\.scenePhase) private var scenePhase
+
+    init(
+        controller: GazeInputController,
+        isRecalibration: Bool = false,
+        onCalibrated: @escaping () -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.controller = controller
+        self.isRecalibration = isRecalibration
+        self.onCalibrated = onCalibrated
+        self.onCancel = onCancel
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -37,6 +50,8 @@ struct GazeCalibrationView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 32)
                     }
+                } else if controller.isPreparingCalibration {
+                    calibrationInstructions
                 } else {
                     setupPanel
                 }
@@ -54,6 +69,33 @@ struct GazeCalibrationView: View {
             if phase == .active { controller.resumeForActiveScene() }
             else { controller.pauseForInactiveScene() }
         }
+    }
+
+    private var calibrationInstructions: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            Image(systemName: "scope")
+                .font(.system(size: 88, weight: .bold))
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text("Get ready for the first dot")
+                .font(.system(size: 42, weight: .heavy, design: .rounded))
+            Text("Focus on the centre of each dot with your eye. Keep your head and the iPad still.")
+                .font(.system(.title2, design: .rounded).weight(.semibold))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 680)
+            Text("\(controller.calibrationCountdown)")
+                .font(.system(size: 88, weight: .heavy, design: .rounded))
+                .foregroundStyle(.orange)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.snappy, value: controller.calibrationCountdown)
+                .accessibilityLabel("First dot in \(controller.calibrationCountdown) seconds")
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
+        .foregroundStyle(.black)
+        .accessibilityElement(children: .contain)
     }
 
     private var setupPanel: some View {
@@ -103,7 +145,7 @@ struct GazeCalibrationView: View {
             }
 
             Button(controller.isPreparingCalibration ? "Get ready…" : "Let's start!") {
-                controller.startCalibration()
+                controller.startCalibration(preparationSeconds: isRecalibration ? 3 : 6)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -196,6 +238,14 @@ struct GazeCalibrationView: View {
                 title: "Turn right a little",
                 message: "Move your nose toward the arrow.",
                 systemImage: "arrow.right.circle.fill",
+                tone: .warning
+            )
+        case .movingTooMuch:
+            return .init(
+                id: "movement",
+                title: "Too much movement",
+                message: "Keep your head and the iPad still.",
+                systemImage: "exclamationmark.triangle.fill",
                 tone: .warning
             )
         case .stabilizing:
@@ -340,6 +390,7 @@ private struct FacePositionGuide: View {
 
     private var label: String {
         if isReady { return "Ready!" }
+        if state == .movingTooMuch { return "Too much movement" }
         if state == .stabilizing || isCheckingPatch { return "Hold still…" }
         return "Your face"
     }

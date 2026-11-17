@@ -106,6 +106,7 @@ public enum SetupState: String, Equatable, Sendable {
     case lookDown
     case turnLeft
     case turnRight
+    case movingTooMuch
     case stabilizing
     case ready
     case tooFar

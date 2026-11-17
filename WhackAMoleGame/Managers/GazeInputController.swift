@@ -1,3 +1,4 @@
+import Dispatch
 @_spi(Engineering) import DrStrangeGazeTracker
 @_spi(Engineering) import DrStrangeGazeTrackerPlatform
 import Observation
@@ -17,6 +18,7 @@ final class GazeInputController {
     private(set) var cameraStatus = "ARKit input pending"
     private(set) var cameraStarted = false
     private(set) var isPreparingCalibration = false
+    private(set) var calibrationCountdown = 0
     private(set) var patchWearState: PatchWearState = .checking
     private(set) var oneEyeEnforcerEnabled = true
     private(set) var isSceneTooDark = false
@@ -32,6 +34,7 @@ final class GazeInputController {
     @ObservationIgnored private var calibrationTask: Task<Void, Never>?
     @ObservationIgnored private var wasPausedByScene = false
     @ObservationIgnored private var patchWearMonitor = PatchWearMonitor()
+    @ObservationIgnored private var calibrationSampleGate = CalibrationSampleGate()
 
     init() {
         // Paddy links only the native full-sensor ARKit tracker product. The
@@ -97,7 +100,7 @@ final class GazeInputController {
         tracker.setOneEyeEnforcementEnabled(enabled)
         patchWearMonitor.reset()
         patchWearState = enabled ? .checking : .verified
-        processCalibrationState()
+        processCalibrationState(isCurrentTargetResult: false)
     }
 
     func startCamera() {
@@ -118,30 +121,38 @@ final class GazeInputController {
         }
     }
 
-    func startCalibration() {
+    func startCalibration(preparationSeconds: Int = 6) {
         guard isReadyToCalibrate, !transitionPending else { return }
+        let preparationSeconds = max(preparationSeconds, 1)
         calibrationTask?.cancel()
         transitionPending = true
         isPreparingCalibration = true
+        calibrationCountdown = preparationSeconds
         activeCalibrationTarget = nil
-        status = "Hold still — calibration begins in 3 seconds"
+        status = "Hold still — calibration begins in \(preparationSeconds) seconds"
 
         do {
             try tracker.beginCalibration(layout: Self.calibrationLayout)
         } catch {
             transitionPending = false
             isPreparingCalibration = false
+            calibrationCountdown = 0
             status = "Calibration blocked: \(error)"
             return
         }
 
         calibrationTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(3))
+            for remaining in stride(from: preparationSeconds, through: 1, by: -1) {
+                guard let self, !Task.isCancelled else { return }
+                calibrationCountdown = remaining
+                try? await Task.sleep(for: .seconds(1))
+            }
             guard let self, !Task.isCancelled else { return }
             calibrationTargets = Self.calibrationLayout.targets
             targetIndex = 0
             transitionPending = false
             isPreparingCalibration = false
+            calibrationCountdown = 0
             presentCalibrationTarget()
         }
     }
@@ -153,6 +164,7 @@ final class GazeInputController {
         cameraStarted = false
         transitionPending = false
         isPreparingCalibration = false
+        calibrationCountdown = 0
         activeCalibrationTarget = nil
         patchWearMonitor.reset()
         patchWearState = oneEyeEnforcerEnabled ? .checking : .verified
@@ -192,6 +204,9 @@ final class GazeInputController {
             guard let self, !Task.isCancelled else { return }
             do {
                 try tracker.beginCalibrationTarget(at: target)
+                calibrationSampleGate.markTargetStarted(
+                    at: DispatchTime.now().uptimeNanoseconds
+                )
                 transitionPending = false
             } catch {
                 transitionPending = false
@@ -200,7 +215,22 @@ final class GazeInputController {
         }
     }
 
-    private func processCalibrationState() {
+    private func processCalibrationState(isCurrentTargetResult: Bool) {
+        if sample.calibrationState == .invalid {
+            calibrationTask?.cancel()
+            calibrationTask = nil
+            transitionPending = false
+            isPreparingCalibration = false
+            calibrationCountdown = 0
+            activeCalibrationTarget = nil
+            calibrationTargets.removeAll(keepingCapacity: true)
+            targetIndex = 0
+            status = sample.setupState == .movingTooMuch
+                ? "Too much movement — hold still, then restart calibration"
+                : "Calibration was lost — return and recalibrate"
+            return
+        }
+
         if cameraStarted, activeCalibrationTarget == nil, !isPreparingCalibration, !isCalibrated {
             status = switch (sample.setupState, sample.eyeAvailability, oneEyeEnforcerEnabled) {
             case (.tooClose, _, _): "Move farther from the front camera"
@@ -210,6 +240,7 @@ final class GazeInputController {
             case (.lookDown, _, _): "Look down a little"
             case (.turnLeft, _, _): "Turn left a little"
             case (.turnRight, _, _): "Turn right a little"
+            case (.movingTooMuch, _, _): "Too much movement — hold still"
             case (.stabilizing, _, _): "Hold still"
             case (.ready, .both, false): "Testing mode — start calibration"
             case (.ready, .both, true): "Put on the prescribed eye patch and keep your face still"
@@ -226,19 +257,22 @@ final class GazeInputController {
         guard !transitionPending else { return }
         switch sample.calibrationState {
         case .targetAccepted:
+            guard isCurrentTargetResult else { return }
             targetIndex += 1
             presentCalibrationTarget()
         case .retryTarget:
+            guard isCurrentTargetResult else { return }
             status = "That target was unstable — hold still and retry"
             presentCalibrationTarget()
         case .calibrated:
+            guard isCurrentTargetResult else { return }
             calibrationTask?.cancel()
             activeCalibrationTarget = nil
             status = "Calibration complete — ready to play"
         case .invalid:
-            activeCalibrationTarget = nil
-            status = "Calibration was lost — return and recalibrate"
+            break
         case .failed:
+            guard isCurrentTargetResult else { return }
             activeCalibrationTarget = nil
             status = "Calibration failed — try again"
         default:
@@ -256,11 +290,21 @@ final class GazeInputController {
     }
 
     private func consume(_ value: GazeSample) {
+        let isTargetResult = switch value.calibrationState {
+        case .targetAccepted, .retryTarget, .calibrated, .failed: true
+        default: false
+        }
+        let decision = calibrationSampleGate.evaluate(
+            timestampNanoseconds: value.timestamp.uptimeNanoseconds,
+            isTargetResult: isTargetResult
+        )
+        guard decision.shouldConsume else { return }
+
         sample = value
         isSceneTooDark = ambientLight.state() == .tooDark
         guard oneEyeEnforcerEnabled else {
             patchWearState = .verified
-            processCalibrationState()
+            processCalibrationState(isCurrentTargetResult: decision.isCurrentTargetResult)
             return
         }
         let observation: PatchEyeObservation
@@ -277,6 +321,6 @@ final class GazeInputController {
             observation,
             timestampNanoseconds: value.timestamp.uptimeNanoseconds
         )
-        processCalibrationState()
+        processCalibrationState(isCurrentTargetResult: decision.isCurrentTargetResult)
     }
 }

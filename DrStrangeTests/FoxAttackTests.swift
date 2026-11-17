@@ -4,12 +4,10 @@ import XCTest
 final class FoxAttackTests: XCTestCase {
     private let timing = FoxAttackTiming()
 
-    private func makeEngine(level: DifficultyLevel = .beginner) -> WhackAMoleEngine {
+    private func makeEngine(board: DifficultySettings = .testSingleRow) -> WhackAMoleEngine {
         var configuration = GameConfiguration()
         configuration.randomSeed = 21
-        configuration.sessionDuration = 60
-        configuration.startingLevel = level
-        configuration.adaptiveDifficulty.isEnabled = false
+        configuration.board = board
         return WhackAMoleEngine(configuration: configuration)
     }
 
@@ -114,6 +112,27 @@ final class FoxAttackTests: XCTestCase {
         XCTAssertEqual(engine.session.hits, 1)
     }
 
+    func testSecondMoleCanBeHitWhileFirstAttackIsAnimating() throws {
+        var engine = makeEngine(board: .standard)
+        var pair: [ActiveTarget] = []
+        for _ in 0..<5000 where pair.count < 2 {
+            engine.advance(by: 0.02)
+            pair = engine.targets.filter { $0.phase.isUp && $0.role == .target }
+        }
+        XCTAssertEqual(pair.count, 2)
+
+        XCTAssertTrue(engine.tapHole(pair[0].holeIndex).contains { if case .attackStarted = $0 { true } else { false } })
+        _ = run(&engine, for: 0.4)
+        XCTAssertTrue(engine.tapHole(pair[1].holeIndex).contains { if case .attackStarted = $0 { true } else { false } })
+
+        XCTAssertEqual(engine.attacks.map(\.targetID), pair.map(\.id))
+        XCTAssertEqual(engine.session.hits, 2)
+        XCTAssertEqual(engine.targets.filter { $0.phase == .targeted }.count, 2)
+
+        let events = run(&engine, for: timing.impactOffset + 0.5)
+        XCTAssertEqual(events.filter { if case .attackImpact = $0 { true } else { false } }.count, 2)
+    }
+
     func testNoSpawnDuringAttackAndSpawningResumesAfter() throws {
         var engine = makeEngine()
         let target = try XCTUnwrap(advanceToSpawn(&engine))
@@ -127,7 +146,7 @@ final class FoxAttackTests: XCTestCase {
     }
 
     func testOtherCharacterDoesNotExpireWhileFoxAttacks() throws {
-        var engine = makeEngine(level: .intermediate)
+        var engine = makeEngine(board: .standard)
         // Wait until two awake characters are up at once.
         var pair: [ActiveTarget] = []
         for _ in 0..<5000 where pair.count < 2 {
@@ -145,7 +164,7 @@ final class FoxAttackTests: XCTestCase {
     }
 
     func testDecoyTapDoesNotTriggerFox() throws {
-        var engine = makeEngine(level: .advanced)
+        var engine = makeEngine(board: .testFullBoardWithDecoys)
         var decoy: ActiveTarget?
         for _ in 0..<20000 where decoy == nil {
             engine.advance(by: 0.02)
@@ -288,10 +307,10 @@ final class FoxAttackTests: XCTestCase {
     }
 
     func testOldSavedSettingsStillLoad() throws {
-        let old = #"{"startingLevel":2,"sessionDuration":300,"patching":{"patchedEye":"left"},"soundEnabled":false}"#
+        // Saved before levels and the session length setting were removed.
+        let old = #"{"startingLevel":2,"sessionDuration":300,"adaptiveDifficulty":{"isEnabled":true},"patching":{"patchedEye":"left"},"soundEnabled":false}"#
         let configuration = try JSONDecoder().decode(GameConfiguration.self, from: Data(old.utf8))
-        XCTAssertEqual(configuration.startingLevel, .intermediate)
-        XCTAssertEqual(configuration.sessionDuration, 300)
+        XCTAssertEqual(configuration.board, .standard)
         XCTAssertEqual(configuration.patching.patchedEye, .left)
         XCTAssertFalse(configuration.soundEnabled)
         XCTAssertEqual(configuration.foxAttack, FoxAttackTiming())
@@ -301,7 +320,7 @@ final class FoxAttackTests: XCTestCase {
     func testSettingsWithOlderFoxTimingStillLoad() throws {
         let old = #"{"startingLevel":3,"foxAttack":{"emerge":0.28,"swing":0.42,"hitReaction":0.38,"returnHome":0.34,"nextTargetDelay":0.4},"patching":{"playingEye":"right"}}"#
         let configuration = try JSONDecoder().decode(GameConfiguration.self, from: Data(old.utf8))
-        XCTAssertEqual(configuration.startingLevel, .advanced)
+        XCTAssertEqual(configuration.board, .standard, "the old level is ignored")
         XCTAssertEqual(configuration.patching.playingEye, .right, "other settings are kept")
         XCTAssertEqual(configuration.foxAttack, FoxAttackTiming())
     }
@@ -322,36 +341,49 @@ final class FoxAttackTests: XCTestCase {
         XCTAssertEqual(last, MoleVisual.frameCount)
     }
 
-    func testPunchedMoleReactsThenPlaysFramesBackwards() throws {
+    func testPunchedMolePlaysHitFramesBackDownTheHole() throws {
         var engine = makeEngine()
         let target = try XCTUnwrap(advanceToSpawn(&engine))
         _ = run(&engine, for: 0.7)
         engine.tapHole(target.holeIndex)
         func visual() -> MoleVisual? { engine.targets.first { $0.id == target.id }.map { engine.moleVisual(for: $0) } }
 
-        // Waiting for the hammer: fully up, no reaction yet.
+        // Waiting for the hammer: fully up, no hit frames yet.
         _ = run(&engine, for: timing.impactOffset - 0.05)
         XCTAssertEqual(visual()?.frame, MoleVisual.frameCount)
-        XCTAssertNil(visual()?.hitProgress)
+        XCTAssertNil(visual()?.hitFrame)
 
-        // Reacting: still fully up, with reaction progress.
-        _ = run(&engine, for: 0.05 + timing.hitReaction / 2)
-        XCTAssertEqual(visual()?.frame, MoleVisual.frameCount)
-        XCTAssertEqual(visual()?.hitProgress ?? 0, 0.5, accuracy: 0.1)
+        // The hammer lands on the first hit frame.
+        _ = run(&engine, for: 0.06)
+        var last = try XCTUnwrap(visual()?.hitFrame)
+        XCTAssertLessThanOrEqual(last, 4)
 
-        // Then the rise plays backwards until it is gone.
-        _ = run(&engine, for: timing.hitReaction / 2 + 0.02)
-        var last = visual()?.frame ?? 0
-        XCTAssertNil(visual()?.hitProgress)
-        var frames = 0
-        while let frame = visual()?.frame {
-            XCTAssertLessThanOrEqual(frame, last)
+        // The hit frames then play forwards once until the mole has gone.
+        var shown = Set<Int>()
+        while let current = visual() {
+            let frame = try XCTUnwrap(current.hitFrame)
+            XCTAssertGreaterThanOrEqual(frame, last)
             last = frame
-            frames += 1
+            shown.insert(frame)
             engine.advance(by: 0.01)
         }
-        XCTAssertLessThanOrEqual(last, 2, "back down to the helmet tip before disappearing")
-        XCTAssertGreaterThan(frames, 10)
+        XCTAssertGreaterThanOrEqual(last, MoleVisual.frameCount - 1, "back down to the helmet tip before disappearing")
+        XCTAssertGreaterThan(shown.count, 20)
+    }
+
+    func testHitAnimationBlendsContinuouslyBetweenAdjacentFrames() throws {
+        let start = try XCTUnwrap(MoleVisual(frame: MoleVisual.frameCount, hitProgress: 0).hitFrameBlend)
+        XCTAssertEqual(start, MoleVisual.FrameBlend(current: 1, next: 2, fraction: 0))
+
+        let halfwayBetweenFrames = try XCTUnwrap(
+            MoleVisual(frame: MoleVisual.frameCount, hitProgress: 5.5 / 23).hitFrameBlend
+        )
+        XCTAssertEqual(halfwayBetweenFrames.current, 6)
+        XCTAssertEqual(halfwayBetweenFrames.next, 7)
+        XCTAssertEqual(halfwayBetweenFrames.fraction, 0.5, accuracy: 0.0001)
+
+        let end = try XCTUnwrap(MoleVisual(frame: MoleVisual.frameCount, hitProgress: 1).hitFrameBlend)
+        XCTAssertEqual(end, MoleVisual.FrameBlend(current: 24, next: 24, fraction: 0))
     }
 
     func testUntappedMoleAlsoGoesBackDown() throws {
@@ -407,7 +439,7 @@ final class FoxAttackTests: XCTestCase {
     }
 
     func testHolesOpenAtManyDifferentSpots() {
-        var engine = makeEngine(level: .advanced)
+        var engine = makeEngine(board: .testFullBoardWithDecoys)
         var spots: [BoardPoint] = []
         var seen = Set<Int>()
         for _ in 0..<12000 where !engine.isFinished {

@@ -13,7 +13,6 @@ struct TrialRecord: Codable, Equatable, Identifiable {
     let holeIndex: Int
     let variant: CharacterVariant
     let role: TargetRole
-    let level: DifficultyLevel
     /// Seconds of active play (pauses excluded) when the character appeared.
     let spawnedAt: TimeInterval
     /// Where on the board the hole opened. Missing in sessions saved before holes were random.
@@ -32,12 +31,6 @@ enum SessionEndReason: String, Codable {
     case restBreak
 }
 
-struct LevelChange: Codable, Equatable {
-    let at: TimeInterval
-    let from: DifficultyLevel
-    let to: DifficultyLevel
-}
-
 /// Gameplay record of one session.
 ///
 /// These are game performance indicators only. They are not diagnostic measurements and are not
@@ -52,18 +45,15 @@ struct GameSessionRecord: Codable, Equatable, Identifiable {
     var completed: Bool = false
     var endReason: SessionEndReason?
     let configuration: GameConfiguration
-    var finalLevel: DifficultyLevel
     var activePlayDuration: TimeInterval = 0
     var trials: [TrialRecord] = []
     var offTargetTaps: Int = 0
-    var levelChanges: [LevelChange] = []
 
     init(configuration: GameConfiguration, startedAt: Date, id: UUID = UUID()) {
         self.id = id
         self.gameIdentifier = "whack-a-mole"
         self.startedAt = startedAt
         self.configuration = configuration
-        self.finalLevel = configuration.startingLevel
     }
 
     private var realTargets: [TrialRecord] { trials.filter { $0.role == .target && $0.outcome != nil } }
