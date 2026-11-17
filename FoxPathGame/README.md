@@ -103,26 +103,26 @@ finish point of the walk; the thief never goes to it.
 
 ### Hearts and time
 
-- The game starts with **3 hearts**, shown in the top bar. Each time a thief reaches the friend takes one; hearts never go
-  below zero. With no hearts left the game ends (**Game over**).
-- The top bar counts down from **02:00** (MM:SS). At 00:00 the game ends (**Time's up!**). The
-  2 minutes are one game, not a recommended play or patching time, and cannot be changed.
+- The top bar shows only the lives, the time bar and the pause button.
+- The game starts with **3 hearts**, shown in the top bar as three carrots. Each time a thief reaches the friend takes one,
+  and that carrot turns grey; hearts never go below zero. With no hearts left the game ends (**Game over**).
+- The time bar fills up as the game goes on, next to the time left (M:SS, from 2:00). At 0:00 the
+  game ends (**Time's up!**). The 2 minutes are one game, not a recommended play or patching time,
+  and cannot be changed.
 - When the game ends, everything stops: the walk, the thief and the clock.
 
 ### Zoom
 
-- The **magnifier buttons** in the top bar zoom in and out in steps, and a **pinch** zooms freely,
-  from the whole map (1×) to 2.5×.
+- A **pinch** zooms freely, from the whole map (1×) to 2.5×. The top bar has no zoom buttons.
 - Zoomed in, the camera follows the fox, looks a little ahead of it and stops at the map edges.
 - The follow radius grows with the fox when the map is zoomed in.
 
 ### Comfort and stopping
 
-- **Pause** freezes the game clock, the walk and the thief. Leaving the app pauses the game and the gaze camera
+- **Pause** (the painted wooden button, top right) freezes the game clock, the walk and the thief. Leaving the app pauses the game and the gaze camera
   automatically; the camera starts again on return and the game waits for **Resume**.
 - The pause screen has **Rest my eyes**, which ends the game straight away and shows the result.
   It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
-- **✕** asks "Stop the game?" first.
 
 ## Folder structure
 
@@ -131,7 +131,7 @@ FoxPathGame/
 ├── App/            FoxPathGameApp (@main, standalone only), FoxPathEntryView
 ├── Views/          FoxPathHomeView, FoxPathGameView, FoxPathResultView
 ├── Components/     FoxPathMapView (tiles, scenery, characters), FoxFocusOverlay (warning, ring,
-│                   hints, role card), FoxPathHUDView (timer, hearts, zoom, pause)
+│                   hints, role card), FoxPathHUDView (carrots, time bar, pause)
 ├── ViewModels/     FoxPathGameViewModel
 ├── Models/         FoxPathConfiguration, FoxPathMap (grid, tiles, sprites), FoxRoute,
 │                   FoxWalkPose (walk animation frames), PathCharacter (the three friends, roles)
@@ -196,6 +196,12 @@ which side they come from is drawn from the same seed.
 - **Finish stall.** The veggie stall stands just above the end of the path, near the right edge,
   and the friend stops in front of the middle of its counter.
 - **Lamps** stand beside the path, spread along the whole walk.
+- **Signpost.** Every map has exactly one "Veggies Stall / Farm" signpost, on the grass beside a
+  level part of the path in the first part of the walk. Above the path it stands just behind the
+  fox; below it, it stands far enough down that it never covers the fox. A map with no room for it
+  is drawn again, like a map with too few houses or lamps.
+- **Tree stumps.** Two to four stumps stand at random spots on the grass, some mirrored and in
+  slightly different sizes, away from the path and from everything else. They change with every map.
 - **Rocks by the path.** Seven to ten grey rocks sit just beside the path, spread along the whole
   walk on alternating sides, never on the path itself.
 - **Grass tufts, soil specks and grass patches** are scattered over the remaining grass.
@@ -287,17 +293,23 @@ transparency kept.
   their canvases and drawn at the tile scale (about 0.22 map units per pixel).
 - **Finish stall** (`Decorations/FinishStall`): the "Veggies" market stall, supplied as a separate
   file (`FINISH.png`).
+- **Signpost** (`Decorations/Signpost`, from `petunjuk`) and **tree stump** (`Decorations/TreeStump`,
+  from `kayu`), each cropped from its 2752 × 2064 canvas.
+- **Top bar** (`HUD/`): the carrot lives panel in four states (`Carrots3` full, then `Carrots2`,
+  `Carrots1` and `Carrots0` with one, two and three grey carrots), cropped from the four supplied
+  pictures (`FULL`, `-1`, `-2`, `-3`), and the painted wooden pause button. The carrots, the time
+  bar and the button share one height (64 points).
 - Only the supplied pictures are used on the map. Nothing is cut out of other pictures or
   drawn as extra scenery.
 - **Drawn in code:** the warning overlay, the focus ring, the role card, the ground ovals under the
-  friend and the thief, and the HUD (timer and hearts).
+  friend and the thief, and the time bar.
 - **Missing:** dedicated sound effects (built-in system sounds stand in), optional background
   music, an app icon, a separate running animation (the walk cycle stands in), and
   dedicated nature props such as trees, bushes or flowers.
 
 ## Testing
 
-- `DrStrangeTests` has 48 unit tests for this game:
+- `DrStrangeTests` has 49 unit tests for this game:
   - `FoxPathSessionTests` (23): every character can be the primary or the thief but never both,
     the thief is the other character of the walk, roles are drawn again for each path, the clock
     starts at the first look and stops at exactly 2 minutes, time up removes a thief that is still
@@ -311,12 +323,13 @@ transparency kept.
     and nothing happens after, reaching the stall chases the thief away, the thief comes into view on
     the map beside the character, old saved settings with a level still load, and the walk is
     faster than before
-  - `FoxPathGeneratorTests` (14): seed reproducibility and variety, the path only goes right, up or
+  - `FoxPathGeneratorTests` (15): seed reproducibility and variety, the path only goes right, up or
     down and never crosses itself, the route stays on the path tiles, scenery never stands on the
     path or covers the character, houses do not overlap, every map has houses, lamps and one
     finish stall, houses are balanced above and below the path and spread over both halves, only
     the supplied scenery is used, every front door has stepping stones in sizes and layouts that
-    vary, rocks and stones stay off the path, the stall stands
+    vary, rocks and stones stay off the path, every map has one signpost and two to four tree stumps
+    that stay clear of the path, the character and each other and change between maps, the stall stands
     behind the end of the route, every picture exists in the asset catalog, and every walk cycle
     follows the distance walked
   - `FoxPathEngineTests` (8): nothing counts before the first look, the start dwell, walking speed,

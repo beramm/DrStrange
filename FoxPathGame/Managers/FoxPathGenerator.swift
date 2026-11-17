@@ -2,13 +2,14 @@ import CoreGraphics
 import Foundation
 
 /// Builds a random map from a seed: a path that winds from the left edge to the right edge,
-/// then houses with stepping stones, lamps, rocks and grass details around it.
+/// then houses with stepping stones, lamps, a signpost, tree stumps, rocks and grass details
+/// around it.
 ///
 /// The same seed and settings always give the same map. Scenery is placed so that nothing
 /// stands on the path and nothing is ever drawn over the fox.
 enum FoxPathGenerator {
-    /// Fewer houses or lamps than this, or houses that are not balanced around the path, and the
-    /// generator tries again with a derived seed.
+    /// Fewer houses or lamps than this, houses that are not balanced around the path, or no room
+    /// for the signpost, and the generator tries again with a derived seed.
     private static let wantedHouses = 4
     private static let wantedLamps = 3
     private static let maximumAttempts = 16
@@ -18,12 +19,14 @@ enum FoxPathGenerator {
         func score(_ map: FoxPathMap) -> Int {
             let sides = houseSides(of: map)
             let balance = 3 - min(abs(sides.above - sides.below), 3)
-            return min(map.houses.count, wantedHouses) * 100 + min(map.lamps.count, wantedLamps) * 100 + balance * 10
+            let sign = map.standingSprites.contains { $0.kind == .signpost } ? 50 : 0
+            return min(map.houses.count, wantedHouses) * 100 + min(map.lamps.count, wantedLamps) * 100 + balance * 10 + sign
         }
         for attempt in 0..<maximumAttempts {
             var generator = SeededGenerator(seed: seed &+ UInt64(attempt) &* 0xD6E8_FEB8_6659_FD93)
             let map = makeMap(seed: seed, settings: settings, using: &generator)
-            if map.houses.count >= wantedHouses, isBalanced(map), map.lamps.count >= wantedLamps { return map }
+            if map.houses.count >= wantedHouses, isBalanced(map), map.lamps.count >= wantedLamps,
+               map.standingSprites.contains(where: { $0.kind == .signpost }) { return map }
             if score(map) > best.map(score) ?? -1 { best = map }
         }
         return best!
@@ -54,6 +57,10 @@ enum FoxPathGenerator {
         scenery.placeLamps()
         scenery.placePathRocks()
         let grassPatches = scenery.makeGrassPatches(avoiding: Set(pathCells.map(\.cell)))
+        // Added after the rest, so they take the room that is left and never crowd out houses,
+        // lamps or rocks.
+        scenery.placeSignpost()
+        scenery.placeTreeStumps()
         scenery.scatterGrassDetails()
         generator = scenery.generator
         return FoxPathMap(
@@ -527,6 +534,62 @@ private struct SceneryBuilder {
                 standing.append(lamp)
                 break
             }
+        }
+    }
+
+    // MARK: Signpost and tree stumps
+
+    /// The one signpost stands on the grass beside the first part of the path, pointing the way
+    /// to the veggie stall.
+    mutating func placeSignpost() {
+        let size = MapSpriteKind.signpost.size
+        for attempt in 0..<400 {
+            // The first part of the walk first; if that is full of houses, a little further on.
+            let along = CGFloat.random(in: 0.02...(attempt < 200 ? 0.45 : 0.6), using: &generator)
+            let (point, tangent) = route.sample(at: route.length * along)
+            // Only beside a level stretch: next to a climb the sign would stand in front of the fox.
+            guard abs(tangent.dx) > 0.9 else { continue }
+            // Above the path it stands just behind the fox; below it, it must stand far enough down
+            // that it never covers the fox's feet.
+            let isAbove = Bool.random(using: &generator)
+            let gap = isAbove
+                ? pathHalfWidth + CGFloat.random(in: 12...80, using: &generator)
+                : size.height + CGFloat.random(in: 12...50, using: &generator)
+            let base = CGPoint(x: point.x, y: point.y + (isAbove ? -gap : gap))
+            let frame = CGRect(x: base.x - size.width / 2, y: base.y - size.height, width: size.width, height: size.height)
+            let sign = makeSprite(.signpost, frame: frame)
+            guard frame.minX >= 8, frame.maxX <= mapSize.width - 8, frame.minY >= 0, frame.maxY <= mapSize.height - 4,
+                  FoxPathGenerator.isClear(sign, of: pathPoints),
+                  !overlapsStanding(frame.insetBy(dx: -16, dy: -8)),
+                  !ground.contains(where: { $0.frame.intersects(sign.footprint) }) else { continue }
+            standing.append(sign)
+            return
+        }
+    }
+
+    /// A few tree stumps at random spots on the grass, away from the path and from each other.
+    mutating func placeTreeStumps() {
+        let wanted = Int.random(in: 2...4, using: &generator)
+        let size = MapSpriteKind.treeStump.size
+        var placed = 0
+        for _ in 0..<(wanted * 40) where placed < wanted {
+            let scale = CGFloat.random(in: 0.85...1.15, using: &generator)
+            let width = size.width * scale, height = size.height * scale
+            let base = CGPoint(
+                x: CGFloat.random(in: (width / 2 + 8)...(mapSize.width - width / 2 - 8), using: &generator),
+                y: CGFloat.random(in: (height + 4)...(mapSize.height - 4), using: &generator)
+            )
+            let frame = CGRect(x: base.x - width / 2, y: base.y - height, width: width, height: height)
+            let stump = makeSprite(.treeStump, frame: frame, isMirrored: Bool.random(using: &generator))
+            let isOffPath = [CGPoint(x: frame.minX, y: frame.maxY), CGPoint(x: frame.maxX, y: frame.maxY),
+                             CGPoint(x: frame.midX, y: frame.minY), CGPoint(x: frame.midX, y: frame.maxY)]
+                .allSatisfy { pathLine.distance(to: $0) > pathHalfWidth + 20 }
+            guard isOffPath,
+                  FoxPathGenerator.isClear(stump, of: pathPoints),
+                  !overlapsStanding(frame.insetBy(dx: -24, dy: -16)),
+                  !ground.contains(where: { $0.frame.intersects(frame.insetBy(dx: -6, dy: -6)) }) else { continue }
+            standing.append(stump)
+            placed += 1
         }
     }
 

@@ -24,7 +24,6 @@ struct FoxPathGameView: View {
     let onClose: () -> Void
 
     @State private var viewModel: FoxPathGameViewModel
-    @State private var isConfirmingStop = false
     @State private var zoomAtPinchStart: CGFloat?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -86,16 +85,12 @@ struct FoxPathGameView: View {
                 GazePointerFeed(controller: controller, viewModel: viewModel)
             }
 
-            FoxPathHUDView(viewModel: viewModel, onExit: requestStop)
+            FoxPathHUDView(viewModel: viewModel)
                 .frame(maxHeight: .infinity, alignment: .top)
 
-            if viewModel.phase == .paused, !isConfirmingStop {
+            if viewModel.phase == .paused {
                 PauseOverlay(onResume: viewModel.resume, onRest: viewModel.finishEarly)
             }
-        }
-        .confirmationDialog("Stop the game?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
-            Button("Stop the game") { viewModel.finishEarly() }
-            Button("Keep playing", role: .cancel) { viewModel.resume() }
         }
     }
 
@@ -114,11 +109,6 @@ struct FoxPathGameView: View {
                 viewModel.setZoom(start * value.magnification)
             }
             .onEnded { _ in zoomAtPinchStart = nil }
-    }
-
-    private func requestStop() {
-        viewModel.pause()
-        isConfirmingStop = true
     }
 
     /// Every new game draws new maps and new roles.

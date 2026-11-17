@@ -110,7 +110,33 @@ final class FoxPathGeneratorTests: XCTestCase {
             let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
             return (map.standingSprites + map.groundSprites).map(\.kind)
         })
-        XCTAssertEqual(kinds.filter { !$0.isHouse }, Set<MapSpriteKind>([.lamp, .finishStall, .steppingStone, .pathRock, .grassTuft1, .grassTuft2, .soilSpeck]))
+        XCTAssertEqual(kinds.filter { !$0.isHouse }, Set<MapSpriteKind>([.lamp, .finishStall, .signpost, .treeStump, .steppingStone, .pathRock, .grassTuft1, .grassTuft2, .soilSpeck]))
+    }
+
+    func testOneSignpostAndRandomTreeStumpsStayOffThePath() {
+        var stumpCounts = Set<Int>()
+        var stumpSpots = Set<String>()
+        for seed in seeds {
+            let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
+            let signs = map.standingSprites.filter { $0.kind == .signpost }
+            let stumps = map.standingSprites.filter { $0.kind == .treeStump }
+            XCTAssertEqual(signs.count, 1, "seed \(seed)")
+            // In the first part of the walk.
+            if let sign = signs.first { XCTAssertLessThan(sign.frame.midX, map.size.width * 0.65, "seed \(seed)") }
+            XCTAssertTrue((2...4).contains(stumps.count), "seed \(seed): \(stumps.count) stumps")
+            let pathPoints = FoxPathGenerator.pathLine(for: map.route).samples(spacing: 6)
+            for sprite in signs + stumps {
+                XCTAssertTrue(FoxPathGenerator.isClear(sprite, of: pathPoints), "seed \(seed) \(sprite.kind)")
+                XCTAssertTrue(CGRect(origin: .zero, size: map.size).contains(sprite.frame), "seed \(seed) \(sprite.kind)")
+                let others = map.standingSprites.filter { $0.id != sprite.id }
+                XCTAssertFalse(others.contains { $0.frame.intersects(sprite.frame) }, "seed \(seed) \(sprite.kind)")
+            }
+            stumpCounts.insert(stumps.count)
+            stumpSpots.insert(stumps.map { "\(Int($0.frame.midX / 100)),\(Int($0.frame.midY / 100))" }.sorted().joined(separator: ";"))
+        }
+        // The stumps change from map to map, in number and in place.
+        XCTAssertGreaterThan(stumpCounts.count, 1)
+        XCTAssertGreaterThan(stumpSpots.count, seeds.count / 2)
     }
 
     func testSteppingStonesInFrontOfDoorsVary() {
@@ -183,6 +209,7 @@ final class FoxPathGeneratorTests: XCTestCase {
 
     func testEveryPictureIsInTheAssetCatalog() {
         var names = MapSpriteKind.allCases.map(\.assetName)
+        names += ["FoxPath/PauseButton", "FoxPath/Carrots0", "FoxPath/Carrots1", "FoxPath/Carrots2", "FoxPath/Carrots3"]
         names += ["FoxPath/PathHorizontal", "FoxPath/PathVertical", "FoxPath/PathCurve", "FoxPath/GrassPatch1", "FoxPath/GrassPatch2"]
         for character in PathCharacter.allCases {
             names.append(character.standingAsset)

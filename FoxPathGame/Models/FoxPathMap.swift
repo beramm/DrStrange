@@ -83,6 +83,10 @@ enum MapSpriteKind: String, CaseIterable {
     case lamp
     case finishStall
     case steppingStone
+    /// The "Veggies Stall / Farm" signpost near the start of the path. One per map.
+    case signpost
+    /// A cut tree stump on the grass. Several per map, at random spots.
+    case treeStump
     /// A grey rock beside the path.
     case pathRock
     case grassTuft1, grassTuft2
@@ -100,6 +104,8 @@ enum MapSpriteKind: String, CaseIterable {
         case .lamp: "FoxPath/Lamp"
         case .finishStall: "FoxPath/FinishStall"
         case .steppingStone: "FoxPath/SteppingStone"
+        case .signpost: "FoxPath/Signpost"
+        case .treeStump: "FoxPath/TreeStump"
         case .pathRock: "FoxPath/PathRock"
         case .grassTuft1: "FoxPath/GrassTuft1"
         case .grassTuft2: "FoxPath/GrassTuft2"
@@ -116,6 +122,8 @@ enum MapSpriteKind: String, CaseIterable {
         case .lamp: CGSize(width: 37, height: 192)
         case .finishStall: CGSize(width: 300, height: 250)
         case .steppingStone: CGSize(width: 85, height: 28)
+        case .signpost: CGSize(width: 152, height: 150)
+        case .treeStump: CGSize(width: 88, height: 38)
         case .pathRock: CGSize(width: 50, height: 22)
         case .grassTuft1: CGSize(width: 16.5, height: 22)
         case .grassTuft2: CGSize(width: 16, height: 17.5)
@@ -139,6 +147,8 @@ enum MapSpriteKind: String, CaseIterable {
         case .onionHouseFront, .onionHouseBack: 0.18...0.81
         case .lamp: 0.2...0.8
         case .finishStall: 0.04...0.95
+        case .signpost: 0.38...0.62
+        case .treeStump: 0.05...0.95
         default: 0...1
         }
     }
@@ -196,8 +206,8 @@ struct FoxPathMap: Equatable {
     let grassPatches: [GrassPatch]
     /// Flat details that lie on the grass: stepping stones, rocks, tufts and soil specks.
     let groundSprites: [MapSprite]
-    /// Things that stand up and can overlap the fox: houses, lamps, garden pieces and the
-    /// finish stall.
+    /// Things that stand up and can overlap the fox: houses, lamps, the signpost, tree stumps,
+    /// garden pieces and the finish stall.
     let standingSprites: [MapSprite]
 
     var size: CGSize { FoxPathMetrics.mapSize }
