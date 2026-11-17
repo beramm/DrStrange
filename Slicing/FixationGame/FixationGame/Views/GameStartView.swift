@@ -95,6 +95,10 @@ struct GameStartView: View {
                 FixationGameView(gaze: nil, character: character, onExit: closeGame)
             }
         }
+        .onChange(of: screen) { _, screen in
+            guard screen == .gazeGame || screen == .fingerGame else { return }
+            BackgroundMusicPlayer.shared.play(.veggieKeeper)
+        }
     }
 
     private func closeGame() {
