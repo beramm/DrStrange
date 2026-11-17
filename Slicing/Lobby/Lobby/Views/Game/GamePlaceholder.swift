@@ -65,7 +65,12 @@ struct SelectedGameView: View {
         case .whackAMole:
             whackAMoleLauncher
         case .veggieKeeper:
-            GameStartView(onExit: onExit)
+            GameStartView(
+                onExit: onExit,
+                onGameplayStarted: {
+                    BackgroundMusicPlayer.shared.play(.veggieKeeper)
+                }
+            )
         }
     }
 
