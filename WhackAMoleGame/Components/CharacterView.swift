@@ -25,9 +25,15 @@ struct CharacterView: View {
     private var isAsleep: Bool { target.role == .decoy }
 
     /// With Reduce Motion the mole fades in and out instead of climbing or sinking.
-    private var assetName: String {
-        if let hitFrame = visual.hitFrame { return Self.hitAssetName(reduceMotion ? 1 : hitFrame) }
-        return Self.assetName(reduceMotion ? MoleVisual.frameCount : visual.frame)
+    private var riseAssetName: String {
+        Self.assetName(reduceMotion ? MoleVisual.frameCount : visual.frame)
+    }
+
+    private var hitFrameBlend: MoleVisual.FrameBlend? {
+        guard let blend = visual.hitFrameBlend else { return nil }
+        return reduceMotion
+            ? MoleVisual.FrameBlend(current: 1, next: 1, fraction: 0)
+            : blend
     }
 
     private var opacity: Double {
@@ -38,20 +44,35 @@ struct CharacterView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            Image(assetName)
-                .resizable()
-                .interpolation(.high)
-                .frame(width: proxy.size.width, height: proxy.size.height)
-                .grayscale(isAsleep ? 1 : 0)
-                .opacity(opacity)
-                .overlay(alignment: .topTrailing) {
-                    if isAsleep && visual.frame >= MoleVisual.frameCount - 2 {
-                        SleepBubble()
-                            .frame(width: proxy.size.width * 0.38, height: proxy.size.width * 0.26)
+            ZStack {
+                if let blend = hitFrameBlend {
+                    sprite(Self.hitAssetName(blend.current), size: proxy.size)
+                        .opacity(1 - blend.fraction)
+                    if blend.next != blend.current {
+                        sprite(Self.hitAssetName(blend.next), size: proxy.size)
+                            .opacity(blend.fraction)
                     }
+                } else {
+                    sprite(riseAssetName, size: proxy.size)
                 }
+            }
+            .grayscale(isAsleep ? 1 : 0)
+            .opacity(opacity)
+            .overlay(alignment: .topTrailing) {
+                if isAsleep && visual.frame >= MoleVisual.frameCount - 2 {
+                    SleepBubble()
+                        .frame(width: proxy.size.width * 0.38, height: proxy.size.width * 0.26)
+                }
+            }
         }
         .accessibilityHidden(true)
+    }
+
+    private func sprite(_ name: String, size: CGSize) -> some View {
+        Image(name)
+            .resizable()
+            .interpolation(.high)
+            .frame(width: size.width, height: size.height)
     }
 }
 

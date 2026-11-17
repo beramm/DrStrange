@@ -112,6 +112,27 @@ final class FoxAttackTests: XCTestCase {
         XCTAssertEqual(engine.session.hits, 1)
     }
 
+    func testSecondMoleCanBeHitWhileFirstAttackIsAnimating() throws {
+        var engine = makeEngine(board: .standard)
+        var pair: [ActiveTarget] = []
+        for _ in 0..<5000 where pair.count < 2 {
+            engine.advance(by: 0.02)
+            pair = engine.targets.filter { $0.phase.isUp && $0.role == .target }
+        }
+        XCTAssertEqual(pair.count, 2)
+
+        XCTAssertTrue(engine.tapHole(pair[0].holeIndex).contains { if case .attackStarted = $0 { true } else { false } })
+        _ = run(&engine, for: 0.4)
+        XCTAssertTrue(engine.tapHole(pair[1].holeIndex).contains { if case .attackStarted = $0 { true } else { false } })
+
+        XCTAssertEqual(engine.attacks.map(\.targetID), pair.map(\.id))
+        XCTAssertEqual(engine.session.hits, 2)
+        XCTAssertEqual(engine.targets.filter { $0.phase == .targeted }.count, 2)
+
+        let events = run(&engine, for: timing.impactOffset + 0.5)
+        XCTAssertEqual(events.filter { if case .attackImpact = $0 { true } else { false } }.count, 2)
+    }
+
     func testNoSpawnDuringAttackAndSpawningResumesAfter() throws {
         var engine = makeEngine()
         let target = try XCTUnwrap(advanceToSpawn(&engine))
@@ -348,6 +369,21 @@ final class FoxAttackTests: XCTestCase {
         }
         XCTAssertGreaterThanOrEqual(last, MoleVisual.frameCount - 1, "back down to the helmet tip before disappearing")
         XCTAssertGreaterThan(shown.count, 20)
+    }
+
+    func testHitAnimationBlendsContinuouslyBetweenAdjacentFrames() throws {
+        let start = try XCTUnwrap(MoleVisual(frame: MoleVisual.frameCount, hitProgress: 0).hitFrameBlend)
+        XCTAssertEqual(start, MoleVisual.FrameBlend(current: 1, next: 2, fraction: 0))
+
+        let halfwayBetweenFrames = try XCTUnwrap(
+            MoleVisual(frame: MoleVisual.frameCount, hitProgress: 5.5 / 23).hitFrameBlend
+        )
+        XCTAssertEqual(halfwayBetweenFrames.current, 6)
+        XCTAssertEqual(halfwayBetweenFrames.next, 7)
+        XCTAssertEqual(halfwayBetweenFrames.fraction, 0.5, accuracy: 0.0001)
+
+        let end = try XCTUnwrap(MoleVisual(frame: MoleVisual.frameCount, hitProgress: 1).hitFrameBlend)
+        XCTAssertEqual(end, MoleVisual.FrameBlend(current: 24, next: 24, fraction: 0))
     }
 
     func testUntappedMoleAlsoGoesBackDown() throws {

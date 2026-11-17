@@ -3,7 +3,7 @@ import SwiftUI
 /// Full-screen gameplay. Shows the result screen in place when the session ends,
 /// whether time ran out or it was stopped early.
 struct WhackAMoleGameView: View {
-    private static let foxSize: CGFloat = 180
+    private static let idleHelperSize: CGFloat = 250
 
     let configuration: GameConfiguration
     let gazeController: GazeInputController?
@@ -79,7 +79,13 @@ struct WhackAMoleGameView: View {
             playfield
                 .overlayPreferenceValue(FoxAnchorKey.self) { anchors in
                     ZStack {
-                        AttackAnimationView(pose: viewModel.foxPose, anchors: anchors, helper: viewModel.helper)
+                        if viewModel.foxPoses.isEmpty {
+                            AttackAnimationView(pose: nil, anchors: anchors, helper: viewModel.helper)
+                        } else {
+                            ForEach(viewModel.foxPoses, id: \.holeIndex) { pose in
+                                AttackAnimationView(pose: pose, anchors: anchors, helper: viewModel.helper)
+                            }
+                        }
                         HitFeedbackOverlay(viewModel: viewModel, anchors: anchors)
                         if let gazeController {
                             GazeInteractionView(
@@ -123,12 +129,12 @@ struct WhackAMoleGameView: View {
                 GameHUDView(viewModel: viewModel, onExit: requestStop)
                 // Side margins keep the fox's corner clear of the moles on every iPad size.
                 GameBoardView(viewModel: viewModel, screenSize: screenSize)
-                    .padding(.horizontal, Self.foxSize + 24)
+                    .padding(.horizontal, Self.idleHelperSize + 24)
                     .padding(.bottom, 24)
             }
 
             FoxHomeAnchor()
-                .frame(width: Self.foxSize, height: Self.foxSize)
+                .frame(width: Self.idleHelperSize, height: Self.idleHelperSize)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(16)
         }

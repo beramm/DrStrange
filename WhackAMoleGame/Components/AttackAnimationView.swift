@@ -42,6 +42,9 @@ struct FoxHomeAnchor: View {
 /// starts exactly when the previous one ends, the impact frame lines up with the character's
 /// reaction, and pausing freezes everything. It never receives touches.
 struct AttackAnimationView: View {
+    /// Preserve the original attack scale even when the idle corner helper is much larger.
+    private static let attackHomeReferenceSize: CGFloat = 130
+
     let pose: FoxPose?
     let anchors: [FoxAnchorID: Anchor<CGRect>]
     /// The helper for this game, in the corner and in every attack. Every helper runs the same
@@ -162,7 +165,8 @@ struct AttackAnimationView: View {
         )
         // The fox stands on the side with more room: left of characters in the right-hand column.
         let mirrored = holeIndex % SpawnManager.gridColumns == SpawnManager.gridColumns - 1
-        let size = max(character.height * 1.1, homePlacement(in: home).size)
+        let minimumAttackSize = min(home.width, Self.attackHomeReferenceSize) * 0.95
+        let size = max(character.height * 1.1, minimumAttackSize)
         let impact = helper.impactPoint
         let impactX = mirrored ? 1 - impact.x : impact.x
         let strikeCenter = CGPoint(
