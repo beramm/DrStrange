@@ -112,6 +112,27 @@ final class FoxAttackTests: XCTestCase {
         XCTAssertEqual(engine.session.hits, 1)
     }
 
+    func testSecondMoleCanBeHitWhileFirstAttackIsAnimating() throws {
+        var engine = makeEngine(board: .standard)
+        var pair: [ActiveTarget] = []
+        for _ in 0..<5000 where pair.count < 2 {
+            engine.advance(by: 0.02)
+            pair = engine.targets.filter { $0.phase.isUp && $0.role == .target }
+        }
+        XCTAssertEqual(pair.count, 2)
+
+        XCTAssertTrue(engine.tapHole(pair[0].holeIndex).contains { if case .attackStarted = $0 { true } else { false } })
+        _ = run(&engine, for: 0.4)
+        XCTAssertTrue(engine.tapHole(pair[1].holeIndex).contains { if case .attackStarted = $0 { true } else { false } })
+
+        XCTAssertEqual(engine.attacks.map(\.targetID), pair.map(\.id))
+        XCTAssertEqual(engine.session.hits, 2)
+        XCTAssertEqual(engine.targets.filter { $0.phase == .targeted }.count, 2)
+
+        let events = run(&engine, for: timing.impactOffset + 0.5)
+        XCTAssertEqual(events.filter { if case .attackImpact = $0 { true } else { false } }.count, 2)
+    }
+
     func testNoSpawnDuringAttackAndSpawningResumesAfter() throws {
         var engine = makeEngine()
         let target = try XCTUnwrap(advanceToSpawn(&engine))

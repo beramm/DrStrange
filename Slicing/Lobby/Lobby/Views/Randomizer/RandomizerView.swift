@@ -4,6 +4,11 @@
 //  A highlight hops across the three game cards. The highlighted card pops up
 //  to full size while the others shrink back. It slows down, stops on the
 //  chosen game, and after a short pause opens that game by itself.
+//  While it picks by itself, the screen is locked: no back button.
+//
+//  With "Random game" off in Setting, the cards are buttons and the child picks,
+//  and a back button is shown. There is no settings button on this screen.
+//  With "Lock games" on (testing), only Whack a Mole can be picked or played.
 //
 //  Every position below is taken from the 1194 × 834 Figma frame and then
 //  scaled to the real screen (same approach as LobbyView).
@@ -14,16 +19,20 @@ import SwiftUI
 struct RandomizerView: View {
     /// Called with the chosen game once the highlight has stopped.
     let onChosen: (MiniGame) -> Void
-    /// Called when the settings button is tapped.
-    let onSettings: () -> Void
 
     /// The last game picked, saved so the same game isn't picked twice in a row.
     @AppStorage(MiniGame.lastGameStorageKey) private var lastGameID = ""
+    /// When disabled, the cards become direct choices and no spin runs.
+    @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
+    /// Testing setting: locked games can't be picked or played.
+    @AppStorage(AppSettings.gamesLockedKey) private var gamesLocked = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
 
     /// The card that is popped up right now (nil before the spin starts).
     @State private var highlighted: MiniGame?
+    @State private var manualSelectionPending = false
+    @State private var manualSelectionTask: Task<Void, Never>?
 
     /// Size of the Figma frame the design was made in.
     private let design = CGSize(width: 1194, height: 834)
@@ -42,26 +51,42 @@ struct RandomizerView: View {
             ZStack {
                 LobbyScenery()
 
-                // Top bar: back, title, settings.
-                RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62 * s) {
-                    dismiss()
+                // Top bar: back and title. When the game is picked at random,
+                // the screen is locked, so there is no back button.
+                if !randomSpinEnabled {
+                    RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62 * s) {
+                        dismiss()
+                    }
+                    .position(x: 68 * sx, y: 83 * sy)
                 }
-                .position(x: 68 * sx, y: 83 * sy)
 
-                Text("Game map")
+                Text(randomSpinEnabled ? "Game map" : "Choose a game")
                     .textCase(.uppercase)
-                    .font(.doodle(80 * s))
+                    .doodleText(size: 80 * s)
                     .foregroundStyle(Color.titleBrown)
                     .position(x: 598 * sx, y: 80 * sy)
                     .accessibilityAddTraits(.isHeader)
 
-                RoundIconButton(systemImage: "gearshape.fill", label: "Settings", size: 62 * s, action: onSettings)
-                    .position(x: 1128 * sx, y: 83 * sy)
-
                 // The three game cards. The highlighted one is full size and in front.
                 ForEach(Array(MiniGame.allCases.enumerated()), id: \.element) { index, game in
                     let isPopped = game == highlighted
-                    MiniGameCard(game: game, scale: s)
+                    let isLocked = game.isLocked(whenGamesLocked: gamesLocked)
+                    Group {
+                        if randomSpinEnabled {
+                            MiniGameCard(game: game, isLocked: isLocked, scale: s)
+                        } else {
+                            Button {
+                                chooseManually(game)
+                            } label: {
+                                MiniGameCard(game: game, isLocked: isLocked, scale: s)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(manualSelectionPending)
+                            // A locked game can't be opened: chooseManually ignores the tap.
+                            // (Not .disabled here, which would also fade the lock.)
+                            .accessibilityHint(isLocked ? "" : "Play \(game.title)")
+                        }
+                    }
                         .scaleEffect(isPopped ? 1 : smallCardScale)
                         .zIndex(isPopped ? 1 : 0)
                         .position(x: cardCentersX[index] * sx, y: cardCenterY * sy)
@@ -74,13 +99,40 @@ struct RandomizerView: View {
         .toolbar(.hidden, for: .navigationBar)
         // A small tap feeling each time a card pops up.
         .sensoryFeedback(.selection, trigger: highlighted)
-        // Runs every time this screen appears, so coming back picks a new game.
-        .task { await spin() }
+        // Runs every time this screen appears when automatic selection is enabled.
+        .task(id: randomSpinEnabled) {
+            guard randomSpinEnabled else {
+                highlighted = nil
+                manualSelectionPending = false
+                return
+            }
+            await spin()
+        }
+        .onDisappear {
+            manualSelectionTask?.cancel()
+            manualSelectionTask = nil
+            manualSelectionPending = false
+        }
+    }
+
+    private func chooseManually(_ game: MiniGame) {
+        guard !randomSpinEnabled, !manualSelectionPending,
+              !game.isLocked(whenGamesLocked: gamesLocked) else { return }
+        manualSelectionPending = true
+        highlighted = game
+        lastGameID = game.rawValue
+        manualSelectionTask?.cancel()
+        manualSelectionTask = Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            onChosen(game)
+        }
     }
 
     private func spin() async {
         highlighted = nil
-        let pick = MiniGame.randomPick(avoiding: MiniGame(rawValue: lastGameID))
+        // Only open (unlocked) games can be picked.
+        let pick = MiniGame.randomPick(avoiding: MiniGame(rawValue: lastGameID), gamesLocked: gamesLocked)
 
         do {
             if !reduceMotion {
@@ -107,5 +159,5 @@ struct RandomizerView: View {
 }
 
 #Preview("Game map", traits: .landscapeLeft) {
-    RandomizerView(onChosen: { _ in }, onSettings: {})
+    RandomizerView(onChosen: { _ in })
 }

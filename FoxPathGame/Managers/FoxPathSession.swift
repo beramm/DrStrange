@@ -1,0 +1,213 @@
+import CoreGraphics
+import Foundation
+
+enum FoxPathSessionPhase: Equatable {
+    /// Before the first look at the character. The clock has not started.
+    case ready
+    case playing
+    /// All hearts were lost.
+    case gameOver
+    /// The 2 minutes are up.
+    case completed
+    /// Stopped early (exit or rest break).
+    case stopped
+
+    var isOver: Bool { self == .gameOver || self == .completed || self == .stopped }
+}
+
+enum FoxPathSessionEvent: Equatable {
+    case thiefAppeared(PathCharacter)
+    case lifeLost(remaining: Int)
+    case thiefLeft
+    case timeUp
+    case gameOver
+}
+
+/// Where the walk stands in one frame, as far as the thief is concerned.
+struct WalkProgress: Equatable {
+    /// Map units the followed character still has to walk to the stall.
+    let distanceLeft: Double
+    /// The followed character's feet, in map units.
+    let feet: CGPoint
+}
+
+/// Gameplay summary of one game. These numbers describe the game only; they are not a
+/// measurement of vision or attention and are not stored.
+struct FoxPathResult: Equatable {
+    enum EndReason: Equatable {
+        case timeUp
+        case noLivesLeft
+        case stopped
+    }
+
+    let endReason: EndReason
+    /// Seconds of play, from the first look at the character (pauses excluded).
+    let playTime: TimeInterval
+    let livesLeft: Int
+    /// Walks that reached the veggie stall.
+    let walksCompleted: Int
+    /// How many times the character had to stop and wait.
+    let offTrackCount: Int
+    /// Times a thief reached the character (one heart each).
+    let catches: Int
+}
+
+/// The game around the walks: the 2-minute clock, the hearts, who plays which role, and when a
+/// thief comes. A thief comes only when
+/// the child has stopped following for a moment; never because of a timer and never because
+/// gaze readings are missing. Driven by a game clock so it can be tested without a screen; it
+/// never reads the pointer itself.
+struct FoxPathSession {
+    let duration: TimeInterval
+    let initialLives: Int
+    let thiefSettings: ThiefSettings
+    let mapSize: CGSize
+
+    private(set) var phase: FoxPathSessionPhase = .ready
+    /// Seconds of play since the first look at the character.
+    private(set) var clock: TimeInterval = 0
+    private(set) var lives: Int
+    private(set) var roles: CharacterRoles
+    private(set) var thief: FoxPathThief?
+    private(set) var walksCompleted = 0
+    private(set) var offTrackCount = 0
+    private(set) var catches = 0
+    /// Seconds the child has been not following without a break, while no thief is around.
+    private(set) var notFollowingTime: TimeInterval = 0
+    /// Clock time before which no new thief can come.
+    private(set) var thiefCooldownUntil: TimeInterval = 0
+
+    private var isWalking = false
+    private var generator: SeededGenerator
+
+    init(
+        seed: UInt64,
+        thiefSettings: ThiefSettings = ThiefSettings(),
+        duration: TimeInterval = FoxPathConfiguration.sessionDuration,
+        initialLives: Int = FoxPathConfiguration.initialLives,
+        mapSize: CGSize = FoxPathMetrics.mapSize
+    ) {
+        self.duration = duration
+        self.initialLives = initialLives
+        self.thiefSettings = thiefSettings
+        self.mapSize = mapSize
+        lives = initialLives
+        generator = SeededGenerator(seed: seed)
+        roles = CharacterRoles.random(using: &generator)
+    }
+
+    var remainingTime: TimeInterval { max(duration - clock, 0) }
+
+    var result: FoxPathResult {
+        FoxPathResult(
+            endReason: phase == .gameOver ? .noLivesLeft : (phase == .completed ? .timeUp : .stopped),
+            playTime: clock,
+            livesLeft: lives,
+            walksCompleted: walksCompleted,
+            offTrackCount: offTrackCount,
+            catches: catches
+        )
+    }
+
+    /// A seed for the next map, drawn from the session's own generator so a fixed game seed
+    /// reproduces every map.
+    mutating func nextMapSeed() -> UInt64 {
+        UInt64.random(in: .min ... .max, using: &generator)
+    }
+
+    /// A new walk on a new map. The first walk keeps the roles
+    /// drawn at the start; every later walk draws them again, so any character can be followed
+    /// or be the thief.
+    mutating func prepareWalk() {
+        if walksCompleted > 0 { roles = CharacterRoles.random(using: &generator) }
+        thief = nil
+        notFollowingTime = 0
+        isWalking = false
+    }
+
+    /// The character started walking (the child looked at it). The first time, the clock starts.
+    mutating func walkStarted() {
+        guard !phase.isOver else { return }
+        phase = .playing
+        isWalking = true
+    }
+
+    /// The character reached the stall. A thief still on its way runs off.
+    mutating func walkFinished() {
+        guard !phase.isOver else { return }
+        walksCompleted += 1
+        isWalking = false
+        thief?.chaseAway()
+        notFollowingTime = 0
+    }
+
+    mutating func recordOffTrack() {
+        guard !phase.isOver else { return }
+        offTrackCount += 1
+    }
+
+    /// Ends the game early (exit or rest break). Nothing changes afterwards.
+    mutating func stop() {
+        guard !phase.isOver else { return }
+        phase = .stopped
+    }
+
+    /// - Parameter walk: where the walk stands; `nil` between walks.
+    mutating func advance(by delta: TimeInterval, attention: PlayerAttentionState, walk: WalkProgress?) -> [FoxPathSessionEvent] {
+        guard delta > 0, phase == .playing else { return [] }
+        clock = min(clock + delta, duration)
+        var events: [FoxPathSessionEvent] = []
+
+        if var current = thief {
+            for event in current.advance(by: delta, attention: attention) {
+                switch event {
+                case .caughtCharacter:
+                    catches += 1
+                    lives = max(lives - 1, 0)
+                    events.append(.lifeLost(remaining: lives))
+                case .left:
+                    events.append(.thiefLeft)
+                }
+            }
+            if current.state == .inactive {
+                thief = nil
+                thiefCooldownUntil = clock + thiefSettings.cooldown
+            } else {
+                thief = current
+            }
+        }
+
+        if lives == 0 {
+            phase = .gameOver
+            events.append(.gameOver)
+            return events
+        }
+        if clock >= duration {
+            phase = .completed
+            thief = nil
+            events.append(.timeUp)
+            return events
+        }
+
+        // Only a stretch of not following counts; following or a missing reading starts it over.
+        if thief == nil, isWalking, attention == .notFollowing {
+            notFollowingTime += delta
+        } else {
+            notFollowingTime = 0
+        }
+        if let walk, notFollowingTime >= thiefSettings.triggerDelay, canSendThief(walkLeft: walk.distanceLeft) {
+            let approach = ThiefApproach.make(around: walk.feet, mapSize: mapSize, using: &generator)
+            thief = FoxPathThief(character: roles.thief, approach: approach, settings: thiefSettings)
+            notFollowingTime = 0
+            events.append(.thiefAppeared(roles.thief))
+        }
+        return events
+    }
+
+    private func canSendThief(walkLeft: Double) -> Bool {
+        thief == nil
+            && clock >= thiefCooldownUntil
+            && remainingTime >= thiefSettings.minimumTimeLeft
+            && walkLeft >= thiefSettings.minimumWalkLeft
+    }
+}

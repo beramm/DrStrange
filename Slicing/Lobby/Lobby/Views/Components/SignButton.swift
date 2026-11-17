@@ -15,7 +15,7 @@ struct SignButton: View {
         Button(action: action) {
             Text(title)
                 .textCase(.uppercase)
-                .font(.doodle(fontSize))
+                .doodleText(size: fontSize)
                 .foregroundStyle(Color.signText)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(

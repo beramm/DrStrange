@@ -33,7 +33,8 @@ enum FoxAttackPhase: Equatable, CaseIterable {
     case frameDisappearing
 }
 
-/// One attack on the character the child tapped. Only one can run at a time.
+/// One attack on a character the child selected. More than one can run when two visible moles are
+/// selected close together.
 struct FoxAttack: Equatable {
     let targetID: Int
     let holeIndex: Int

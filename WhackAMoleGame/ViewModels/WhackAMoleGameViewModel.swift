@@ -30,9 +30,10 @@ final class WhackAMoleGameViewModel {
     let settings: DifficultySettings
     private(set) var remainingSeconds: Int
     private(set) var progress: Double = 0
-    /// The fox's attack in progress; `nil` while it waits in its window.
-    /// Updated every frame during an attack, from game time, so pausing freezes the fox exactly.
-    private(set) var foxPose: FoxPose?
+    /// Every helper attack in progress. Updated from game time each frame, so pausing freezes all
+    /// helpers exactly. Two poses are possible when both visible moles are selected close together.
+    private(set) var foxPoses: [FoxPose] = []
+    var foxPose: FoxPose? { foxPoses.first }
     /// The helper for this game (fox or raccoon), picked at random when the game starts.
     var helper: HelperCharacter { engine.helper }
     private(set) var interactionState: GameInteractionState = .idle
@@ -125,7 +126,7 @@ final class WhackAMoleGameViewModel {
     func finishEarly(reason: SessionEndReason) {
         guard phase != .finished else { return }
         engine.end(reason: reason)
-        foxPose = nil
+        foxPoses = []
         moleVisuals = [:]
         holes = []
         complete()
@@ -173,7 +174,7 @@ final class WhackAMoleGameViewModel {
             apply(engine.advance(by: delta))
             #endif
             #if DEBUG
-            if autoplay, engine.attack == nil, phase == .playing,
+            if autoplay, phase == .playing,
                let target = engine.targets.first(where: { $0.phase.isUp && $0.role == .target && engine.clock - $0.spawnedAt > 0.6 }) {
                 apply(engine.tapHole(target.holeIndex))
             }
@@ -190,7 +191,7 @@ final class WhackAMoleGameViewModel {
                 break
             case let .attackImpact(target):
                 // Points and sound arrive when the hammer lands, not at the tap.
-                score = engine.session.score
+                score += target.pointsAwarded ?? GameSessionRecord.defaultPointsPerHit
                 feedback.hit()
             case .decoyTapped:
                 feedback.decoyTapped()
@@ -213,10 +214,16 @@ final class WhackAMoleGameViewModel {
         let roundedProgress = (engine.progress * 200).rounded() / 200
         if roundedProgress != progress { progress = roundedProgress }
 
-        let pose = engine.attack.flatMap { attack in
-            engine.attackState.map { FoxPose(phase: $0.phase, progress: $0.progress, holeIndex: attack.holeIndex, artIndex: attack.artIndex, helper: attack.helper) }
+        let poses = engine.attackStates.map { state in
+            FoxPose(
+                phase: state.phase,
+                progress: state.progress,
+                holeIndex: state.attack.holeIndex,
+                artIndex: state.attack.artIndex,
+                helper: state.attack.helper
+            )
         }
-        if pose != foxPose { foxPose = pose }
+        if poses != foxPoses { foxPoses = poses }
         let state = engine.interactionState
         if state != interactionState { interactionState = state }
     }

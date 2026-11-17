@@ -1,8 +1,8 @@
 //
 //  GamePlaceholder.swift
-//  Launches the selected mini-game through calibration.
-//  Whack a Mole is connected to the shared calibration and gameplay flow;
-//  games that have not been built yet remain on their announcement screen.
+//  Routes each lobby selection to its playable mini-game.
+//  Whack a Mole launches through the shared calibration flow; Veggie Dash and
+//  Veggie Keeper own their start and calibration screens.
 //
 
 import SwiftUI
@@ -17,14 +17,55 @@ struct SelectedGameView: View {
     }
 
     let game: MiniGame
+    /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
+    let onExit: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var configuration = ConfigurationStore.standard.load()
     @State private var gazeController = GazeInputController()
     @State private var presentedScreen: PresentedScreen?
     @State private var hasStarted = false
 
     var body: some View {
+        selectedGame
+            .toolbar(.hidden, for: .navigationBar)
+            .task {
+                guard game == .whackAMole, !hasStarted else { return }
+                hasStarted = true
+                // Apply the caregiver's saved gaze-testing setting before calibration.
+                gazeController.setOneEyeEnforcerEnabled(configuration.oneEyeEnforcerEnabled)
+                presentedScreen = .calibration
+            }
+            .fullScreenCover(item: $presentedScreen) { screen in
+                switch screen {
+                case .calibration:
+                    GazeCalibrationView(
+                        controller: gazeController,
+                        onCalibrated: { presentedScreen = .game },
+                        onCancel: { closeGameFlow() }
+                    )
+                case .game:
+                    WhackAMoleGameView(
+                        configuration: configuration,
+                        gazeController: gazeController,
+                        onClose: { closeGameFlow() }
+                    )
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var selectedGame: some View {
+        switch game {
+        case .veggieDash:
+            FoxPathHomeView(onExit: onExit)
+        case .whackAMole:
+            whackAMoleLauncher
+        case .veggieKeeper:
+            GameStartView(onExit: onExit)
+        }
+    }
+
+    private var whackAMoleLauncher: some View {
         ZStack(alignment: .topLeading) {
             Color.sky
                 .ignoresSafeArea()
@@ -36,51 +77,25 @@ struct SelectedGameView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62) {
-                dismiss()
+                onExit()
             }
             .padding(.leading, 37)
             .padding(.top, 20)
-        }
-        .toolbar(.hidden, for: .navigationBar)
-        .task {
-            guard game == .whackAMole, !hasStarted else { return }
-            hasStarted = true
-            // TestFlight production flow always requires the prescribed patch.
-            // Normalize any engineering value saved by an earlier local build.
-            configuration.oneEyeEnforcerEnabled = true
-            ConfigurationStore.standard.save(configuration)
-            gazeController.setOneEyeEnforcerEnabled(true)
-            presentedScreen = .calibration
-        }
-        .fullScreenCover(item: $presentedScreen) { screen in
-            switch screen {
-            case .calibration:
-                GazeCalibrationView(
-                    controller: gazeController,
-                    onCalibrated: { presentedScreen = .game },
-                    onCancel: { closeGameFlow() }
-                )
-            case .game:
-                WhackAMoleGameView(
-                    configuration: configuration,
-                    gazeController: gazeController,
-                    onClose: { closeGameFlow() }
-                )
-            }
         }
     }
 
     private func closeGameFlow() {
         gazeController.stop()
         presentedScreen = nil
-        dismiss()
+        onExit()
     }
 }
 #else
 struct SelectedGameView: View {
     let game: MiniGame
+    /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
+    let onExit: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         gameAnnouncement
@@ -98,7 +113,7 @@ struct SelectedGameView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             RoundIconButton(systemImage: "arrowtriangle.backward.fill", label: "Back", size: 62) {
-                dismiss()
+                onExit()
             }
             .padding(.leading, 37)
             .padding(.top, 20)
@@ -109,5 +124,5 @@ struct SelectedGameView: View {
 #endif
 
 #Preview(traits: .landscapeLeft) {
-    SelectedGameView(game: .whackAMole)
+    SelectedGameView(game: .whackAMole, onExit: {})
 }

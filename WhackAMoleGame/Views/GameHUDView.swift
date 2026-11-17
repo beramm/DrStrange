@@ -44,6 +44,27 @@ struct PauseButton: View {
     }
 }
 
+/// Round icon button. Whack-a-Mole's top bar no longer uses it, but the shared Fox Path top bar
+/// on `development` still does.
+struct HUDButton: View {
+    let systemImage: String
+    let label: String
+    let ink: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(ink)
+                .frame(width: 60, height: 60)
+                .background(Circle().fill(.white.opacity(0.75)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
 struct SessionProgressView: View {
     let progress: Double
     let remainingSeconds: Int

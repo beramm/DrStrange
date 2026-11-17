@@ -3,7 +3,7 @@ import SwiftUI
 /// Full-screen gameplay. Shows the result screen in place when the session ends,
 /// whether time ran out or it was stopped early.
 struct WhackAMoleGameView: View {
-    private static let foxSize: CGFloat = 130
+    private static let idleHelperSize: CGFloat = 250
 
     let configuration: GameConfiguration
     let gazeController: GazeInputController?
@@ -11,6 +11,8 @@ struct WhackAMoleGameView: View {
 
     @State private var viewModel: WhackAMoleGameViewModel
     @State private var isPausedForMissingPatch = false
+    @State private var isPausedForRecalibration = false
+    @State private var isPresentingRecalibration = false
     @Environment(\.scenePhase) private var scenePhase
 
     init(
@@ -56,6 +58,19 @@ struct WhackAMoleGameView: View {
         .onChange(of: gazeController?.patchWearState, initial: true) { _, state in
             respondToPatchState(state)
         }
+        .onChange(of: gazeController?.isCalibrated, initial: true) { _, isCalibrated in
+            respondToCalibrationState(isCalibrated)
+        }
+        .fullScreenCover(isPresented: $isPresentingRecalibration) {
+            if let gazeController {
+                GazeCalibrationView(
+                    controller: gazeController,
+                    isRecalibration: true,
+                    onCalibrated: finishRecalibration,
+                    onCancel: { isPresentingRecalibration = false }
+                )
+            }
+        }
     }
 
     private var gameplay: some View {
@@ -63,7 +78,13 @@ struct WhackAMoleGameView: View {
             playfield
                 .overlayPreferenceValue(FoxAnchorKey.self) { anchors in
                     ZStack {
-                        AttackAnimationView(pose: viewModel.foxPose, anchors: anchors, helper: viewModel.helper)
+                        if viewModel.foxPoses.isEmpty {
+                            AttackAnimationView(pose: nil, anchors: anchors, helper: viewModel.helper)
+                        } else {
+                            ForEach(viewModel.foxPoses, id: \.holeIndex) { pose in
+                                AttackAnimationView(pose: pose, anchors: anchors, helper: viewModel.helper)
+                            }
+                        }
                         HitFeedbackOverlay(viewModel: viewModel, anchors: anchors)
                         if let gazeController {
                             GazeInteractionView(
@@ -103,12 +124,12 @@ struct WhackAMoleGameView: View {
                 GameHUDView(viewModel: viewModel)
                 // Side margins keep the fox's corner clear of the moles on every iPad size.
                 GameBoardView(viewModel: viewModel, screenSize: screenSize)
-                    .padding(.horizontal, Self.foxSize + 24)
+                    .padding(.horizontal, Self.idleHelperSize + 24)
                     .padding(.bottom, 24)
             }
 
             FoxHomeAnchor()
-                .frame(width: Self.foxSize, height: Self.foxSize)
+                .frame(width: Self.idleHelperSize, height: Self.idleHelperSize)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(16)
         }
@@ -125,7 +146,12 @@ struct WhackAMoleGameView: View {
                 .animation(.snappy, value: number)
                 .accessibilityLabel("Starting in \(number)")
         case .paused:
-            if isPausedForMissingPatch, let gazeController {
+            if isPausedForRecalibration {
+                RecalibrationPauseOverlay(
+                    onRecalibrate: { isPresentingRecalibration = true },
+                    onRest: { viewModel.finishEarly(reason: .restBreak) }
+                )
+            } else if isPausedForMissingPatch, let gazeController {
                 MissingPatchPauseOverlay(
                     isPatchVerified: gazeController.isPatchVerified,
                     onResume: resumeAfterPatchCheck,
@@ -147,6 +173,24 @@ struct WhackAMoleGameView: View {
         viewModel = WhackAMoleGameViewModel(configuration: configuration)
         viewModel.start()
         respondToPatchState(gazeController?.patchWearState)
+        respondToCalibrationState(gazeController?.isCalibrated)
+    }
+
+    private func respondToCalibrationState(_ isCalibrated: Bool?) {
+        guard gazeController != nil,
+              isCalibrated == false,
+              viewModel.phase != .finished else { return }
+        isPausedForRecalibration = true
+        viewModel.pause()
+    }
+
+    private func finishRecalibration() {
+        isPresentingRecalibration = false
+        isPausedForRecalibration = false
+        if gazeController?.isPatchVerified == true {
+            isPausedForMissingPatch = false
+        }
+        viewModel.resume()
     }
 
     private func respondToPatchState(_ state: PatchWearState?) {
@@ -166,6 +210,50 @@ struct WhackAMoleGameView: View {
         guard gazeController?.isPatchVerified == true else { return }
         isPausedForMissingPatch = false
         viewModel.resume()
+    }
+}
+
+private struct RecalibrationPauseOverlay: View {
+    let onRecalibrate: () -> Void
+    let onRest: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.32).ignoresSafeArea()
+            VStack(spacing: 20) {
+                Image(systemName: "viewfinder.circle.fill")
+                    .font(.system(size: 68))
+                    .foregroundStyle(.orange)
+                    .accessibilityHidden(true)
+                Text("Eye control needs recalibration")
+                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
+                Text("Your position changed too much. Set up eye control again before continuing.")
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 560)
+                HStack(spacing: 20) {
+                    Button(action: onRest) {
+                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
+                            .frame(minWidth: 200, minHeight: 56)
+                    }
+                    .buttonStyle(.bordered)
+                    Button(action: onRecalibrate) {
+                        Label("Calibrate again", systemImage: "eye.fill")
+                            .frame(minWidth: 220, minHeight: 56)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(WhackAMolePalette.accent)
+                }
+                .font(.title2.weight(.bold))
+                Text("Your score and remaining play time will stay paused while you recalibrate.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 520)
+            }
+            .padding(48)
+            .background(RoundedRectangle(cornerRadius: 36).fill(WhackAMolePalette.cream))
+        }
     }
 }
 
