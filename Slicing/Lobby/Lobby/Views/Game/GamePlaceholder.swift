@@ -51,6 +51,10 @@ struct SelectedGameView: View {
                     )
                 }
             }
+            .onChange(of: presentedScreen) { _, screen in
+                guard screen == .game else { return }
+                BackgroundMusicPlayer.shared.play(.whackAMole)
+            }
     }
 
     @ViewBuilder
