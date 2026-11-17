@@ -1,5 +1,5 @@
 //
-//  GameCharacter.swift
+//  FixationCharacter.swift
 //  The three characters. The one the player picks keeps the stall;
 //  the other two are the thieves.
 //
@@ -9,7 +9,7 @@
 
 import CoreGraphics
 
-nonisolated enum GameCharacter: String, CaseIterable, Identifiable {
+nonisolated enum FixationCharacter: String, CaseIterable, Identifiable {
     case fox, bunny, raccoon
 
     var id: String { rawValue }
@@ -38,7 +38,7 @@ nonisolated enum GameCharacter: String, CaseIterable, Identifiable {
     var thiefRunImages: [String] { (1...4).map { "\(prefix)ThiefRun\($0)" } }
 
     /// The other two characters, who come to steal.
-    var thieves: [GameCharacter] { Self.allCases.filter { $0 != self } }
+    var thieves: [FixationCharacter] { Self.allCases.filter { $0 != self } }
 
     // MARK: Sizes
 

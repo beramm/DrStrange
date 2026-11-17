@@ -25,7 +25,7 @@ struct RandomizerView: View {
     /// When disabled, the cards become direct choices and no spin runs.
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
     /// Testing setting: locked games can't be picked or played.
-    @AppStorage(AppSettings.gamesLockedKey) private var gamesLocked = true
+    @AppStorage(AppSettings.gamesLockedKey) private var gamesLocked = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
 

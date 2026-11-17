@@ -17,7 +17,7 @@ struct GuardProgressView: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(.white.opacity(0.7))
                     Capsule()
-                        .fill(Color.ink.opacity(0.55))
+                        .fill(FixationPalette.ink.opacity(0.55))
                         .frame(width: max(proxy.size.height, proxy.size.width * progress))
                         .animation(.linear(duration: 0.2), value: progress)
                 }
@@ -27,7 +27,7 @@ struct GuardProgressView: View {
             Text(String(format: "%d:%02d", secondsLeft / 60, secondsLeft % 60))
                 .font(.system(.title3, design: .rounded).weight(.bold))
                 .monospacedDigit()
-                .foregroundStyle(Color.ink)
+                .foregroundStyle(FixationPalette.ink)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Time left")

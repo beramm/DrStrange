@@ -18,9 +18,15 @@ struct GameStartView: View {
     /// One tracker session shared by calibration and the game, like Whack-a-Mole.
     @State private var gaze = GazeInputController()
     @State private var screen: Screen?
+    /// Leaves the host app's game flow. Nil in the standalone Veggie Keeper app.
+    let onExit: (() -> Void)?
     /// Who keeps the stall; the other two characters are the thieves.
     /// Fox for now. Later this will be the character chosen in onboarding.
-    private let character = GameCharacter.fox
+    private let character = FixationCharacter.fox
+
+    init(onExit: (() -> Void)? = nil) {
+        self.onExit = onExit
+    }
 
     var body: some View {
         ZStack {
@@ -35,7 +41,7 @@ struct GameStartView: View {
 
                 Text("Veggie Keeper")
                     .font(.system(size: 56, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.ink)
+                    .foregroundStyle(FixationPalette.ink)
 
                 Button {
                     screen = .calibration
@@ -45,7 +51,7 @@ struct GameStartView: View {
                         .frame(minWidth: 320, minHeight: 84)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Color.accent)
+                .tint(FixationPalette.accent)
                 .clipShape(Capsule())
 
                 // For testing without the front camera (e.g. in the simulator).
@@ -57,9 +63,23 @@ struct GameStartView: View {
                         .frame(minWidth: 280, minHeight: 56)
                 }
                 .buttonStyle(.bordered)
-                .tint(Color.ink)
+                .tint(FixationPalette.ink)
             }
             .padding(48)
+
+            if let onExit {
+                Button(action: onExit) {
+                    Label("Back", systemImage: "chevron.backward")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 28, weight: .heavy))
+                        .frame(width: 56, height: 56)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(FixationPalette.accent)
+                .clipShape(Circle())
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(24)
+            }
         }
         .fullScreenCover(item: $screen) { current in
             switch current {
@@ -70,15 +90,17 @@ struct GameStartView: View {
                     onCancel: { screen = nil }
                 )
             case .gazeGame:
-                FixationGameView(gaze: gaze, character: character) {
-                    // Turn the camera off when leaving the game.
-                    gaze.stop()
-                    screen = nil
-                }
+                FixationGameView(gaze: gaze, character: character, onExit: closeGame)
             case .fingerGame:
-                FixationGameView(gaze: nil, character: character) { screen = nil }
+                FixationGameView(gaze: nil, character: character, onExit: closeGame)
             }
         }
+    }
+
+    private func closeGame() {
+        gaze.stop()
+        screen = nil
+        onExit?()
     }
 }
 

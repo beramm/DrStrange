@@ -12,7 +12,7 @@ import SwiftUI
 
 struct MarketSceneView: View {
     /// The character who keeps the stall. The other two are the thieves.
-    let keeper: GameCharacter
+    let keeper: FixationCharacter
     let veggiesLeft: Int
     let keeperIsAwake: Bool
     let thiefIsHere: Bool

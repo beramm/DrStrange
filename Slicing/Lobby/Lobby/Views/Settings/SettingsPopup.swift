@@ -20,7 +20,7 @@ struct SettingsPopup: View {
     @AppStorage(AppSettings.soundEffectsKey) private var savedSoundEffects = true
     @AppStorage(AppSettings.wearsEyePatchKey) private var savedWearsEyePatch = true
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var savedRandomSpin = true
-    @AppStorage(AppSettings.gamesLockedKey) private var savedGamesLocked = true
+    @AppStorage(AppSettings.gamesLockedKey) private var savedGamesLocked = false
 
     // The choices on the card, before they are saved.
     @State private var language = AppLanguage.english
@@ -28,7 +28,7 @@ struct SettingsPopup: View {
     @State private var soundEffects = true
     @State private var wearsEyePatch = true
     @State private var randomSpin = true
-    @State private var gamesLocked = true
+    @State private var gamesLocked = false
 
     /// Width ÷ height of the card picture.
     private let cardAspect: CGFloat = 1933 / 1405

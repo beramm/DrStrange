@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct KeeperView: View {
-    let character: GameCharacter
+    let character: FixationCharacter
     let isAwake: Bool
 
     /// How long each sleeping picture stays on screen.
@@ -34,7 +34,7 @@ struct KeeperView: View {
 
 #Preview {
     HStack {
-        ForEach(GameCharacter.allCases) { character in
+        ForEach(FixationCharacter.allCases) { character in
             KeeperView(character: character, isAwake: true)
             KeeperView(character: character, isAwake: false)
         }

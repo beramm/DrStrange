@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-struct HUDButton: View {
+struct FixationHUDButton: View {
     let systemImage: String
     /// Read out by VoiceOver, since the button only shows an icon.
     let label: LocalizedStringKey
@@ -15,7 +15,7 @@ struct HUDButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.title2.weight(.bold))
-                .foregroundStyle(Color.ink)
+                .foregroundStyle(FixationPalette.ink)
                 .frame(width: 60, height: 60)
                 .background(Circle().fill(.white.opacity(0.75)))
         }

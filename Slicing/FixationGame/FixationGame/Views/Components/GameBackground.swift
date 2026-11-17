@@ -7,7 +7,7 @@ import SwiftUI
 
 struct GameBackground: View {
     var body: some View {
-        Color.meadow
+        FixationPalette.meadow
             .ignoresSafeArea()
     }
 }

@@ -17,7 +17,7 @@ struct FixationGameView: View {
     /// The gaze tracker, already calibrated. nil = finger mode.
     let gaze: GazeInputController?
     /// The character who keeps the stall. The other two come to steal.
-    let character: GameCharacter
+    let character: FixationCharacter
     /// Back to the start screen.
     let onExit: () -> Void
 
@@ -82,7 +82,7 @@ struct FixationGameView: View {
     var body: some View {
         ZStack {
             if case let .finished(stoppedEarly) = phase {
-                GameResultView(
+                FixationGameResultView(
                     veggiesSaved: veggiesLeft,
                     totalVeggies: totalVeggies,
                     stoppedEarly: stoppedEarly,
@@ -154,7 +154,7 @@ struct FixationGameView: View {
             }
 
             if phase == .paused {
-                PauseOverlay(
+                FixationPauseOverlay(
                     onResume: { phase = .playing },
                     onRest: { phase = .finished(stoppedEarly: true) }
                 )
@@ -165,7 +165,7 @@ struct FixationGameView: View {
     /// Exit, veggies left, time bar and pause, like Whack-a-Mole's top bar.
     private var topBar: some View {
         HStack(spacing: 20) {
-            HUDButton(systemImage: "xmark", label: "Stop the game") {
+            FixationHUDButton(systemImage: "xmark", label: "Stop the game") {
                 phase = .finished(stoppedEarly: true)
             }
 
@@ -174,7 +174,7 @@ struct FixationGameView: View {
             GuardProgressView(progress: guardedSeconds / guardSeconds, secondsLeft: secondsLeft)
                 .frame(maxWidth: .infinity)
 
-            HUDButton(systemImage: "pause.fill", label: "Pause") {
+            FixationHUDButton(systemImage: "pause.fill", label: "Pause") {
                 phase = .paused
             }
             .disabled(phase != .playing)
@@ -189,7 +189,7 @@ struct FixationGameView: View {
         if phase == .waiting || (phase == .playing && !isWatching) {
             Label(promptText, systemImage: usesGaze ? "eye.fill" : "hand.point.up.left.fill")
                 .font(.system(.title, design: .rounded).weight(.heavy))
-                .foregroundStyle(Color.ink)
+                .foregroundStyle(FixationPalette.ink)
                 .padding(.horizontal, 28)
                 .padding(.vertical, 14)
                 .background(Capsule().fill(.white.opacity(0.85)))
@@ -212,7 +212,7 @@ struct FixationGameView: View {
             if showsGazeDot, gaze.hasUsableGaze, let point = smoother.point {
                 Circle()
                     .strokeBorder(.white, lineWidth: 3)
-                    .background(Circle().fill(Color.accent.opacity(0.65)))
+                    .background(Circle().fill(FixationPalette.accent.opacity(0.65)))
                     .frame(width: 30, height: 30)
                     .position(point)
                     .shadow(radius: 3)

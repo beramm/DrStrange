@@ -14,7 +14,7 @@ struct VeggiesLeftView: View {
         HStack(spacing: 6) {
             ForEach(0..<total, id: \.self) { index in
                 Image(systemName: "carrot.fill")
-                    .foregroundStyle(index < left ? Color.accent : Color.ink.opacity(0.2))
+                    .foregroundStyle(index < left ? FixationPalette.accent : FixationPalette.ink.opacity(0.2))
             }
         }
         .font(.title)

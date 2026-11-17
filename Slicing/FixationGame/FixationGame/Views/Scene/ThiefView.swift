@@ -14,7 +14,7 @@ struct ThiefView: View {
     /// Which crate to steal: 0 = left, 1 = middle, 2 = right.
     let crate: Int
     /// The characters who steal. They take turns, one per crate.
-    let thieves: [GameCharacter]
+    let thieves: [FixationCharacter]
     /// Where each crate is, as a fraction of the stage width.
     let crateX: [CGFloat]
     /// Where the thief's feet are while stealing, as a fraction of the stage height.
@@ -38,7 +38,7 @@ struct ThiefView: View {
     @State private var startedMoving = Date.distantPast
 
     /// The thief for the current crate: the two thieves take turns.
-    private var thief: GameCharacter {
+    private var thief: FixationCharacter {
         thieves[shownCrate % thieves.count]
     }
 

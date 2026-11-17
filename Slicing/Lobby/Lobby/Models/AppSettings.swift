@@ -24,5 +24,7 @@ nonisolated enum AppSettings {
     static let wearsEyePatchKey = "wearsEyePatch"
     /// Testing option: when on, only Whack a Mole can be played. The other games
     /// show a lock on the Game Map and are never picked.
-    static let gamesLockedKey = "gamesLocked"
+    // Use a fresh key now that all three games are playable. Older installs saved
+    // `gamesLocked = true` as the default while the other games were placeholders.
+    static let gamesLockedKey = "gamesLockedAfterIntegration"
 }

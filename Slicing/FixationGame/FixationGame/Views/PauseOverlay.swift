@@ -6,7 +6,7 @@
 
 import SwiftUI
 
-struct PauseOverlay: View {
+struct FixationPauseOverlay: View {
     let onResume: () -> Void
     let onRest: () -> Void
 
@@ -17,11 +17,11 @@ struct PauseOverlay: View {
             VStack(spacing: 24) {
                 Image(systemName: "pause.circle.fill")
                     .font(.system(size: 72))
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(FixationPalette.accent)
                     .accessibilityHidden(true)
                 Text("Paused")
                     .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                    .foregroundStyle(Color.ink)
+                    .foregroundStyle(FixationPalette.ink)
                 HStack(spacing: 20) {
                     Button(action: onRest) {
                         Label("Rest my eyes", systemImage: "moon.zzz.fill")
@@ -33,12 +33,12 @@ struct PauseOverlay: View {
                             .frame(minWidth: 180, minHeight: 56)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Color.accent)
+                    .tint(FixationPalette.accent)
                 }
                 .font(.title2.weight(.bold))
             }
             .padding(48)
-            .background(RoundedRectangle(cornerRadius: 36).fill(Color.cream))
+            .background(RoundedRectangle(cornerRadius: 36).fill(FixationPalette.cream))
         }
     }
 }
