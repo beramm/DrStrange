@@ -1,3 +1,4 @@
+import Dispatch
 @_spi(Engineering) import DrStrangeGazeTracker
 @_spi(Engineering) import DrStrangeGazeTrackerPlatform
 import Observation
@@ -33,6 +34,7 @@ final class GazeInputController {
     @ObservationIgnored private var calibrationTask: Task<Void, Never>?
     @ObservationIgnored private var wasPausedByScene = false
     @ObservationIgnored private var patchWearMonitor = PatchWearMonitor()
+    @ObservationIgnored private var calibrationSampleGate = CalibrationSampleGate()
 
     init() {
         // Paddy links only the native full-sensor ARKit tracker product. The
@@ -98,7 +100,7 @@ final class GazeInputController {
         tracker.setOneEyeEnforcementEnabled(enabled)
         patchWearMonitor.reset()
         patchWearState = enabled ? .checking : .verified
-        processCalibrationState()
+        processCalibrationState(isCurrentTargetResult: false)
     }
 
     func startCamera() {
@@ -202,6 +204,9 @@ final class GazeInputController {
             guard let self, !Task.isCancelled else { return }
             do {
                 try tracker.beginCalibrationTarget(at: target)
+                calibrationSampleGate.markTargetStarted(
+                    at: DispatchTime.now().uptimeNanoseconds
+                )
                 transitionPending = false
             } catch {
                 transitionPending = false
@@ -210,7 +215,7 @@ final class GazeInputController {
         }
     }
 
-    private func processCalibrationState() {
+    private func processCalibrationState(isCurrentTargetResult: Bool) {
         if sample.calibrationState == .invalid {
             calibrationTask?.cancel()
             calibrationTask = nil
@@ -252,18 +257,22 @@ final class GazeInputController {
         guard !transitionPending else { return }
         switch sample.calibrationState {
         case .targetAccepted:
+            guard isCurrentTargetResult else { return }
             targetIndex += 1
             presentCalibrationTarget()
         case .retryTarget:
+            guard isCurrentTargetResult else { return }
             status = "That target was unstable — hold still and retry"
             presentCalibrationTarget()
         case .calibrated:
+            guard isCurrentTargetResult else { return }
             calibrationTask?.cancel()
             activeCalibrationTarget = nil
             status = "Calibration complete — ready to play"
         case .invalid:
             break
         case .failed:
+            guard isCurrentTargetResult else { return }
             activeCalibrationTarget = nil
             status = "Calibration failed — try again"
         default:
@@ -281,11 +290,21 @@ final class GazeInputController {
     }
 
     private func consume(_ value: GazeSample) {
+        let isTargetResult = switch value.calibrationState {
+        case .targetAccepted, .retryTarget, .calibrated, .failed: true
+        default: false
+        }
+        let decision = calibrationSampleGate.evaluate(
+            timestampNanoseconds: value.timestamp.uptimeNanoseconds,
+            isTargetResult: isTargetResult
+        )
+        guard decision.shouldConsume else { return }
+
         sample = value
         isSceneTooDark = ambientLight.state() == .tooDark
         guard oneEyeEnforcerEnabled else {
             patchWearState = .verified
-            processCalibrationState()
+            processCalibrationState(isCurrentTargetResult: decision.isCurrentTargetResult)
             return
         }
         let observation: PatchEyeObservation
@@ -302,6 +321,6 @@ final class GazeInputController {
             observation,
             timestampNanoseconds: value.timestamp.uptimeNanoseconds
         )
-        processCalibrationState()
+        processCalibrationState(isCurrentTargetResult: decision.isCurrentTargetResult)
     }
 }
