@@ -57,8 +57,10 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 
 - The top bar shows only the stars, the time bar and the painted **pause** button (top right).
   Pause freezes the game clock. Leaving the app pauses automatically.
-- If both eyes remain visible for 1 second, the game pauses. Play stays disabled until only the
-  selected right eye has been consistently visible again for 1.5 seconds.
+- If both eyes remain visible for 1 second, the game pauses behind a full-screen patch reminder
+  (`PatchReminderScreen`: three foxes putting their patch on, in a small meadow). Once only the
+  selected right eye has been consistently visible again for 1.5 seconds, the reminder closes
+  and the game carries on by itself. The reminder also has **Rest my eyes**.
 - The pause screen has **Rest my eyes**, which ends the session straight away and shows the
   summary. It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
 - Each saved session records why it ended: `timeUp`, `stopped` or `restBreak`.
@@ -201,7 +203,7 @@ How the animation is driven:
 WhackAMoleGame/
 ├── App/            WhackAMoleGameApp (@main, standalone only), GameEntryView
 ├── Views/          GameHomeView, PatchingSetupView, WhackAMoleGameView, GameBoardView,
-│                   GameHUDView, GameResultView
+│                   GameHUDView, GameResultView, PatchReminderScreen (shared with Fox Path)
 ├── Components/     CharacterView (target), MoleHoleView, ScoreView, FeedbackView (points bubble),
 │                   FoxCharacterView, FoxWindowView, AttackAnimationView
 ├── ViewModels/     WhackAMoleGameViewModel
