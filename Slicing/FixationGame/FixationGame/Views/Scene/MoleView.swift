@@ -18,9 +18,9 @@ struct MoleView: View {
     /// (the bottom of the screen is where the gaze tracker is least accurate).
     /// Three areas: left of the stall, in front of it, and right of it.
     private let areas: [[UnitPoint]] = [
-        [UnitPoint(x: 0.14, y: 0.80), UnitPoint(x: 0.25, y: 0.84)],   // left
-        [UnitPoint(x: 0.33, y: 0.89), UnitPoint(x: 0.71, y: 0.89)],   // middle, in front of the stall
-        [UnitPoint(x: 0.86, y: 0.80), UnitPoint(x: 0.76, y: 0.84)]    // right
+        [UnitPoint(x: 0.14, y: 0.655), UnitPoint(x: 0.25, y: 0.705)],   // left
+        [UnitPoint(x: 0.33, y: 0.785), UnitPoint(x: 0.71, y: 0.785)],   // middle, in front of the stall
+        [UnitPoint(x: 0.86, y: 0.655), UnitPoint(x: 0.76, y: 0.705)]    // right
     ]
     private let frameCount = 24
     /// Higher = the mole comes up and goes down faster (24 frames each way).

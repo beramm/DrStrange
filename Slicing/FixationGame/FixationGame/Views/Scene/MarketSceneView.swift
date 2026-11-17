@@ -1,7 +1,7 @@
 //
 //  MarketSceneView.swift
-//  The Veggie Keeper picture: sky and grass, drifting clouds, the keeper behind
-//  the stall, the thieves and the moles.
+//  The Veggie Keeper picture: sky and grass, drifting clouds, the hot air
+//  balloon, the keeper behind the stall, the thieves and the moles.
 //
 //  The artwork is drawn for a 4:3 screen (the 13-inch iPad). Everything sits on a
 //  4:3 "stage" that fills the screen, and each piece is placed with fractions of
@@ -37,8 +37,9 @@ struct MarketSceneView: View {
     /// The stall, its shadow, the keeper and the thieves all shrink together.
     private let stallScale: CGFloat = 0.65
     /// Where the middle of the stall's base stands, as fractions of the stage.
-    /// Smaller y = higher up on the screen.
-    private let stallStandsAt = CGPoint(x: 0.52, y: 0.76)
+    /// Smaller y = higher up on the screen. The horizon is at about 0.585, so the
+    /// stall and its shadow stand on the grass, a little below it.
+    private let stallStandsAt = CGPoint(x: 0.52, y: 0.645)
     /// The middle of the stall's base in the original full-size layout.
     private let fullSizeBase = CGPoint(x: 0.52, y: 0.80)
 
@@ -67,6 +68,9 @@ struct MarketSceneView: View {
                 .frame(width: w, height: h)
 
             DriftingCloudsView(stageWidth: w, stageHeight: h)
+
+            // Distraction from above: flies in the sky, behind the stall.
+            BalloonView(canAppear: molesCanAppear, stageWidth: w, stageHeight: h)
 
             // The stall's shadow on the grass. Moves together with the stall.
             Image("StallShadow")
