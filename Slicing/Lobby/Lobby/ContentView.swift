@@ -13,7 +13,8 @@ struct ContentView: View {
     @State private var showsSettings = false
     /// Setting "Random game": the Game Map picks the game by itself.
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
-    @AppStorage(AppSettings.backgroundVolumeKey) private var backgroundMusicVolume = 1.0
+    @AppStorage(AppSettings.backgroundVolumeKey)
+    private var backgroundMusicVolume = AppSettings.migratedBackgroundVolume()
     @Environment(\.scenePhase) private var scenePhase
 
     private let music = BackgroundMusicPlayer.shared
