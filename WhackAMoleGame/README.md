@@ -57,9 +57,11 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 
 - **Pause** (top right) freezes the game clock. Leaving the app pauses automatically.
 - If both eyes remain visible for 1 second, the game pauses behind a full-screen patch reminder
-  (`PatchReminderScreen`: three foxes putting their patch on, in a small meadow). Once only the
+  (`PatchReminderScreen`, "Do not forget to use your patch"): three copies of the character the
+  child picked on the character select screen keep lifting their patch and putting it back on
+  (`PatchReminder/<Character>PatchOn|Off`; a still picture with Reduce Motion). Once only the
   selected right eye has been consistently visible again for 1.5 seconds, the reminder closes
-  and the game carries on by itself. The reminder also has **Rest my eyes**.
+  and the game carries on by itself.
 - The pause screen has **Rest my eyes**, which ends the session straight away and shows the
   summary. It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
 - **✕** (top left) asks "Stop the game?" and then also shows the summary.

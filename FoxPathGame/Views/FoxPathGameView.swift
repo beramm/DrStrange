@@ -94,7 +94,7 @@ struct FoxPathGameView: View {
 
             if viewModel.phase == .paused {
                 if isPausedForMissingPatch, gazeController != nil {
-                    PatchReminderScreen(onRest: viewModel.finishEarly)
+                    PatchReminderScreen()
                         .transition(.opacity)
                 } else {
                     PauseOverlay(onResume: viewModel.resume, onRest: viewModel.finishEarly)

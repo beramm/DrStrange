@@ -158,7 +158,7 @@ struct WhackAMoleGameView: View {
                     onRest: { viewModel.finishEarly(reason: .restBreak) }
                 )
             } else if isPausedForMissingPatch, gazeController != nil {
-                PatchReminderScreen(onRest: { viewModel.finishEarly(reason: .restBreak) })
+                PatchReminderScreen()
                     .transition(.opacity)
             } else {
                 PauseOverlay(
