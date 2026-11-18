@@ -8,6 +8,10 @@ struct WhackAMoleGameView: View {
     let configuration: GameConfiguration
     let gazeController: GazeInputController?
     let onClose: () -> Void
+    /// Finish screen "Next": goes on to another game. Nil hides the button (standalone app).
+    let onNextGame: (() -> Void)?
+    /// Finish screen "Home": back to the start of the app. Nil falls back to `onClose`.
+    let onHome: (() -> Void)?
 
     @State private var viewModel: WhackAMoleGameViewModel
     @State private var isPausedForMissingPatch = false
@@ -18,24 +22,28 @@ struct WhackAMoleGameView: View {
     init(
         configuration: GameConfiguration,
         gazeController: GazeInputController? = nil,
+        onNextGame: (() -> Void)? = nil,
+        onHome: (() -> Void)? = nil,
         onClose: @escaping () -> Void
     ) {
         self.configuration = configuration
         self.gazeController = gazeController
+        self.onNextGame = onNextGame
+        self.onHome = onHome
         self.onClose = onClose
         _viewModel = State(initialValue: WhackAMoleGameViewModel(configuration: configuration))
     }
 
     var body: some View {
         ZStack {
-            if let session = viewModel.finishedSession {
+            if viewModel.finishedSession != nil {
                 GameResultView(
-                    session: session,
                     score: viewModel.score,
                     previousHighScore: viewModel.highScore,
                     isNewHighScore: viewModel.isNewHighScore,
-                    onPlayAgain: restart,
-                    onDone: onClose
+                    onRestart: restart,
+                    onNext: onNextGame,
+                    onHome: onHome ?? onClose
                 )
                 .transition(.opacity)
             } else {

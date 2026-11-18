@@ -113,9 +113,11 @@ made just before the game ends still counts.
 
 ### High score
 
-The home screen shows the best score on this iPad, and the result screen shows "New high score!"
-when a game beats it (a tie does not). Only that one number is kept, in `UserDefaults`
-(`whackAMole.highScore`). Games that were stopped early count too.
+The home screen shows the best score on this iPad, and the finish screen shows it under the
+score ("High Score: …", or "New High Score: …" with a small star when a game beats it; a tie does
+not). Only that one number is kept, in `UserDefaults` (`whackAMole.highScore`), so it survives
+closing the app, Restart and Home. Games that were stopped early count too. Only Whack-a-Mole has
+a high score; Veggie Dash and Veggie Keeper do not.
 
 ### The fox attack
 
@@ -282,16 +284,26 @@ The hole and mole scale together, so the mole always fits its hole as drawn. The
 scoring limits always come from the current defaults, even if older settings were saved on the
 device. All values in this section are gameplay placeholders for review.
 
+## Finish screen
+
+When a game ends (time up or stopped), `GameResultView` shows the finish screen from the design:
+the cream `SettingsCard` panel hanging on the lobby vines (`LobbyRope`), three stars on its top
+edge with soft rays turning and a warm glow breathing behind them (still with Reduce Motion), the
+"Great job" ribbon, "Your Score" with the final score from the game, the high score, and three
+round buttons (`FinishScreen/` assets: star, ribbon, restart, next, home):
+
+- **Restart** starts a fresh Whack-a-Mole game: new score, full timer, new board.
+- **Next** goes on to Veggie Dash (smooth pursuit) or Veggie Keeper (fixation), picked at random
+  with equal chance when the button is tapped (`MiniGame.randomNext(after:)`), never Whack-a-Mole
+  again. It opens that game's own start screen in place of Whack-a-Mole. Only shown inside the
+  DrStrange app, where the other games exist.
+- **Home** goes back to the lobby start screen.
+
+The first tap disables all three buttons, so repeated taps cannot navigate twice.
+
 ## Session metrics
 
-The summary screen shows:
-
-- an encouraging message, the score, and the high score (or "New high score!")
-- characters, hits, missed, accuracy and average response time
-- play time
-- a session record: start and end time, why it ended, patched eye and playing eye
-
-Every session is also saved as JSON in `Application Support/Sessions/WhackAMole/<id>.json`
+The finish screen shows only the score. Every session is also saved as JSON in `Application Support/Sessions/WhackAMole/<id>.json`
 (`GameSessionRecord`). Each file contains:
 
 - the configuration, with the board, the patching record and the random seed
@@ -451,7 +463,8 @@ clinical improvement.
   - patching setup, including the same-eye warning
   - play and hit animation
   - pause and Rest my eyes
-  - result screen and Play again
+  - finish screen: Restart, Next (opens Veggie Dash or Veggie Keeper) and Home (lobby start
+    screen), and the high score kept after closing and reopening the app
   - DrStrange app navigation into the game
 - The fox attack, checked in slow motion with autoplay at 20 % speed:
   - the sequence: the fox emerges and flies to the character, the hammer lands on its head at the

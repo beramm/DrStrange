@@ -19,6 +19,10 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Whack-a-Mole finish screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Whack-a-Mole finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
     @State private var configuration = ConfigurationStore.standard.load()
     @State private var gazeController = GazeInputController()
@@ -47,6 +51,8 @@ struct SelectedGameView: View {
                     WhackAMoleGameView(
                         configuration: configuration,
                         gazeController: gazeController,
+                        onNextGame: { closeGameFlow(then: onNextGame) },
+                        onHome: { closeGameFlow(then: onHome) },
                         onClose: { closeGameFlow() }
                     )
                 }
@@ -93,10 +99,12 @@ struct SelectedGameView: View {
         }
     }
 
-    private func closeGameFlow() {
+    /// Stops the camera, closes the game and hands over to `destination` (by default the usual
+    /// exit).
+    private func closeGameFlow(then destination: (() -> Void)? = nil) {
         gazeController.stop()
         presentedScreen = nil
-        onExit()
+        (destination ?? onExit)()
     }
 }
 #else
@@ -104,6 +112,10 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Whack-a-Mole finish screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Whack-a-Mole finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
 
     var body: some View {
