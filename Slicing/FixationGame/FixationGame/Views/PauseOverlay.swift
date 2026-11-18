@@ -1,7 +1,8 @@
 //
 //  PauseOverlay.swift
-//  Pause screen, same as Whack-a-Mole's: resume, or stop and rest when the
-//  child's eyes are tired or uncomfortable.
+//  Pause screen of the standalone Veggie Keeper project: resume, or stop and
+//  rest when the child's eyes are tired or uncomfortable. Inside the DrStrange
+//  app the game uses the shared GamePausePopup instead.
 //
 
 import SwiftUI
