@@ -22,8 +22,10 @@ struct GameStartView: View {
     let onExit: (() -> Void)?
     /// Notifies the host when active gameplay begins. Nil in the standalone app.
     let onGameplayStarted: (() -> Void)?
-    /// Pause screen "Home": back to the start of the host app. Nil stays on this screen.
+    /// Pause and finish screen "Home": back to the start of the host app. Nil stays on this screen.
     let onHome: (() -> Void)?
+    /// Finish screen "Next": on to another game in the host app. Nil hides the button.
+    let onNextGame: (() -> Void)?
     /// Who keeps the stall; the other two characters are the thieves.
     /// Fox for now. Later this will be the character chosen in onboarding.
     private let character = FixationCharacter.fox
@@ -31,11 +33,13 @@ struct GameStartView: View {
     init(
         onExit: (() -> Void)? = nil,
         onGameplayStarted: (() -> Void)? = nil,
-        onHome: (() -> Void)? = nil
+        onHome: (() -> Void)? = nil,
+        onNextGame: (() -> Void)? = nil
     ) {
         self.onExit = onExit
         self.onGameplayStarted = onGameplayStarted
         self.onHome = onHome
+        self.onNextGame = onNextGame
     }
 
     var body: some View {
@@ -54,6 +58,11 @@ struct GameStartView: View {
                     .foregroundStyle(FixationPalette.ink)
 
                 Button {
+                    #if !VEGGIE_KEEPER_STANDALONE
+                    // Apply the caregiver's saved one-eye check setting before calibration, as
+                    // Whack-a-Mole does.
+                    gaze.setOneEyeEnforcerEnabled(ConfigurationStore.standard.load().oneEyeEnforcerEnabled)
+                    #endif
                     screen = .calibration
                 } label: {
                     Label("Calibrate & Play", systemImage: "eye.fill")
@@ -100,9 +109,21 @@ struct GameStartView: View {
                     onCancel: { screen = nil }
                 )
             case .gazeGame:
-                FixationGameView(gaze: gaze, character: character, onExit: closeGame, onHome: goHome)
+                FixationGameView(
+                    gaze: gaze,
+                    character: character,
+                    onExit: { closeGame() },
+                    onHome: goHome,
+                    onNextGame: onNextGame.map { next in { closeGame(then: next) } }
+                )
             case .fingerGame:
-                FixationGameView(gaze: nil, character: character, onExit: closeGame, onHome: goHome)
+                FixationGameView(
+                    gaze: nil,
+                    character: character,
+                    onExit: { closeGame() },
+                    onHome: goHome,
+                    onNextGame: onNextGame.map { next in { closeGame(then: next) } }
+                )
             }
         }
         .onChange(of: screen) { _, screen in
@@ -111,10 +132,12 @@ struct GameStartView: View {
         }
     }
 
-    private func closeGame() {
+    /// Stops the camera, closes the game and hands over to `destination` (by default the usual
+    /// exit).
+    private func closeGame(then destination: (() -> Void)? = nil) {
         gaze.stop()
         screen = nil
-        onExit?()
+        (destination ?? onExit)?()
     }
 
     /// Closes the game and goes back to the start of the host app (or to this screen when

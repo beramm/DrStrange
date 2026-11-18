@@ -1,7 +1,7 @@
 //
 //  GuardProgressView.swift
 //  Top-bar time bar: fills up while the child guards the stall, with the time left.
-//  Same look as Whack-a-Mole's session progress bar.
+//  Same look as Veggie Dash's time bar.
 //
 
 import SwiftUI
@@ -12,22 +12,25 @@ struct GuardProgressView: View {
     let secondsLeft: Int
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.7))
+                    // Outlined so the track stays visible over the sky.
+                    Capsule()
+                        .fill(.white.opacity(0.85))
+                        .overlay(Capsule().stroke(FixationPalette.ink.opacity(0.35), lineWidth: 2.5))
                     Capsule()
                         .fill(FixationPalette.ink.opacity(0.55))
                         .frame(width: max(proxy.size.height, proxy.size.width * progress))
                         .animation(.linear(duration: 0.2), value: progress)
                 }
             }
-            .frame(height: 18)
+            .frame(height: 26)
 
             Text(String(format: "%d:%02d", secondsLeft / 60, secondsLeft % 60))
-                .font(.system(.title3, design: .rounded).weight(.bold))
+                .font(.system(size: 34, weight: .bold, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(FixationPalette.ink)
+                .foregroundStyle(secondsLeft <= 10 ? Color(red: 0.86, green: 0.2, blue: 0.1) : FixationPalette.ink)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Time left")
