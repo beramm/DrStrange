@@ -74,7 +74,8 @@ struct SelectedGameView: View {
                 onGameplayStarted: {
                     BackgroundMusicPlayer.shared.play(.veggieKeeper)
                 },
-                onHome: onHome
+                onHome: onHome,
+                onNextGame: onNextGame
             )
         }
     }
