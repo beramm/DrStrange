@@ -22,16 +22,20 @@ struct GameStartView: View {
     let onExit: (() -> Void)?
     /// Notifies the host when active gameplay begins. Nil in the standalone app.
     let onGameplayStarted: (() -> Void)?
+    /// Pause screen "Home": back to the start of the host app. Nil stays on this screen.
+    let onHome: (() -> Void)?
     /// Who keeps the stall; the other two characters are the thieves.
     /// Fox for now. Later this will be the character chosen in onboarding.
     private let character = FixationCharacter.fox
 
     init(
         onExit: (() -> Void)? = nil,
-        onGameplayStarted: (() -> Void)? = nil
+        onGameplayStarted: (() -> Void)? = nil,
+        onHome: (() -> Void)? = nil
     ) {
         self.onExit = onExit
         self.onGameplayStarted = onGameplayStarted
+        self.onHome = onHome
     }
 
     var body: some View {
@@ -96,9 +100,9 @@ struct GameStartView: View {
                     onCancel: { screen = nil }
                 )
             case .gazeGame:
-                FixationGameView(gaze: gaze, character: character, onExit: closeGame)
+                FixationGameView(gaze: gaze, character: character, onExit: closeGame, onHome: goHome)
             case .fingerGame:
-                FixationGameView(gaze: nil, character: character, onExit: closeGame)
+                FixationGameView(gaze: nil, character: character, onExit: closeGame, onHome: goHome)
             }
         }
         .onChange(of: screen) { _, screen in
@@ -111,6 +115,14 @@ struct GameStartView: View {
         gaze.stop()
         screen = nil
         onExit?()
+    }
+
+    /// Closes the game and goes back to the start of the host app (or to this screen when
+    /// standalone).
+    private func goHome() {
+        gaze.stop()
+        screen = nil
+        onHome?()
     }
 }
 
