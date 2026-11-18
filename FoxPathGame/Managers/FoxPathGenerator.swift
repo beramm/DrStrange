@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 
 /// Builds a random map from a seed: a path that winds from the left edge to the right edge,
-/// then houses with stepping stones, lamps, a signpost, tree stumps, rocks and grass details
+/// then houses with stepping stones, lamps, a signpost, tree stumps, rocks, small gardens and grass details
 /// around it.
 ///
 /// The same seed and settings always give the same map. Scenery is placed so that nothing
@@ -61,6 +61,7 @@ enum FoxPathGenerator {
         // lamps or rocks.
         scenery.placeSignpost()
         scenery.placeTreeStumps()
+        scenery.fillOpenGrass()
         scenery.scatterGrassDetails()
         generator = scenery.generator
         return FoxPathMap(
@@ -596,6 +597,125 @@ private struct SceneryBuilder {
             standing.append(stump)
             placed += 1
         }
+    }
+
+    // MARK: Gardens
+
+    private enum GardenStyle: CaseIterable {
+        /// A row or two of onions coming up through the soil.
+        case onionBed
+        /// A clump of leafy plants.
+        case leafyClump
+        /// Leafy plants with the baskets beside them.
+        case leafyWithBaskets
+        /// The baskets beside a few onions, as if picking has just started.
+        case harvest
+    }
+
+    /// Open grass farther than this from any house, lamp, stall or garden gets a garden.
+    private static let openGrassDistance: CGFloat = 100
+    private static let maximumGardens = 12
+
+    /// Fills the open grass with small gardens, always in the emptiest spot left, until no
+    /// large empty area remains. Nothing lands on the path, under the top bar or in front of the
+    /// characters.
+    mutating func fillOpenGrass() {
+        let spacing: CGFloat = 48
+        var spots: [CGPoint] = []
+        for y in stride(from: topBarClearance + 90, through: mapSize.height - 20, by: spacing) {
+            for x in stride(from: CGFloat(60), through: mapSize.width - 60, by: spacing) {
+                let point = CGPoint(x: x, y: y)
+                if pathLine.distance(to: point) > pathHalfWidth + 70 { spots.append(point) }
+            }
+        }
+        var styles = ShuffleBag(GardenStyle.allCases)
+        var tried: [CGPoint] = []
+
+        for _ in 0..<(Self.maximumGardens * 3) {
+            let features = standing.map(\.frame)
+            func openness(_ point: CGPoint) -> CGFloat {
+                let fromScenery = features.map { distance(from: point, to: $0) }.min() ?? .greatestFiniteMagnitude
+                let fromTried = tried.map { hypot($0.x - point.x, $0.y - point.y) }.min() ?? .greatestFiniteMagnitude
+                return min(fromScenery, fromTried)
+            }
+            guard let spot = spots.max(by: { openness($0) < openness($1) }),
+                  openness(spot) > Self.openGrassDistance else { return }
+            tried.append(spot)
+            // When one kind of garden does not fit here, try the others before moving on.
+            for _ in GardenStyle.allCases where !placeGarden(styles.next(using: &generator), at: spot) {}
+            if standing.filter(\.kind.isGardenPiece).count >= Self.maximumGardens * 4 { return }
+        }
+    }
+
+    /// Places the pieces of one garden around `spot`, skipping any piece that does not fit.
+    /// Returns `true` when at least one piece landed.
+    @discardableResult
+    private mutating func placeGarden(_ style: GardenStyle, at spot: CGPoint) -> Bool {
+        var pieces: [(MapSpriteKind, CGPoint)] = []
+        switch style {
+        case .onionBed:
+            let columns = Int.random(in: 3...4, using: &generator)
+            let rows = Int.random(in: 1...2, using: &generator)
+            for row in 0..<rows {
+                for column in 0..<columns {
+                    let x = spot.x + (CGFloat(column) - CGFloat(columns - 1) / 2) * 82 + (row == 1 ? 41 : 0)
+                    pieces.append((.onionSprout, CGPoint(x: x, y: spot.y + CGFloat(row) * 54)))
+                }
+            }
+        case .leafyClump:
+            let count = Int.random(in: 2...3, using: &generator)
+            for index in 0..<count {
+                let x = spot.x + (CGFloat(index) - CGFloat(count - 1) / 2) * 86
+                pieces.append((.leafyPlant, CGPoint(x: x, y: spot.y + (index.isMultiple(of: 2) ? 0 : 20))))
+            }
+        case .leafyWithBaskets:
+            pieces.append((.leafyPlant, CGPoint(x: spot.x - 70, y: spot.y)))
+            pieces.append((.leafyPlant, CGPoint(x: spot.x + 12, y: spot.y + 26)))
+            pieces.append((.baskets, CGPoint(x: spot.x + 118, y: spot.y + 16)))
+        case .harvest:
+            pieces.append((.baskets, CGPoint(x: spot.x - 76, y: spot.y)))
+            pieces.append((.onionSprout, CGPoint(x: spot.x + 36, y: spot.y - 12)))
+            pieces.append((.onionSprout, CGPoint(x: spot.x + 112, y: spot.y + 6)))
+            pieces.append((.onionSprout, CGPoint(x: spot.x + 70, y: spot.y + 48)))
+        }
+
+        var placedAny = false
+        let mirrored = Bool.random(using: &generator)
+        for (kind, base) in pieces {
+            let scale = CGFloat.random(in: 0.92...1.1, using: &generator)
+            let size = CGSize(width: kind.size.width * scale, height: kind.size.height * scale)
+            // `base` is where the piece touches the ground.
+            let jitter = CGPoint(x: CGFloat.random(in: -6...6, using: &generator), y: CGFloat.random(in: -4...4, using: &generator))
+            let frame = CGRect(x: base.x + jitter.x - size.width / 2, y: base.y + jitter.y - size.height, width: size.width, height: size.height)
+            guard frame.minX >= 4, frame.maxX <= mapSize.width - 4, frame.minY >= topBarClearance,
+                  frame.maxY <= mapSize.height - 4 else { continue }
+            let piece = makeSprite(kind, frame: frame, isMirrored: mirrored != Bool.random(using: &generator))
+            // Pieces of one garden may touch a little; anything else keeps a small gap.
+            guard FoxPathGenerator.isClear(piece, of: pathPoints),
+                  !standing.contains(where: { other in
+                      other.kind.isGardenPiece
+                          ? other.frame.insetBy(dx: -4, dy: -4).intersects(frame.insetBy(dx: 6, dy: 6))
+                          : other.frame.insetBy(dx: -8, dy: -8).intersects(frame)
+                  }),
+                  // Stones and rocks stay in sight: no piece stands on them.
+                  !ground.contains(where: { $0.kind != .soilSpeck && $0.frame.intersects(frame.insetBy(dx: 0, dy: frame.height * 0.3)) })
+            else { continue }
+            standing.append(piece)
+            placedAny = true
+            if kind == .onionSprout || kind == .leafyPlant {
+                // A little dark soil at the foot of each plant.
+                let speck = MapSpriteKind.soilSpeck.size
+                let soil = CGRect(x: frame.midX - speck.width * 0.7, y: frame.maxY - speck.height * 0.9, width: speck.width * 1.4, height: speck.height * 1.2)
+                ground.append(makeSprite(.soilSpeck, frame: soil, isMirrored: Bool.random(using: &generator)))
+            }
+        }
+        return placedAny
+    }
+
+    private func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {
+        let dx = max(rect.minX - point.x, 0, point.x - rect.maxX)
+        let dy = max(rect.minY - point.y, 0, point.y - rect.maxY)
+        return hypot(dx, dy)
     }
 
     // MARK: Grass

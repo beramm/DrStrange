@@ -209,6 +209,10 @@ which side they come from is drawn from the same seed.
 - The signpost and the stumps keep clear of the top strip of the map, where the top bar sits.
 - **Rocks by the path.** Seven to ten grey rocks sit just beside the path, spread along the whole
   walk on alternating sides, never on the path itself.
+- **Gardens.** The open grass that is left gets small gardens, always in the emptiest spot first:
+  a bed of onions coming up through the soil, a clump of leafy plants, leafy plants with a pair
+  of baskets, or the baskets beside a few onions. They keep off the path, out from under the top
+  bar, off the stepping stones and rocks, and never cover the friend. No veggie crates.
 - **Grass tufts, soil specks and grass patches** are scattered over the remaining grass.
 - **Thief's side**, as described above.
 - **Clearance.** Nothing stands on the path, and nothing that is drawn in front of the friend may
@@ -305,8 +309,9 @@ transparency kept.
   cropped from the four supplied pictures (`full`, `-1`, `-2`, `-3`; the second version, with no
   panel behind the carrots), and the painted wooden pause button. The carrots, the time
   bar and the button share one height (64 points).
-- Only the supplied pictures are used on the map. Nothing is cut out of other pictures or
-  drawn as extra scenery.
+- **Garden pieces** (`Decorations/LeafyPlant`, `Decorations/OnionSprout`, `Decorations/Baskets`):
+  extra scenery made for this game, cut from the house and veggie stall art. The veggie crate
+  from the same art is not used.
 - **Drawn in code:** the warning overlay, the focus ring, the role card, the ground ovals under the
   friend and the thief, and the time bar.
 - **Missing:** dedicated sound effects (built-in system sounds stand in), optional background

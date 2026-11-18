@@ -105,12 +105,48 @@ final class FoxPathGeneratorTests: XCTestCase {
         }
     }
 
-    func testOnlySuppliedSceneryIsUsed() {
+    func testSceneryUsesTheVillagePiecesAndGardensWithoutCrates() {
         let kinds = Set(seeds.flatMap { seed -> [MapSpriteKind] in
             let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
             return (map.standingSprites + map.groundSprites).map(\.kind)
         })
-        XCTAssertEqual(kinds.filter { !$0.isHouse }, Set<MapSpriteKind>([.lamp, .finishStall, .signpost, .treeStump, .steppingStone, .pathRock, .grassTuft1, .grassTuft2, .soilSpeck]))
+        XCTAssertEqual(kinds.filter { !$0.isHouse }, Set<MapSpriteKind>([
+            .lamp, .finishStall, .signpost, .treeStump, .steppingStone, .pathRock, .grassTuft1, .grassTuft2,
+            .soilSpeck, .leafyPlant, .onionSprout, .baskets,
+        ]))
+        XCTAssertFalse(MapSpriteKind.allCases.contains { $0.assetName.localizedCaseInsensitiveContains("crate") })
+    }
+
+    func testGardensFillTheOpenGrass() {
+        var kindsUsed = Set<MapSpriteKind>()
+        for seed in seeds {
+            let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
+            let pieces = map.standingSprites.filter(\.kind.isGardenPiece)
+            XCTAssertGreaterThanOrEqual(pieces.count, 4, "seed \(seed)")
+            kindsUsed.formUnion(pieces.map(\.kind))
+            for piece in pieces {
+                XCTAssertGreaterThanOrEqual(piece.frame.minY, 96, "seed \(seed) \(piece.kind): under the top bar")
+                XCTAssertTrue(CGRect(origin: .zero, size: map.size).contains(piece.frame), "seed \(seed) \(piece.kind)")
+            }
+
+            // No big empty area is left: every open spot has scenery nearby.
+            let line = FoxPathGenerator.pathLine(for: map.route)
+            var widest: CGFloat = 0
+            for y in stride(from: CGFloat(140), through: map.size.height - 40, by: 64) {
+                for x in stride(from: CGFloat(80), through: map.size.width - 80, by: 64) {
+                    let point = CGPoint(x: x, y: y)
+                    guard line.distance(to: point) > FoxPathMetrics.pathHalfWidth + 70 else { continue }
+                    let nearest = map.standingSprites.map { sprite -> CGFloat in
+                        let dx = max(sprite.frame.minX - x, 0, x - sprite.frame.maxX)
+                        let dy = max(sprite.frame.minY - y, 0, y - sprite.frame.maxY)
+                        return hypot(dx, dy)
+                    }.min() ?? .greatestFiniteMagnitude
+                    widest = max(widest, nearest)
+                }
+            }
+            XCTAssertLessThan(widest, 300, "seed \(seed): open grass \(widest) units from any scenery")
+        }
+        XCTAssertEqual(kindsUsed, [.leafyPlant, .onionSprout, .baskets])
     }
 
     func testOneSignpostAndRandomTreeStumpsStayOffThePath() {
