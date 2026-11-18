@@ -94,7 +94,7 @@ struct FoxPathGameView: View {
                     PatchReminderScreen()
                         .transition(.opacity)
                 } else {
-                    FoxPathPauseView(onResume: viewModel.resume, onRestart: restart, onHome: goHome)
+                    GamePausePopup(onResume: viewModel.resume, onRestart: restart, onHome: goHome)
                 }
             }
         }

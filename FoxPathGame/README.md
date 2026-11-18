@@ -121,7 +121,8 @@ finish point of the walk; the thief never goes to it.
 
 - **Pause** (the painted wooden button, top right) freezes the game clock, the walk and the thief. Leaving the app pauses the game and the gaze camera
   automatically; the camera starts again on return and the game waits on the pause screen.
-- The pause screen (`FoxPathPauseView`) says "Game paused" over the dimmed game and has three
+- The pause screen is the shared "Game paused" pop-up (`GamePausePopup`, also used by Whack-a-Mole
+  and Veggie Keeper), shown over the dimmed game. It has three
   round buttons: **Home** (back to the lobby start screen, ending the game; the Follow the Fox
   home in the standalone app), **Restart** (a fresh game with a new map) and **Play** (carry on).
   The close button in the corner also carries on. Home is the way to stop when the child's eyes
