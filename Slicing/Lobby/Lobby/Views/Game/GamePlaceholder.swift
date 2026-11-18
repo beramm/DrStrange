@@ -51,6 +51,10 @@ struct SelectedGameView: View {
                     )
                 }
             }
+            .onChange(of: presentedScreen) { _, screen in
+                guard screen == .game else { return }
+                BackgroundMusicPlayer.shared.play(.whackAMole)
+            }
     }
 
     @ViewBuilder
@@ -61,7 +65,12 @@ struct SelectedGameView: View {
         case .whackAMole:
             whackAMoleLauncher
         case .veggieKeeper:
-            GameStartView(onExit: onExit)
+            GameStartView(
+                onExit: onExit,
+                onGameplayStarted: {
+                    BackgroundMusicPlayer.shared.play(.veggieKeeper)
+                }
+            )
         }
     }
 

@@ -20,12 +20,18 @@ struct GameStartView: View {
     @State private var screen: Screen?
     /// Leaves the host app's game flow. Nil in the standalone Veggie Keeper app.
     let onExit: (() -> Void)?
+    /// Notifies the host when active gameplay begins. Nil in the standalone app.
+    let onGameplayStarted: (() -> Void)?
     /// Who keeps the stall; the other two characters are the thieves.
     /// Fox for now. Later this will be the character chosen in onboarding.
     private let character = FixationCharacter.fox
 
-    init(onExit: (() -> Void)? = nil) {
+    init(
+        onExit: (() -> Void)? = nil,
+        onGameplayStarted: (() -> Void)? = nil
+    ) {
         self.onExit = onExit
+        self.onGameplayStarted = onGameplayStarted
     }
 
     var body: some View {
@@ -94,6 +100,10 @@ struct GameStartView: View {
             case .fingerGame:
                 FixationGameView(gaze: nil, character: character, onExit: closeGame)
             }
+        }
+        .onChange(of: screen) { _, screen in
+            guard screen == .gazeGame || screen == .fingerGame else { return }
+            onGameplayStarted?()
         }
     }
 
