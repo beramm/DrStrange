@@ -19,6 +19,10 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Finish and pause screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
     @State private var configuration = ConfigurationStore.standard.load()
     @State private var gazeController = GazeInputController()
@@ -104,6 +108,10 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Finish and pause screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
 
     var body: some View {
