@@ -11,7 +11,7 @@ The game uses the app's on-device gaze tracker (`GazeInputController`, calibrate
 
 > This is a research and development prototype. It does not treat or cure amblyopia, does not
 > replace patching, glasses or any treatment prescribed by an eye-care professional, and does not
-> replace clinical follow-up. The numbers on the result screen are gameplay results, not
+> replace clinical follow-up. The carrots on the finish screen are gameplay results, not
 > measurements of vision, of eye movements or of treatment progress. Which eye to patch, for how
 > long, and how often are decided by the child's ophthalmologist or orthoptist, never by the app.
 
@@ -120,9 +120,12 @@ finish point of the walk; the thief never goes to it.
 ### Comfort and stopping
 
 - **Pause** (the painted wooden button, top right) freezes the game clock, the walk and the thief. Leaving the app pauses the game and the gaze camera
-  automatically; the camera starts again on return and the game waits for **Resume**.
-- The pause screen has **Rest my eyes**, which ends the game straight away and shows the result.
-  It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
+  automatically; the camera starts again on return and the game waits on the pause screen.
+- The pause screen (`FoxPathPauseView`) says "Game paused" over the dimmed game and has three
+  round buttons: **Home** (back to the lobby start screen, ending the game; the Follow the Fox
+  home in the standalone app), **Restart** (a fresh game with a new map) and **Play** (carry on).
+  The close button in the corner also carries on. Home is the way to stop when the child's eyes
+  are sore or tired, or the patch is uncomfortable.
 - With eye control, if both eyes stay visible for 1 second the game pauses behind the shared
   patch reminder (`WhackAMoleGame/Views/PatchReminderScreen.swift`). When the one-eye check
   passes again the reminder closes and the game carries on without a tap.
@@ -238,13 +241,22 @@ with less than 3 s left or within 100 map units of the stall, appear 1 s, approa
 rate 0.6, chased off after 2.5 s of following, patience 14 s, retreat 2 s. A heart is lost at
 92 map units (`ThiefApproach.catchDistance`).
 
-## Result screen
+## Finish screen
 
-The result screen shows, for this one game only:
+When the game ends (time up or no carrots left), `FoxPathResultView` shows the finish screen, laid
+out like the Whack-a-Mole one: the cream `SettingsCard` panel on the lobby vines, three stars with
+light shining from behind them, the "Great job" ribbon, **Life Remaining** with the carrots left
+(`FoxPath/Carrots0…3`, one grey carrot per life lost), and three round buttons. The three stars
+stay gold whatever the result.
 
-- why it ended: **Time's up!**, **Game over** (no hearts left) or **Time to rest!** (stopped)
-- the hearts left
-- the time played, the paths finished and how many times the friend had to wait
+- **Restart** starts a fresh Veggie Dash game.
+- **Next** goes on to Whack a Mole or Veggie Keeper, picked at random with equal chance when the
+  button is tapped (`MiniGame.randomNext(after:)`), never Veggie Dash again. Only shown inside the
+  DrStrange app.
+- **Home** goes back to the lobby start screen (the Follow the Fox home in the standalone app).
+
+The first tap disables the buttons, so repeated taps cannot navigate twice. Veggie Dash has no
+score or high score.
 
 These are gameplay numbers. **Nothing from a game is saved**: no results, no gaze samples, no gaze
 paths and no camera frames. Only the settings (sound, haptics, gaze marker) are remembered on the

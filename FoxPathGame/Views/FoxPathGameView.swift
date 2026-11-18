@@ -22,15 +22,27 @@ struct FoxPathGameView: View {
     let configuration: FoxPathConfiguration
     let input: FoxPathInput
     let onClose: () -> Void
+    /// Finish screen "Next": goes on to another game. Nil hides the button (standalone app).
+    let onNextGame: (() -> Void)?
+    /// Finish and pause screen "Home": back to the start of the app. Nil falls back to `onClose`.
+    let onHome: (() -> Void)?
 
     @State private var viewModel: FoxPathGameViewModel
     @State private var isPausedForMissingPatch = false
     @State private var zoomAtPinchStart: CGFloat?
     @Environment(\.scenePhase) private var scenePhase
 
-    init(configuration: FoxPathConfiguration, input: FoxPathInput, onClose: @escaping () -> Void) {
+    init(
+        configuration: FoxPathConfiguration,
+        input: FoxPathInput,
+        onNextGame: (() -> Void)? = nil,
+        onHome: (() -> Void)? = nil,
+        onClose: @escaping () -> Void
+    ) {
         self.configuration = configuration
         self.input = input
+        self.onNextGame = onNextGame
+        self.onHome = onHome
         self.onClose = onClose
         _viewModel = State(initialValue: Self.makeViewModel(configuration: configuration, input: input))
     }
@@ -43,10 +55,10 @@ struct FoxPathGameView: View {
         ZStack {
             if let result = viewModel.result {
                 FoxPathResultView(
-                    result: result,
-                    character: viewModel.roles.primary,
-                    onPlayAgain: restart,
-                    onDone: onClose
+                    livesLeft: result.livesLeft,
+                    onRestart: restart,
+                    onNext: onNextGame,
+                    onHome: goHome
                 )
                 .transition(.opacity)
             } else {
@@ -75,6 +87,24 @@ struct FoxPathGameView: View {
 
     private var gameplay: some View {
         ZStack {
+            playfield
+
+            if viewModel.phase == .paused {
+                if isPausedForMissingPatch, gazeController != nil {
+                    PatchReminderScreen()
+                        .transition(.opacity)
+                } else {
+                    FoxPathPauseView(onResume: viewModel.resume, onRestart: restart, onHome: goHome)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: isPausedForMissingPatch)
+    }
+
+    /// The map, the guidance, the pointer and the top bar.
+    @ViewBuilder
+    private var playfield: some View {
+        ZStack {
             FoxPathMapView(viewModel: viewModel)
                 .gesture(input.usesGaze ? nil : fingerGesture)
                 .simultaneousGesture(pinchGesture)
@@ -91,17 +121,7 @@ struct FoxPathGameView: View {
 
             FoxPathHUDView(viewModel: viewModel)
                 .frame(maxHeight: .infinity, alignment: .top)
-
-            if viewModel.phase == .paused {
-                if isPausedForMissingPatch, gazeController != nil {
-                    PatchReminderScreen()
-                        .transition(.opacity)
-                } else {
-                    PauseOverlay(onResume: viewModel.resume, onRest: viewModel.finishEarly)
-                }
-            }
         }
-        .animation(.easeInOut(duration: 0.3), value: isPausedForMissingPatch)
     }
 
     /// Practice mode: the finger stands in for the eyes.
@@ -119,6 +139,12 @@ struct FoxPathGameView: View {
                 viewModel.setZoom(start * value.magnification)
             }
             .onEnded { _ in zoomAtPinchStart = nil }
+    }
+
+    /// Leaves the game for the start of the app (or the Fox Path home in the standalone app).
+    private func goHome() {
+        viewModel.stop()
+        (onHome ?? onClose)()
     }
 
     /// Every new game draws new maps and new roles.
@@ -199,48 +225,5 @@ private struct GazePointerFeed: View {
             x: frame.minX + gaze.x * frame.width,
             y: frame.minY + gaze.y * frame.height
         ))
-    }
-}
-
-/// Pause screen. Besides resuming, it offers a clear way to stop and rest when the child's eyes
-/// are tired or uncomfortable.
-private struct PauseOverlay: View {
-    let onResume: () -> Void
-    let onRest: () -> Void
-
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.25).ignoresSafeArea()
-            VStack(spacing: 24) {
-                Image(systemName: "pause.circle.fill")
-                    .font(.system(size: 72))
-                    .foregroundStyle(FoxPathPalette.accent)
-                    .accessibilityHidden(true)
-                Text("Paused")
-                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                    .foregroundStyle(FoxPathPalette.ink)
-                HStack(spacing: 20) {
-                    Button(action: onRest) {
-                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
-                            .frame(minWidth: 200, minHeight: 56)
-                    }
-                    .buttonStyle(.bordered)
-                    Button(action: onResume) {
-                        Label("Play", systemImage: "play.fill")
-                            .frame(minWidth: 180, minHeight: 56)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(FoxPathPalette.accent)
-                }
-                .font(.title2.weight(.bold))
-                Text("Grown-ups: if your child has sore or tired eyes, a headache, or the patch feels uncomfortable, choose Rest my eyes.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 460)
-            }
-            .padding(48)
-            .background(RoundedRectangle(cornerRadius: 36).fill(FoxPathPalette.cream))
-        }
     }
 }

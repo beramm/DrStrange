@@ -19,6 +19,10 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Finish and pause screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
     @State private var configuration = ConfigurationStore.standard.load()
     @State private var gazeController = GazeInputController()
@@ -28,7 +32,9 @@ struct SelectedGameView: View {
     var body: some View {
         selectedGame
             .toolbar(.hidden, for: .navigationBar)
-            .task {
+            // Keyed by the game: "Next" on a finish screen swaps the game in place, and the
+            // launcher must start again for the new one.
+            .task(id: game) {
                 guard game == .whackAMole, !hasStarted else { return }
                 hasStarted = true
                 // Apply the caregiver's saved gaze-testing setting before calibration.
@@ -61,7 +67,7 @@ struct SelectedGameView: View {
     private var selectedGame: some View {
         switch game {
         case .veggieDash:
-            FoxPathHomeView(onExit: onExit)
+            FoxPathHomeView(onExit: onExit, onHome: onHome, onNextGame: onNextGame)
         case .whackAMole:
             whackAMoleLauncher
         case .veggieKeeper:
@@ -104,6 +110,10 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Finish and pause screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
 
     var body: some View {

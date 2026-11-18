@@ -16,9 +16,15 @@ struct FoxPathHomeView: View {
     @State private var presentedScreen: PresentedScreen?
     /// Leaves the host app's game flow. Nil in the standalone Follow the Fox app.
     let onExit: (() -> Void)?
+    /// Finish and pause screen "Home": back to the start of the host app. Nil stays here.
+    let onHome: (() -> Void)?
+    /// Finish screen "Next": on to another game in the host app. Nil hides the button.
+    let onNextGame: (() -> Void)?
 
-    init(onExit: (() -> Void)? = nil) {
+    init(onExit: (() -> Void)? = nil, onHome: (() -> Void)? = nil, onNextGame: (() -> Void)? = nil) {
         self.onExit = onExit
+        self.onHome = onHome
+        self.onNextGame = onNextGame
     }
 
     var body: some View {
@@ -60,16 +66,32 @@ struct FoxPathHomeView: View {
                     }
                 )
             case .gazeGame:
-                FoxPathGameView(configuration: configuration, input: .gaze(gazeController)) {
-                    gazeController.stop()
-                    presentedScreen = nil
+                FoxPathGameView(
+                    configuration: configuration,
+                    input: .gaze(gazeController),
+                    onNextGame: onNextGame.map { next in { closeGame(then: next) } },
+                    onHome: onHome.map { home in { closeGame(then: home) } }
+                ) {
+                    closeGame()
                 }
             case .touchGame:
-                FoxPathGameView(configuration: configuration, input: .touch) {
-                    presentedScreen = nil
+                FoxPathGameView(
+                    configuration: configuration,
+                    input: .touch,
+                    onNextGame: onNextGame.map { next in { closeGame(then: next) } },
+                    onHome: onHome.map { home in { closeGame(then: home) } }
+                ) {
+                    closeGame()
                 }
             }
         }
+    }
+
+    /// Stops the camera, closes the game and, for Home or Next, hands over to the host app.
+    private func closeGame(then destination: (() -> Void)? = nil) {
+        gazeController.stop()
+        presentedScreen = nil
+        destination?()
     }
 
     // MARK: - Child panel
