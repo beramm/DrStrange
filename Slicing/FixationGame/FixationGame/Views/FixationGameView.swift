@@ -20,6 +20,8 @@ struct FixationGameView: View {
     let character: FixationCharacter
     /// Back to the start screen.
     let onExit: () -> Void
+    /// Pause screen "Home": back to the start of the app. Nil falls back to `onExit`.
+    var onHome: (() -> Void)? = nil
 
     private enum Phase: Equatable {
         case waiting                          // before the child first watches the stall
@@ -154,10 +156,20 @@ struct FixationGameView: View {
             }
 
             if phase == .paused {
+                #if VEGGIE_KEEPER_STANDALONE
+                // The standalone Veggie Keeper project has no shared pop-up or its pictures.
                 FixationPauseOverlay(
                     onResume: { phase = .playing },
                     onRest: { phase = .finished(stoppedEarly: true) }
                 )
+                #else
+                // Inside the DrStrange app: the shared pause pop-up (Home, Restart, Play).
+                GamePausePopup(
+                    onResume: { phase = .playing },
+                    onRestart: restart,
+                    onHome: { (onHome ?? onExit)() }
+                )
+                #endif
             }
         }
     }
