@@ -49,8 +49,10 @@ struct GameResultView: View {
                 Self.sky
                 shine(scale: s)
                     .position(at(0, -337))
+                // The right vine ends higher in the picture (674 of 737 pixels) than the left one
+                // (728), so the vines are lowered until both ends are tucked behind the panel.
                 ropes(scale: s)
-                    .position(x: c.x, y: c.y - panel.height / 2 + 12 * s - 760 * s / Self.ropeAspect / 2)
+                    .position(x: c.x, y: c.y - panel.height / 2 + 20 * s - 760 * s / Self.ropeAspect * (674 / 737 - 0.5))
                 Image("SettingsCard")
                     .resizable()
                     .frame(width: panel.width, height: panel.height)
