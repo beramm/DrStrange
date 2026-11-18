@@ -2,9 +2,10 @@
 
 A calm, child-friendly iPad game. A friend (the fox, the bunny or the raccoon) walks along a
 winding path through a small village, and the child keeps their eyes on it all the way to the
-veggie stall. Another friend plays the thief: it only comes when the child stops following, and
-it rushes at the friend. If it gets close enough, the child loses a heart. A game lasts 2 minutes
-and the child has 3 hearts.
+veggie stall. The thief is a mole: it only comes when the child stops following. The friend stops
+where it is, and the mole pops up out of a hole under the vegetable basket on the friend's back,
+takes a carrot and goes back down. Each carrot taken costs a heart. A game lasts 2 minutes and the
+child has 3 hearts.
 
 The game uses the app's on-device gaze tracker (`GazeInputController`, calibrated with
 `GazeCalibrationView`). A finger can be used instead for practice or on devices without tracking.
@@ -38,30 +39,32 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 - `-FoxPathAutostart`: skips the home screen and starts a game with the saved settings and finger
   input. Useful for checking layouts on different iPad sizes.
 - `-FoxPathSimulatedGaze YES`: moves a pretend pointer that follows the character and looks away
-  six times during the 2 minutes (two of them long enough for the thief to reach the friend, the others short enough
-  for the thief to be chased off), so the warning, the refocus and the thief can be checked and
+  six times during the 2 minutes (two of them long enough for the mole to take a carrot, the others short enough
+  for the mole to be sent away), so the warning, the refocus and the mole can be checked and
   recorded on a simulator. It is a recording aid only, not gaze tracking.
 
 ## Gameplay
 
 1. **Home screen.** **Calibrate & Play** runs the gaze calibration and then starts the game with
    eye control. **Practice with a finger** starts it with touch. There are no levels.
-2. **Roles.** Each path draws a primary character at random from the fox, the bunny and the
-   raccoon, and a thief from the other two. A card shows "Follow Bunny!" and "Raccoon wants the
-   veggies!". A white oval on the ground marks the friend to follow and a red one marks the thief.
+2. **Who to follow.** Each path draws one friend at random from the fox, the bunny and the raccoon;
+   only that friend is on the map. None of them is ever the thief: that is always the mole. A card
+   shows "Follow Bunny!" and "Mole wants the veggies!". A white oval on the ground marks the friend
+   to follow.
 3. **Start.** The friend stands at the left end of the path and starts walking when the child has looked at it (or held a finger on it) for a moment. The
    2-minute clock starts with the first look of the game.
 4. **Follow.** The friend walks right, and up or down around the bends, while the gaze stays within
    the follow radius around it. It faces sideways when walking right, shows its front going down
    and its back going up.
 5. **Off track.** When the gaze leaves the friend for longer than the grace time:
-   - the friend stops and waits where it is
+   - the friend stops exactly where it is and keeps facing the way it was walking (it does not
+     turn round), standing with its feet together
    - the edges of the screen dim to a soft red and a clear spotlight stays on the friend
    - a dashed ring breathes around the friend, a "!" bubble bobs above it, and a hint tells the
      child to look at it again
    - the ring fills while the child looks at the friend, and it walks on when the ring is full
-6. **Next path.** When the friend reaches the veggie stall, a new random path appears, the roles
-   are drawn again, and the walk goes on until the time is up.
+6. **Next path.** When the friend reaches the veggie stall, a new random path appears, the friend
+   to follow is drawn again, and the walk goes on until the time is up.
 7. **End.** The game ends when the 2 minutes are up or when the last heart is gone.
 
 The warning never flashes: it fades in and moves slowly. With **Reduce Motion** switched on, the
@@ -71,45 +74,56 @@ If the tracker loses the face (the child looked away from the iPad, or the camer
 friend simply waits. This does not count as going off track. If tracking stays poor, the game
 offers to recalibrate.
 
-### The thief
+### The thief: the mole
 
-A thief comes **only because the child stopped following**. There is no timer that sends one,
+The mole comes **only because the child stopped following**. There is no timer that sends one,
 and missing gaze readings never bring one. Exactly:
 
 1. The gaze leaves the friend for longer than the look-away grace (0.55 s): the walk goes off
-   track and the attention state becomes `notFollowing`.
-2. If the child is still not following 0.5 s later (`triggerDelay`), one thief comes, provided
-   that no thief is around, the last thief left at least 4 s
-   ago (`cooldown`), at least 3 s of the game are left and the friend is not about to reach the
-   stall. Following again, or a missing reading, starts the 0.5 s over.
-3. Only one thief is ever on the map, so a long stretch of not following brings one thief, not
-   one per frame.
+   track, the friend stops where it is (facing the way it was going) and the attention state
+   becomes `notFollowing`.
+2. If the child is still not following 0.5 s later (`triggerDelay`), one mole comes, provided
+   that no mole is around, the last mole left at least 4 s ago (`cooldown`), at least 3 s of the
+   game are left and the friend is not about to reach the stall. Following again, or a missing
+   reading, starts the 0.5 s over.
+3. Only one mole is ever on the map, so a long stretch of not following brings one mole, not one
+   per frame.
 
 | State | What happens |
 |---|---|
-| `appearing` | The thief fades in about 430 map units to the left or right of the friend, on the side with room on the map, and starts walking towards it (1 s). |
-| `approaching` | It rushes at the friend only while the child is **not following**: 1 s of not following takes it from where it lurks to the friend. While the child follows, it backs off at 0.6 × that speed, and 2.5 s of following without a break chase it away. When tracking is unavailable, it waits where it is. After 14 s it gives up and leaves. |
-| `retreating` | It walks back the way it came and fades out (2 s). |
+| `openingHole` | A hole (`Holes/Hole1`, the supplied mole hole) opens on the ground right under the basket on the friend's back (0.35 s). |
+| `emerging` | The mole comes up out of the hole (0.6 s). Its feet stay in the hole. |
+| `reaching` | It leans towards the basket and reaches up (0.9 s). At the end it has a carrot: the heart is lost now, once. |
+| `sinking` | It goes back down the same hole, holding the carrot over its head (0.6 s). |
+| `closingHole` | The hole closes (0.35 s) and nothing is left on the map. |
 
-As soon as the thief is within `ThiefApproach.catchDistance` (92 map units, feet to feet) of the
-friend, the child loses one heart and the thief runs off straight away. There is no stealing
-step: the thief never carries, takes or touches the veggies.
+Where the hole opens depends on which way the friend faces (`FoxWalkPose.bagHolePoint`): in the
+side view the basket is behind the body, so the hole is just behind the feet and the mole comes up
+in front of the tail, under the basket; in the back view (walking up the map) the basket faces the
+player, so the hole is in front of the legs; in the front view (walking down) the basket is hidden
+behind the body, so the hole is beside the friend where the mole can still be seen. The hole stays
+where it opened, and is always kept on the map.
 
-The thief's position is always measured from the friend's feet, so it goes for the friend
-wherever the friend is and never jumps. Each thief can cost at most one heart, and another
-thief can come once the cooldown is over and the child stops following again. When the friend
-reaches the stall, a thief that has not reached the friend runs off. The veggie stall is only the
-finish point of the walk; the thief never goes to it.
+- **Looking back before the carrot is taken** (the walk refocuses): the mole goes straight back
+  down the same hole empty-handed and no heart is lost; the friend walks on from where it
+  stopped. A hole that is still opening just closes again.
+- **Looking back after the carrot is taken**: the heart stays lost; the mole finishes going down.
+- **Tracking unavailable**: the mole holds still where it is, nothing is taken and no heart is
+  lost until tracking is usable again. A missing reading never counts as looking away.
+- **Reaching the stall** sends a mole that has not taken a carrot back down.
+
+Each mole can take at most one carrot and cost at most one heart. Another mole can come once the
+cooldown is over and the child stops following again.
 
 ### Hearts and time
 
 - The top bar shows only the lives, the time bar and the pause button.
-- The game starts with **3 hearts**, shown in the top bar as three carrots. Each time a thief reaches the friend takes one,
+- The game starts with **3 hearts**, shown in the top bar as three carrots. Each carrot the mole takes costs one,
   and that carrot turns grey; hearts never go below zero. With no hearts left the game ends (**Game over**).
 - The time bar fills up as the game goes on, next to the time left (M:SS, from 2:00). At 0:00 the
   game ends (**Time's up!**). The 2 minutes are one game, not a recommended play or patching time,
   and cannot be changed.
-- When the game ends, everything stops: the walk, the thief and the clock.
+- When the game ends, everything stops: the walk, the mole and the clock.
 
 ### Zoom
 
@@ -119,7 +133,7 @@ finish point of the walk; the thief never goes to it.
 
 ### Comfort and stopping
 
-- **Pause** (the painted wooden button, top right) freezes the game clock, the walk and the thief. Leaving the app pauses the game and the gaze camera
+- **Pause** (the painted wooden button, top right) freezes the game clock, the walk and the mole. Leaving the app pauses the game and the gaze camera
   automatically; the camera starts again on return and the game waits on the pause screen.
 - The pause screen is the shared "Game paused" pop-up (`GamePausePopup`, also used by Whack-a-Mole
   and Veggie Keeper), shown over the dimmed game. It has three
@@ -141,9 +155,11 @@ FoxPathGame/
 │                   hints, role card), FoxPathHUDView (carrots, time bar, pause)
 ├── ViewModels/     FoxPathGameViewModel
 ├── Models/         FoxPathConfiguration, FoxPathMap (grid, tiles, sprites), FoxRoute,
-│                   FoxWalkPose (walk animation frames), PathCharacter (the three friends, roles)
+│                   FoxWalkPose (walk animation frames, the stopped pose), PathCharacter (the
+│                   three friends, who to follow)
 ├── Managers/       FoxPathGenerator (random map), FoxPathEngine (one walk), FoxPathSession (clock,
-│                   hearts, roles, when a thief comes), FoxPathThief (thief rules and approach),
+│                   hearts, who to follow, when the mole comes), FoxPathThief (the mole's rules
+│                   and where its hole opens),
 │                   FoxPathCamera (zoom and follow), FoxPathFeedback (sounds and haptics)
 ├── Utilities/      FoxPathPalette (colours)
 └── Resources/      Assets.xcassets (FoxPath/Fox, Bunny, Raccoon, Houses, Tiles, Decorations, app
@@ -156,7 +172,7 @@ FoxPathGame/
 - **Timing:** the view model runs a ~60 Hz display-link loop. Each frame it works out whether the
   gaze (or the finger) is on the friend, away from it or unavailable, feeds that to the walk, then
   turns the walk's state into a `PlayerAttentionState` (`following`, `notFollowing`,
-  `trackingUnavailable`) for the session and the thief. The thief never reads the pointer itself.
+  `trackingUnavailable`) for the session and the mole. The mole never reads the pointer itself.
 - **Shared code:** the gaze tracker, the calibration screen, `ParameterProvenance`, the seeded
   random generator and a few small views come from `WhackAMoleGame/`.
 - **UI:** SwiftUI only.
@@ -178,12 +194,11 @@ Membership**. `README.md` files are excluded from every app.
 ## Randomization
 
 Every game draws a fresh seed (`FoxPathConfiguration.randomSeed` fixes it for research or QA; it is
-`nil` in normal play). From it come every map, every role draw and every thief time, so the same
-seed replays the same game for the same play. Thieves come only from the child's attention, but
-which side they come from is drawn from the same seed.
+`nil` in normal play). From it come every map and every draw of the friend to follow, so the same
+seed replays the same game for the same play. The mole comes only from the child's attention.
 
-- **Roles.** The primary character is drawn from all three friends and the thief from the other two,
-  again for every new path.
+- **Who to follow.** One friend is drawn from all three, again for every new path. The thief is
+  always the mole.
 - **Path.** It runs from the left edge to the right edge of a 12 × 9 grid and only goes right, up
   or down, never back. The length of each straight stretch (2–3 tiles) and the height of each turn
   (1–3 rows) are drawn at random, and the path stays in the middle rows so houses fit above and
@@ -218,7 +233,6 @@ which side they come from is drawn from the same seed.
   of baskets, or the baskets beside a few onions. They keep off the path, out from under the top
   bar, off the stepping stones and rocks, and never cover the friend. No veggie crates.
 - **Grass tufts, soil specks and grass patches** are scattered over the remaining grass.
-- **Thief's side**, as described above.
 - **Clearance.** Nothing stands on the path, and nothing that is drawn in front of the friend may
   cover it anywhere along the route (checked against the largest of the three characters).
 
@@ -237,10 +251,9 @@ There are no levels. Every game uses `FoxPathSettings.standard`:
 | Game length | 2 min |
 | Hearts | 3 |
 
-Thief timings (`ThiefSettings`): trigger delay 0.5 s, cooldown 4 s, no thief
-with less than 3 s left or within 100 map units of the stall, appear 1 s, approach 1 s, back-off
-rate 0.6, chased off after 2.5 s of following, patience 14 s, retreat 2 s. A heart is lost at
-92 map units (`ThiefApproach.catchDistance`).
+Mole timings (`ThiefSettings`): trigger delay 0.5 s, cooldown 4 s, no mole with less than 3 s
+left or within 100 map units of the stall, hole opens 0.35 s, comes up 0.6 s, reaches 0.9 s (the
+carrot is taken, and the heart lost, at the end), goes down 0.6 s, hole closes 0.35 s.
 
 ## Finish screen
 
@@ -302,10 +315,17 @@ transparency kept.
   - Each side walk plays forward and back in the supplied files, so only the unique pictures are
     in the catalog and `PathCharacter.sideSequence` lists the order they play in. The walk cycle
     advances with the distance walked, so the feet do not slide and a waiting character stands
-    still. The thief uses the side view mirrored when it walks left, and stands side on, facing
-    the friend, when it has reached it.
-  - The veggies the thief is after are the small basket every character wears on its back in
+    still. A friend that stops because the child looked away keeps its facing and shows the first
+    picture of that view (feet together).
+  - The veggies the mole is after are the small basket every character wears on its back in
     the supplied art.
+- **The mole** (`Mole/`): standing (`FoxPath/Mole/Standing`) and holding a carrot over its head
+  (`FoxPath/Mole/Carrot`), each cropped from its supplied picture. The carrot picture was drawn
+  smaller, so it is shown 1.6× larger to keep the body the same size. The hole is `Holes/Hole1`
+  from the supplied mole holes, already in the Whack-a-Mole catalog. There are no separate
+  emerging, reaching or retracting frames: the mole rises out of and sinks into the hole by
+  hiding everything below the middle of the hole, leans towards the basket while it reaches, and
+  switches to the carrot picture once it has the carrot.
 - **The House** (`Houses/`): front and back views of the carrot, mushroom and onion houses.
 - **The Path** (`Tiles/`, `Decorations/`): horizontal, vertical and curved path tiles (the curve is
   rotated and mirrored for all four corners), grass patches, the lamp, grass tufts and soil specks.
@@ -325,28 +345,33 @@ transparency kept.
 - **Garden pieces** (`Decorations/LeafyPlant`, `Decorations/OnionSprout`, `Decorations/Baskets`):
   extra scenery made for this game, cut from the house and veggie stall art. The veggie crate
   from the same art is not used.
-- **Drawn in code:** the warning overlay, the focus ring, the role card, the ground ovals under the
-  friend and the thief, and the time bar.
+- **Drawn in code:** the warning overlay, the focus ring, the role card, the ground oval under the
+  friend, and the time bar.
 - **Missing:** dedicated sound effects (built-in system sounds stand in), optional background
   music, an app icon, a separate running animation (the walk cycle stands in), and
   dedicated nature props such as trees, bushes or flowers.
 
 ## Testing
 
-- `DrStrangeTests` has 49 unit tests for this game:
-  - `FoxPathSessionTests` (23): every character can be the primary or the thief but never both,
-    the thief is the other character of the walk, roles are drawn again for each path, the clock
-    starts at the first look and stops at exactly 2 minutes, time up removes a thief that is still
-    around, stopping ends everything, no thief while the child keeps following (no timer), missing
-    gaze never brings a thief or costs a heart, a thief comes only after a stretch of not
-    following, never a second thief at once, the cooldown, no thief near the end of the game, of
-    the walk or between walks, the thief goes for the character and keeps to it, following again
-    makes it back off and leave, missing gaze makes it wait, it never jumps, reaching the
-    character costs exactly one heart (with no stealing step) and the next thief comes after the
-    cooldown, the heart is lost the moment the thief is close enough, three catches end the game
-    and nothing happens after, reaching the stall chases the thief away, the thief comes into view on
-    the map beside the character, old saved settings with a level still load, and the walk is
-    faster than before
+- `DrStrangeTests` has 60 unit tests for this game:
+  - `FoxPathSessionTests` (25): every friend can be the one to follow and it is drawn again for
+    each path, the clock starts at the first look and stops at exactly 2 minutes, time up removes
+    a mole that is still around, stopping ends everything, no mole while the child keeps following
+    (no timer), missing gaze never brings a mole or costs a heart, a mole comes only after a
+    stretch of not following, never a second mole at once, the cooldown, no mole near the end of
+    the game, of the walk or between walks, the hole opens under the basket and stays there and on
+    the map, the mole opens its hole, comes up, takes exactly one carrot (one heart), goes down
+    holding it and leaves nothing behind, it rises and sinks without jumps, showing up costs no
+    heart, looking back before the theft sends it away empty-handed (also while the hole is still
+    opening), looking back after the theft does not give the heart back, missing gaze freezes it
+    and costs nothing, three thefts end the game and nothing happens after, reaching the stall
+    sends the mole away, old saved settings with a level still load, the trigger delay and
+    cooldown are unchanged, and the walk is faster than before
+  - `FoxPathMoleTests` (9): a stopped friend keeps its place and facing (never turns to the
+    player) for all three friends, it faces the player only before the walk and at the stall, the
+    walk carries on from where it stopped, the hole is behind the friend in the side view, in front
+    of the legs in the back view and beside it in the front view, the mole and hole pictures are in
+    the catalog, and both mole pictures are the same size
   - `FoxPathGeneratorTests` (15): seed reproducibility and variety, the path only goes right, up or
     down and never crosses itself, the route stays on the path tiles, scenery never stands on the
     path or covers the character, houses do not overlap, every map has houses, lamps and one

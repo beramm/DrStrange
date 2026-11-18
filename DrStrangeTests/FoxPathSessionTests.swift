@@ -3,8 +3,8 @@ import XCTest
 
 final class FoxPathSessionTests: XCTestCase {
     private let step = 1.0 / 60
-    private let feet = CGPoint(x: 700, y: 500)
-    private var walk: WalkProgress { WalkProgress(distanceLeft: 2000, feet: feet) }
+    private let hole = CGPoint(x: 660, y: 506)
+    private var walk: WalkProgress { WalkProgress(distanceLeft: 2000, bagHole: hole) }
 
     /// A session on its first walk, with the clock running.
     private func makeSession(seed: UInt64 = 5, thief: ThiefSettings = ThiefSettings(), duration: TimeInterval = 120) -> FoxPathSession {
@@ -30,56 +30,51 @@ final class FoxPathSessionTests: XCTestCase {
         return events
     }
 
-    /// Stops following until a thief comes.
-    private func waitForThief(_ session: inout FoxPathSession) {
+    /// Stops following until a mole comes.
+    private func waitForMole(_ session: inout FoxPathSession) {
         for _ in 0..<Int(60 / step) where session.thief == nil {
             session.advance(by: step, attention: .notFollowing, walk: walk)
         }
     }
 
+    /// Keeps feeding `attention` until the mole is in `state` (or 10 s pass).
+    private func run(_ session: inout FoxPathSession, _ attention: PlayerAttentionState, until state: ThiefState) -> [FoxPathSessionEvent] {
+        var events: [FoxPathSessionEvent] = []
+        for _ in 0..<Int(10 / step) where session.thief?.state != state {
+            events += session.advance(by: step, attention: attention, walk: walk)
+        }
+        return events
+    }
+
     private func appearances(in events: [FoxPathSessionEvent]) -> Int {
-        events.filter { if case .thiefAppeared = $0 { true } else { false } }.count
+        events.filter { $0 == .thiefAppeared }.count
     }
 
     private func livesLost(in events: [FoxPathSessionEvent]) -> [FoxPathSessionEvent] {
         events.filter { if case .lifeLost = $0 { true } else { false } }
     }
 
-    // MARK: - Roles
+    // MARK: - Who to follow
 
-    func testEveryCharacterCanTakeEitherRoleButNeverBoth() {
+    func testEveryFriendCanBeTheOneToFollow() {
         var primaries = Set<PathCharacter>()
-        var thieves = Set<PathCharacter>()
         var generator = SeededGenerator(seed: 1)
         for _ in 0..<300 {
-            let roles = CharacterRoles.random(using: &generator)
-            XCTAssertNotEqual(roles.primary, roles.thief)
-            primaries.insert(roles.primary)
-            thieves.insert(roles.thief)
+            primaries.insert(CharacterRoles.random(using: &generator).primary)
         }
-        XCTAssertEqual(primaries, Set(PathCharacter.allCases))
-        XCTAssertEqual(thieves, Set(PathCharacter.allCases))
+        XCTAssertEqual(primaries, [.fox, .bunny, .raccoon])
     }
 
-    func testThiefIsTheOtherCharacterOfTheWalk() {
-        for seed: UInt64 in 1...20 {
-            var session = makeSession(seed: seed)
-            waitForThief(&session)
-            XCTAssertEqual(session.thief?.character, session.roles.thief)
-            XCTAssertNotEqual(session.thief?.character, session.roles.primary)
-        }
-    }
-
-    func testRolesAreDrawnAgainForEachNewWalk() {
+    func testOneFriendIsFollowedPerWalkAndItIsDrawnAgainForEachNewWalk() {
         var session = makeSession(seed: 3)
-        var seen = Set<String>()
+        var seen = Set<PathCharacter>()
         for _ in 0..<30 {
-            seen.insert("\(session.roles.primary)-\(session.roles.thief)")
+            seen.insert(session.roles.primary)
             session.walkFinished()
             session.prepareWalk()
             session.walkStarted()
         }
-        XCTAssertGreaterThan(seen.count, 3, "roles change between walks")
+        XCTAssertGreaterThan(seen.count, 1, "the friend to follow changes between walks")
     }
 
     // MARK: - Clock
@@ -97,18 +92,18 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .completed)
         XCTAssertEqual(session.clock, 120, accuracy: 1e-9)
         XCTAssertEqual(session.remainingTime, 0)
-        XCTAssertNil(session.thief, "no thief is left on the map")
+        XCTAssertNil(session.thief, "no mole is left on the map")
         XCTAssertTrue(run(&session, .notFollowing, for: 10).isEmpty, "nothing happens after the end")
         XCTAssertEqual(session.result.endReason, .timeUp)
     }
 
-    func testTimeUpRemovesAThiefThatIsStillAround() {
+    func testTimeUpRemovesAMoleThatIsStillAround() {
         var session = makeSession(duration: 9)
         while session.catches == 0, !session.phase.isOver {
             session.advance(by: step, attention: .notFollowing, walk: walk)
         }
         XCTAssertEqual(session.catches, 1)
-        XCTAssertEqual(session.thief?.state, .retreating, "still running off")
+        XCTAssertEqual(session.thief?.state, .sinking, "still going back down")
         let events = run(&session, .notFollowing, for: 9)
         XCTAssertEqual(events.last, .timeUp)
         XCTAssertNil(session.thief)
@@ -124,26 +119,27 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertEqual(session.result.endReason, .stopped)
     }
 
-    // MARK: - When a thief comes
+    // MARK: - When the mole comes
 
-    func testNoThiefWhileTheChildKeepsFollowing() {
+    func testNoMoleWhileTheChildKeepsFollowing() {
         var session = makeSession()
         let events = run(&session, .following, for: 115)
-        XCTAssertEqual(appearances(in: events), 0, "no timer ever sends a thief")
+        XCTAssertEqual(appearances(in: events), 0, "no timer ever sends a mole")
         XCTAssertNil(session.thief)
     }
 
-    func testMissingGazeNeverBringsAThiefOrCostsAHeart() {
+    func testMissingGazeNeverBringsAMoleOrCostsAHeart() {
         var session = makeSession()
         let events = run(&session, .trackingUnavailable, for: 60)
         XCTAssertEqual(appearances(in: events), 0)
+        XCTAssertTrue(livesLost(in: events).isEmpty)
         XCTAssertEqual(session.lives, 3)
     }
 
-    func testAThiefComesOnlyAfterAStretchOfNotFollowing() {
+    func testAMoleComesOnlyAfterAStretchOfNotFollowing() {
         let delay = ThiefSettings().triggerDelay
         var session = makeSession()
-        XCTAssertEqual(appearances(in: run(&session, .notFollowing, for: delay * 0.8)), 0, "a quick glance away brings no thief")
+        XCTAssertEqual(appearances(in: run(&session, .notFollowing, for: delay * 0.8)), 0, "a quick glance away brings no mole")
         run(&session, .following, for: 1)
         XCTAssertEqual(appearances(in: run(&session, .notFollowing, for: delay * 0.8)), 0, "following again starts the count over")
         run(&session, .trackingUnavailable, for: 1)
@@ -152,25 +148,26 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertNotNil(session.thief)
     }
 
-    func testStillNotFollowingNeverBringsASecondThiefAtOnce() {
+    func testStillNotFollowingNeverBringsASecondMoleAtOnce() {
         var session = makeSession(seed: 9)
         var active = 0
         var appeared = 0
         for _ in 0..<Int(115 / step) where !session.phase.isOver {
             for event in session.advance(by: step, attention: .notFollowing, walk: walk) {
-                if case .thiefAppeared = event { active += 1; appeared += 1 }
+                if event == .thiefAppeared { active += 1; appeared += 1 }
                 if event == .thiefLeft { active -= 1 }
             }
             XCTAssertLessThanOrEqual(active, 1)
         }
-        XCTAssertGreaterThan(appeared, 1, "a new thief can come once the last one has gone")
+        XCTAssertGreaterThan(appeared, 1, "a new mole can come once the last one has gone")
     }
 
-    func testNoNewThiefUntilTheCooldownHasPassed() {
+    func testNoNewMoleUntilTheCooldownHasPassed() {
         var session = makeSession()
-        waitForThief(&session)
-        // Following again chases this one off before it reaches the character.
-        var events = run(&session, .following, for: 6)
+        waitForMole(&session)
+        // Following again sends this one away before it takes a carrot; the cooldown starts once
+        // its hole has closed.
+        var events = run(&session, .following, for: 1)
         XCTAssertTrue(events.contains(.thiefLeft))
         events = run(&session, .notFollowing, for: ThiefSettings().cooldown - 1.5)
         XCTAssertEqual(appearances(in: events), 0, "still cooling down")
@@ -178,10 +175,10 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertEqual(appearances(in: events), 1)
     }
 
-    func testNoThiefCloseToTheEndOfTheGameOrOfTheWalk() {
+    func testNoMoleCloseToTheEndOfTheGameOrOfTheWalk() {
         let settings = ThiefSettings()
         var nearStall = makeSession(thief: settings)
-        run(&nearStall, .notFollowing, for: 5, walk: WalkProgress(distanceLeft: settings.minimumWalkLeft - 1, feet: feet))
+        run(&nearStall, .notFollowing, for: 5, walk: WalkProgress(distanceLeft: settings.minimumWalkLeft - 1, bagHole: hole))
         XCTAssertNil(nearStall.thief)
 
         var late = makeSession(thief: settings, duration: settings.minimumTimeLeft + 0.2)
@@ -190,143 +187,139 @@ final class FoxPathSessionTests: XCTestCase {
 
         var between = makeSession(thief: settings)
         run(&between, .notFollowing, for: 5, walk: .some(nil))
-        XCTAssertNil(between.thief, "no thief between walks")
+        XCTAssertNil(between.thief, "no mole between walks")
     }
 
-    // MARK: - What the thief does
+    // MARK: - What the mole does
 
-    func testThiefGoesForTheCharacterNotTheStall() throws {
+    func testMoleComesUpUnderTheBasketAndStaysInItsHole() throws {
         var session = makeSession()
-        waitForThief(&session)
-        let thief = try XCTUnwrap(session.thief)
-        let start = thief.position(around: feet)
-        XCTAssertEqual(hypot(start.x - feet.x, start.y - feet.y), ThiefApproach.startDistance, accuracy: 160)
-
-        run(&session, .notFollowing, for: ThiefSettings().appearDuration + ThiefSettings().approachDuration - 0.05)
-        XCTAssertEqual(session.thief?.state, .approaching)
-        let near = try XCTUnwrap(session.thief).position(around: feet)
-        XCTAssertLessThan(hypot(near.x - feet.x, near.y - feet.y), 120, "close beside the character")
-
-        // The thief keeps to the character wherever it goes.
-        let elsewhere = CGPoint(x: 300, y: 260)
-        let moved = try XCTUnwrap(session.thief).position(around: elsewhere)
-        XCTAssertEqual(moved.x - elsewhere.x, near.x - feet.x, accuracy: 1e-9)
-        XCTAssertEqual(moved.y - elsewhere.y, near.y - feet.y, accuracy: 1e-9)
+        waitForMole(&session)
+        XCTAssertEqual(try XCTUnwrap(session.thief).hole, hole, "the hole opens under the basket")
+        // The hole stays where it opened, even if the character later walks on.
+        let elsewhere = WalkProgress(distanceLeft: 1500, bagHole: CGPoint(x: 900, y: 400))
+        run(&session, .notFollowing, for: 0.5, walk: .some(elsewhere))
+        XCTAssertEqual(try XCTUnwrap(session.thief).hole, hole)
     }
 
-    func testFollowingAgainMakesTheThiefBackOffAndLeave() throws {
+    func testHoleStaysOnTheMap() throws {
         var session = makeSession()
-        waitForThief(&session)
-        run(&session, .notFollowing, for: 1.3)
-        let closer = try XCTUnwrap(session.thief).progress
-        XCTAssertGreaterThan(closer, FoxPathThief.lurkProgress)
-
-        run(&session, .following, for: 1)
-        XCTAssertLessThan(try XCTUnwrap(session.thief).progress, closer, "it backs off")
-
-        let events = run(&session, .following, for: ThiefSettings().chasedOffAfter + ThiefSettings().retreatDuration)
-        XCTAssertTrue(events.contains(.thiefLeft), "following long enough chases it away")
-        XCTAssertTrue(livesLost(in: events).isEmpty)
-        XCTAssertEqual(session.lives, 3)
-    }
-
-    func testMissingGazeMakesTheThiefWait() throws {
-        var session = makeSession()
-        waitForThief(&session)
-        run(&session, .notFollowing, for: 1.3)
-        let before = try XCTUnwrap(session.thief)
-        let events = run(&session, .trackingUnavailable, for: ThiefSettings().patience + 1)
-        XCTAssertTrue(livesLost(in: events).isEmpty)
-        XCTAssertEqual(session.lives, 3)
-        let thief = try XCTUnwrap(session.thief)
-        XCTAssertEqual(thief.state, .approaching)
-        XCTAssertEqual(thief.progress, before.progress, accuracy: 1e-9, "the thief holds still while tracking is unavailable")
-        XCTAssertEqual(thief.age, before.age, accuracy: 1e-9, "missing tracking does not use up its patience")
-        XCTAssertEqual(thief.stateTime, before.stateTime, accuracy: 1e-9)
-    }
-
-    func testMissingGazeFreezesAThiefWhileItAppears() throws {
-        var session = makeSession()
-        waitForThief(&session)
-        let before = try XCTUnwrap(session.thief)
-
-        let events = run(&session, .trackingUnavailable, for: ThiefSettings().patience + 1)
-
-        XCTAssertTrue(livesLost(in: events).isEmpty)
-        let thief = try XCTUnwrap(session.thief)
-        XCTAssertEqual(thief.state, .appearing)
-        XCTAssertEqual(thief.progress, before.progress, accuracy: 1e-9)
-        XCTAssertEqual(thief.visibility, before.visibility, accuracy: 1e-9)
-        XCTAssertEqual(thief.age, before.age, accuracy: 1e-9)
-        XCTAssertEqual(thief.stateTime, before.stateTime, accuracy: 1e-9)
-    }
-
-    func testThiefNeverJumps() {
-        var session = makeSession()
-        waitForThief(&session)
-        let settings = ThiefSettings()
-        let fastest = 1 / min(
-            settings.approachDuration / (1 - FoxPathThief.lurkProgress),
-            settings.retreatDuration,
-            settings.appearDuration / FoxPathThief.lurkProgress
-        )
-        var last = session.thief?.progress ?? 0
-        for _ in 0..<Int(20 / step) {
-            session.advance(by: step, attention: .notFollowing, walk: walk)
-            guard let thief = session.thief else { break }
-            XCTAssertLessThanOrEqual(abs(thief.progress - last), fastest * step + 1e-9)
-            last = thief.progress
+        let size = FoxPathMetrics.mapSize
+        for _ in 0..<Int(60 / step) where session.thief == nil {
+            session.advance(by: step, attention: .notFollowing, walk: WalkProgress(distanceLeft: 2000, bagHole: CGPoint(x: -40, y: size.height + 30)))
         }
+        let opened = try XCTUnwrap(session.thief).hole
+        XCTAssertTrue((0...size.width).contains(opened.x))
+        XCTAssertTrue((0...size.height).contains(opened.y))
     }
 
-    // MARK: - Hearts
-
-    func testReachingTheCharacterCostsExactlyOneHeart() throws {
+    func testMoleOpensItsHoleComesUpTakesOneCarrotAndGoesBackDown() {
         var session = makeSession()
-        waitForThief(&session)
+        waitForMole(&session)
         var events: [FoxPathSessionEvent] = []
         var states: [ThiefState] = []
-        // Until this thief has gone.
+        var carrotWhileSinking = false
         for _ in 0..<Int(10 / step) where !events.contains(.thiefLeft) {
             events += session.advance(by: step, attention: .notFollowing, walk: walk)
-            if let thief = session.thief, states.last != thief.state { states.append(thief.state) }
+            guard let mole = session.thief else { continue }
+            if states.last != mole.state { states.append(mole.state) }
+            if mole.state == .sinking, mole.hasStolen { carrotWhileSinking = true }
         }
-        XCTAssertEqual(states, [.appearing, .approaching, .retreating], "it rushes up, then runs off; no stealing")
-        XCTAssertEqual(livesLost(in: events), [.lifeLost(remaining: 2)])
-        XCTAssertTrue(events.contains(.thiefLeft))
+        XCTAssertEqual(states, [.openingHole, .emerging, .reaching, .sinking, .closingHole])
+        XCTAssertTrue(carrotWhileSinking, "it goes back down holding the carrot")
+        XCTAssertEqual(livesLost(in: events), [.lifeLost(remaining: 2)], "exactly one carrot, one heart")
+        XCTAssertNil(session.thief, "nothing is left on the map once the hole has closed")
         XCTAssertEqual(session.lives, 2)
         XCTAssertEqual(session.catches, 1)
 
-        // Still not following: the next thief comes once the cooldown is over.
+        // Still not following: the next mole comes once the cooldown is over.
         let next = run(&session, .notFollowing, for: ThiefSettings().cooldown + 1)
         XCTAssertEqual(appearances(in: next), 1)
     }
 
-    func testHeartIsLostTheMomentTheThiefIsCloseEnough() throws {
+    func testMoleRisesSteadilyOutOfTheHoleAndBackIn() {
         var session = makeSession()
-        waitForThief(&session)
+        waitForMole(&session)
         let settings = ThiefSettings()
-        var elapsed: TimeInterval = 0
-        var caughtAt: TimeInterval?
-        var progressAtCatch: Double?
-        while caughtAt == nil, elapsed < 10 {
-            let before = session.thief?.progress ?? 0
-            let events = session.advance(by: step, attention: .notFollowing, walk: walk)
-            elapsed += step
-            if !livesLost(in: events).isEmpty {
-                caughtAt = elapsed
-                progressAtCatch = before
-            }
+        let fastest = 1 / min(settings.emergeDuration, settings.sinkDuration)
+        var last = session.thief?.rise ?? 0
+        var highest = 0.0
+        for _ in 0..<Int(5 / step) {
+            session.advance(by: step, attention: .notFollowing, walk: walk)
+            guard let mole = session.thief else { break }
+            XCTAssertLessThanOrEqual(abs(mole.rise - last), fastest * step + 1e-9, "never jumps")
+            last = mole.rise
+            highest = max(highest, mole.rise)
         }
-        let caught = try XCTUnwrap(caughtAt)
-        // Fade in, then a quick rush: the heart goes as soon as the thief arrives.
-        XCTAssertLessThanOrEqual(caught, settings.appearDuration + settings.approachDuration + 2 * step)
-        XCTAssertGreaterThan(try XCTUnwrap(progressAtCatch), 0.9, "lost on arrival, not before")
-        XCTAssertEqual(session.thief?.state, .retreating)
-        XCTAssertTrue(try XCTUnwrap(session.thief).hasCaught)
+        XCTAssertEqual(highest, 1, accuracy: 1e-9)
+        XCTAssertNil(session.thief)
     }
 
-    func testThreeCatchesEndTheGameAndNothingHappensAfter() {
+    func testTheMoleShowingUpDoesNotCostAHeart() {
+        var session = makeSession()
+        waitForMole(&session)
+        let events = run(&session, .notFollowing, until: .reaching)
+        XCTAssertTrue(livesLost(in: events).isEmpty)
+        XCTAssertEqual(session.lives, 3, "up and reaching, but no carrot yet")
+    }
+
+    func testLookingBackBeforeTheTheftSendsTheMoleAwayEmptyHanded() throws {
+        var session = makeSession()
+        waitForMole(&session)
+        run(&session, .notFollowing, until: .reaching)
+        run(&session, .notFollowing, for: ThiefSettings().reachDuration * 0.5)
+        session.advance(by: step, attention: .following, walk: walk)
+        let mole = try XCTUnwrap(session.thief)
+        XCTAssertEqual(mole.state, .sinking, "it goes straight back down")
+        XCTAssertFalse(mole.hasStolen)
+        XCTAssertTrue(mole.wasChasedOff)
+        // Even if the child looks away again while it goes down, it does not come back up.
+        let events = run(&session, .notFollowing, for: 2)
+        XCTAssertTrue(livesLost(in: events).isEmpty)
+        XCTAssertTrue(events.contains(.thiefLeft))
+        XCTAssertEqual(session.lives, 3)
+        XCTAssertEqual(session.catches, 0)
+    }
+
+    func testLookingBackWhileTheHoleOpensClosesItAgain() throws {
+        var session = makeSession()
+        waitForMole(&session)
+        run(&session, .notFollowing, for: ThiefSettings().holeOpenDuration * 0.6)
+        XCTAssertEqual(try XCTUnwrap(session.thief).state, .openingHole)
+        session.advance(by: step, attention: .following, walk: walk)
+        XCTAssertEqual(try XCTUnwrap(session.thief).state, .closingHole)
+        let events = run(&session, .following, for: 1)
+        XCTAssertTrue(events.contains(.thiefLeft))
+        XCTAssertTrue(livesLost(in: events).isEmpty)
+    }
+
+    func testLookingBackAfterTheTheftDoesNotGiveTheHeartBack() throws {
+        var session = makeSession()
+        waitForMole(&session)
+        let stolen = run(&session, .notFollowing, until: .sinking)
+        XCTAssertEqual(livesLost(in: stolen).count, 1)
+        let after = run(&session, .following, for: 3)
+        XCTAssertTrue(livesLost(in: after).isEmpty, "never a second heart for the same carrot")
+        XCTAssertEqual(session.lives, 2)
+    }
+
+    func testMissingGazeFreezesTheMoleAndCostsNothing() throws {
+        var session = makeSession()
+        waitForMole(&session)
+        run(&session, .notFollowing, until: .reaching)
+        let before = try XCTUnwrap(session.thief)
+        let events = run(&session, .trackingUnavailable, for: 10)
+        XCTAssertTrue(livesLost(in: events).isEmpty)
+        let mole = try XCTUnwrap(session.thief)
+        XCTAssertEqual(mole.state, .reaching)
+        XCTAssertEqual(mole.stateTime, before.stateTime, accuracy: 1e-9, "the mole holds still while tracking is unavailable")
+        XCTAssertEqual(mole.age, before.age, accuracy: 1e-9)
+        XCTAssertFalse(mole.wasChasedOff, "a missing reading is not looking back")
+    }
+
+    // MARK: - Hearts
+
+    func testThreeTheftsEndTheGameAndNothingHappensAfter() {
         var session = makeSession()
         var events: [FoxPathSessionEvent] = []
         for _ in 0..<Int(115 / step) where !session.phase.isOver {
@@ -341,37 +334,18 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertEqual(session.result.endReason, .noLivesLeft)
     }
 
-    func testReachingTheStallChasesTheThiefAway() throws {
+    func testReachingTheStallSendsTheMoleAway() throws {
         var session = makeSession()
-        waitForThief(&session)
-        run(&session, .notFollowing, for: 1.2)
-        XCTAssertEqual(session.lives, 3, "not reached yet")
+        waitForMole(&session)
+        run(&session, .notFollowing, until: .reaching)
+        XCTAssertEqual(session.lives, 3, "no carrot yet")
         session.walkFinished()
-        XCTAssertEqual(try XCTUnwrap(session.thief).state, .retreating)
+        XCTAssertEqual(try XCTUnwrap(session.thief).state, .sinking)
         let events = run(&session, .notFollowing, for: 5, walk: .some(nil))
         XCTAssertTrue(livesLost(in: events).isEmpty)
         XCTAssertNil(session.thief)
-        XCTAssertEqual(appearances(in: events), 0, "no new thief until the next walk starts")
+        XCTAssertEqual(appearances(in: events), 0, "no new mole until the next walk starts")
         XCTAssertEqual(session.walksCompleted, 1)
-    }
-
-    // MARK: - Way in
-
-    func testThiefComesIntoViewOnTheMapBesideTheCharacter() {
-        var generator = SeededGenerator(seed: 4)
-        let size = FoxPathMetrics.mapSize
-        for _ in 0..<300 {
-            let feet = CGPoint(
-                x: CGFloat.random(in: FoxPathMetrics.routeInset...(size.width - FoxPathMetrics.routeEndInset), using: &generator),
-                y: CGFloat.random(in: 240...(size.height - 120), using: &generator)
-            )
-            let approach = ThiefApproach.make(around: feet, mapSize: size, using: &generator)
-            let start = CGPoint(x: feet.x + approach.start.dx, y: feet.y + approach.start.dy)
-            XCTAssertTrue((70...(size.width - 70)).contains(start.x), "\(feet): starts at \(start)")
-            XCTAssertTrue((236...(size.height - 12)).contains(start.y), "\(feet): starts at \(start)")
-            XCTAssertEqual(abs(approach.stand.dx), ThiefApproach.catchDistance)
-            XCTAssertEqual(approach.side, approach.start.dx < 0 ? -1 : 1, "it stays on the side it came from")
-        }
     }
 
     // MARK: - Settings
@@ -384,6 +358,12 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertEqual(configuration.settings, .standard)
         XCTAssertEqual(FoxPathConfiguration.sessionDuration, 120)
         XCTAssertEqual(FoxPathConfiguration.initialLives, 3)
+    }
+
+    func testMoleTimingsKeepTheExistingTriggerAndCooldown() {
+        let settings = ThiefSettings()
+        XCTAssertEqual(settings.triggerDelay, 0.5)
+        XCTAssertEqual(settings.cooldown, 4)
     }
 
     func testWalkIsFasterThanBefore() {

@@ -33,31 +33,27 @@ struct FoxPathSettings: Codable, Equatable {
 /// A thief only ever comes because the child stopped following; there is no timer that sends
 /// one. Missing gaze readings never bring a thief.
 struct ThiefSettings: Codable, Equatable {
-    /// Seconds the child must keep not following (on top of the look-away grace) before a
-    /// thief comes, so a quick glance away does not bring one.
+    /// Seconds the child must keep not following (on top of the look-away grace) before the
+    /// mole comes, so a quick glance away does not bring one.
     var triggerDelay: Double = 0.5
-    /// Seconds after a thief has left before another one can come.
+    /// Seconds after a mole has gone before another one can come.
     var cooldown: Double = 4
-    /// No new thief comes when fewer seconds than this are left in the game.
+    /// No new mole comes when fewer seconds than this are left in the game.
     var minimumTimeLeft: Double = 3
-    /// No new thief comes when the character the child follows is this close to the stall
+    /// No new mole comes when the character the child follows is this close to the stall
     /// (map units), because the walk is about to end.
     var minimumWalkLeft: Double = 100
-    /// Seconds the thief takes to come into view.
-    var appearDuration: Double = 1
-    /// Seconds of not following that take the thief from where it lurks to the character. Short,
-    /// so the thief rushes in.
-    var approachDuration: Double = 1
-    /// While the child follows, the thief backs away at this fraction of its approach speed.
-    var backOffRate: Double = 0.6
-    /// Seconds of following without a break that chase a thief off before it reaches the
-    /// character.
-    var chasedOffAfter: Double = 2.5
-    /// Seconds the thief stays around without reaching the character before it gives up and
-    /// leaves.
-    var patience: Double = 14
-    /// Seconds the thief takes to run off.
-    var retreatDuration: Double = 2
+    /// Seconds the hole under the basket takes to open.
+    var holeOpenDuration: Double = 0.35
+    /// Seconds the mole takes to come up out of the hole.
+    var emergeDuration: Double = 0.6
+    /// Seconds the mole reaches up to the basket before it has the carrot. Looking back at the
+    /// character before then sends the mole away with nothing.
+    var reachDuration: Double = 0.9
+    /// Seconds the mole takes to go back down the hole from all the way up.
+    var sinkDuration: Double = 0.6
+    /// Seconds the hole takes to close.
+    var holeCloseDuration: Double = 0.35
 }
 
 /// Everything needed to start one Follow the Fox game.
