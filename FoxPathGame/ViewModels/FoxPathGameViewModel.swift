@@ -37,6 +37,8 @@ final class FoxPathGameViewModel {
     private(set) var foxPose: FoxWalkPose
     /// The mole and its hole, while one is on the map.
     private(set) var mole: MoleThiefVisual?
+    /// A decoy mole popping up on the grass to tempt the eyes away; it never takes anything.
+    private(set) var decoy: MoleThiefVisual?
     private(set) var trackingState: FoxTrackingState = .waiting
     private(set) var attention: PlayerAttentionState = .following
     private(set) var refocusProgress: Double = 0
@@ -56,6 +58,7 @@ final class FoxPathGameViewModel {
 
     @ObservationIgnored private var session: FoxPathSession
     @ObservationIgnored private var engine: FoxPathEngine
+    @ObservationIgnored private var decoys: DecoyMoleSpawner
     @ObservationIgnored private var displayLink: CADisplayLink?
     @ObservationIgnored private let linkTarget = DisplayLinkTarget()
     @ObservationIgnored private var lastTick: CFTimeInterval?
@@ -83,6 +86,8 @@ final class FoxPathGameViewModel {
         self.settings = settings
         self.pointerTimeout = pointerTimeout
         self.session = session
+        // Its own generator, drawn from the game seed, so decoys never change the maps.
+        decoys = DecoyMoleSpawner(seed: seed ^ 0x6D6F_6C65)
         map = walk.map
         engine = walk.engine
         roles = session.roles
@@ -239,6 +244,16 @@ final class FoxPathGameViewModel {
             }
             syncFromEngine()
             syncMole()
+            // Decoys pop up only while the child follows the walking character and no thief is around.
+            decoys.advance(
+                by: delta,
+                canSpawn: nextWalkCountdown == nil && engine.state == .following
+                    && attention == .following && session.thief == nil,
+                feet: foxPose.feet,
+                map: map
+            )
+            let decoyVisual = decoys.decoy.map(MoleThiefVisual.init(decoy:))
+            if decoyVisual != decoy { decoy = decoyVisual }
         }
 
         var nextCamera = camera
@@ -295,6 +310,8 @@ final class FoxPathGameViewModel {
         let walk = Self.makeWalk(session: &session, settings: settings)
         map = walk.map
         engine = walk.engine
+        decoys.reset()
+        decoy = nil
         roles = session.roles
         foxPose = .standing(roles.primary, at: walk.map.route.sample(at: 0).point)
         tangent = CGVector(dx: 1, dy: 0)
@@ -327,9 +344,7 @@ final class FoxPathGameViewModel {
             if mole != nil { mole = nil }
             return
         }
-        // The basket is on the character's back, at the middle of the picture's width; the mole
-        // leans that way while it reaches up.
-        let visual = MoleThiefVisual(thief: thief, basketX: foxPose.frame.midX)
+        let visual = MoleThiefVisual(thief: thief)
         if visual != mole { mole = visual }
     }
 

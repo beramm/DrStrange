@@ -93,7 +93,7 @@ and missing gaze readings never bring one. Exactly:
 |---|---|
 | `openingHole` | A hole (`Holes/Hole1`, the supplied mole hole) opens on the ground right under the basket on the friend's back (0.35 s). |
 | `emerging` | The mole comes up out of the hole (0.6 s). Its feet stay in the hole. |
-| `reaching` | It leans towards the basket and reaches up (0.9 s). At the end it has a carrot: the heart is lost now, once. |
+| `reaching` | It stays upright and stretches up to the basket (0.9 s). At the end it has a carrot: the heart is lost now, once. |
 | `sinking` | It goes back down the same hole, holding the carrot over its head (0.6 s). |
 | `closingHole` | The hole closes (0.35 s) and nothing is left on the map. |
 
@@ -114,6 +114,22 @@ where it opened, and is always kept on the map.
 
 Each mole can take at most one carrot and cost at most one heart. Another mole can come once the
 cooldown is over and the child stops following again.
+
+### Decoy moles
+
+While the child follows, harmless decoy moles pop up at random on the grass to tempt the eyes
+away (`DecoyMoleSpawner`). A decoy's hole opens, it comes up, stays up for 1.2 s, goes back down
+and the hole closes; it never takes anything, never costs a heart and does not react to where
+the child looks. Looking at it is what costs: the friend stops, and the real thief comes from under
+the basket.
+
+- Only while the child follows the walking friend and no thief is around, and only one at a time.
+- The first one pops up 4–7 s into a walk, then one every 4–8 s after the last has gone (random).
+- It pops up 240–520 map units from the friend, on open grass: off the path, clear of houses,
+  lamps and other things that stand, below the top bar and on the map. If there is no room
+  nearby, it tries again half a second later.
+- A new walk clears it. Its random times and spots come from the game seed, so a fixed seed
+  replays them.
 
 ### Hearts and time
 
@@ -159,7 +175,7 @@ FoxPathGame/
 │                   three friends, who to follow)
 ├── Managers/       FoxPathGenerator (random map), FoxPathEngine (one walk), FoxPathSession (clock,
 │                   hearts, who to follow, when the mole comes), FoxPathThief (the mole's rules
-│                   and where its hole opens),
+│                   and where its hole opens), FoxPathDecoyMoles (decoy moles on the grass),
 │                   FoxPathCamera (zoom and follow), FoxPathFeedback (sounds and haptics)
 ├── Utilities/      FoxPathPalette (colours)
 └── Resources/      Assets.xcassets (FoxPath/Fox, Bunny, Raccoon, Houses, Tiles, Decorations, app
@@ -324,8 +340,9 @@ transparency kept.
   smaller, so it is shown 1.6× larger to keep the body the same size. The hole is `Holes/Hole1`
   from the supplied mole holes, already in the Whack-a-Mole catalog. There are no separate
   emerging, reaching or retracting frames: the mole rises out of and sinks into the hole by
-  hiding everything below the middle of the hole, leans towards the basket while it reaches, and
-  switches to the carrot picture once it has the carrot.
+  hiding everything below the middle of the hole, stays upright and stretches up a little while it
+  reaches, and switches to the carrot picture once it has the carrot. Decoy moles use the standing
+  picture and the same hole.
 - **The House** (`Houses/`): front and back views of the carrot, mushroom and onion houses.
 - **The Path** (`Tiles/`, `Decorations/`): horizontal, vertical and curved path tiles (the curve is
   rotated and mirrored for all four corners), grass patches, the lamp, grass tufts and soil specks.
@@ -353,7 +370,7 @@ transparency kept.
 
 ## Testing
 
-- `DrStrangeTests` has 60 unit tests for this game:
+- `DrStrangeTests` has 67 unit tests for this game:
   - `FoxPathSessionTests` (25): every friend can be the one to follow and it is drawn again for
     each path, the clock starts at the first look and stops at exactly 2 minutes, time up removes
     a mole that is still around, stopping ends everything, no mole while the child keeps following
@@ -367,6 +384,10 @@ transparency kept.
     and costs nothing, three thefts end the game and nothing happens after, reaching the stall
     sends the mole away, old saved settings with a level still load, the trigger delay and
     cooldown are unchanged, and the walk is faster than before
+  - `FoxPathDecoyMoleTests` (7): decoys pop up only while the child follows, the first one comes at
+    a random time in its range, one at a time at random intervals, a decoy pops up, goes back down
+    and leaves nothing, decoys pop up on open grass near the friend (off the path, clear of houses
+    and on the map), a new walk clears the decoy, and the same seed replays the same decoys
   - `FoxPathMoleTests` (9): a stopped friend keeps its place and facing (never turns to the
     player) for all three friends, it faces the player only before the walk and at the stall, the
     walk carries on from where it stopped, the hole is behind the friend in the side view, in front

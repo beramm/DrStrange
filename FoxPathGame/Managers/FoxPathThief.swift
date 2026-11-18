@@ -185,7 +185,7 @@ extension FoxWalkPose {
     }
 }
 
-/// What the map shows of the mole in one frame.
+/// What the map shows of a mole in one frame: the thief, or a decoy that only pops up.
 struct MoleThiefVisual: Equatable {
     /// Ground point of the hole, in map units.
     let hole: CGPoint
@@ -193,12 +193,10 @@ struct MoleThiefVisual: Equatable {
     let holeOpenness: Double
     /// 0 inside the hole, 1 all the way up.
     let rise: Double
-    /// 0...1 while the mole reaches up to the basket.
+    /// 0...1 while the thief reaches up to the basket. It stays upright: it only stretches up.
     let reach: Double
     /// The mole has the carrot.
     let holdsCarrot: Bool
-    /// Which way the basket is from the hole: -1 left, 1 right, 0 straight above.
-    let towardBasket: CGFloat
 
     /// Drawn size of the mole standing, in map units (from the 702 × 1149-pixel picture).
     static let standingSize = CGSize(width: 68.1, height: 110.9)
@@ -209,13 +207,19 @@ struct MoleThiefVisual: Equatable {
     /// the hole.
     static let highestRise: CGFloat = 0.84
 
-    init(thief: FoxPathThief, basketX: CGFloat) {
-        hole = thief.hole
-        holeOpenness = (thief.holeOpenness * 20).rounded() / 20
-        rise = (thief.rise * 40).rounded() / 40
-        reach = (thief.reach * 20).rounded() / 20
-        holdsCarrot = thief.hasStolen
-        let dx = basketX - thief.hole.x
-        towardBasket = abs(dx) < 8 ? 0 : (dx < 0 ? -1 : 1)
+    init(hole: CGPoint, holeOpenness: Double, rise: Double, reach: Double = 0, holdsCarrot: Bool = false) {
+        self.hole = hole
+        self.holeOpenness = (holeOpenness * 20).rounded() / 20
+        self.rise = (rise * 40).rounded() / 40
+        self.reach = (reach * 20).rounded() / 20
+        self.holdsCarrot = holdsCarrot
+    }
+
+    init(thief: FoxPathThief) {
+        self.init(hole: thief.hole, holeOpenness: thief.holeOpenness, rise: thief.rise, reach: thief.reach, holdsCarrot: thief.hasStolen)
+    }
+
+    init(decoy: DecoyMole) {
+        self.init(hole: decoy.hole, holeOpenness: decoy.holeOpenness, rise: decoy.rise)
     }
 }

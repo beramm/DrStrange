@@ -17,7 +17,8 @@ struct FoxPathMapView: View {
                 FoxPathStandingView(
                     sprites: viewModel.map.standingSprites,
                     fox: viewModel.foxPose,
-                    mole: viewModel.mole
+                    mole: viewModel.mole,
+                    decoy: viewModel.decoy
                 )
             }
             .frame(width: mapSize.width, height: mapSize.height, alignment: .topLeading)
@@ -113,6 +114,7 @@ private struct FoxPathStandingView: View {
     let sprites: [MapSprite]
     let fox: FoxWalkPose
     let mole: MoleThiefVisual?
+    let decoy: MoleThiefVisual?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -124,6 +126,12 @@ private struct FoxPathStandingView: View {
                 .zIndex(Double(fox.feet.y) - 0.5)
             FoxSpriteView(pose: fox)
                 .zIndex(Double(fox.feet.y))
+            if let decoy {
+                ThiefHoleView(mole: decoy)
+                    .zIndex(-1)
+                ThiefMoleView(mole: decoy)
+                    .zIndex(Double(decoy.hole.y) + 0.25)
+            }
             if let mole {
                 // The hole lies flat on the ground, under everything that stands.
                 ThiefHoleView(mole: mole)
@@ -168,8 +176,9 @@ private struct ThiefHoleView: View {
 }
 
 /// The mole coming up out of its hole: everything below the middle of the hole is hidden, so it
-/// rises out of the ground and sinks back into it. While it reaches up it leans towards the
-/// basket; once it has the carrot it holds it over its head (`FoxPath/Mole/Carrot`).
+/// rises out of the ground and sinks back into it. It always stays upright; while it reaches up to
+/// the basket it stretches up a little, and once it has the carrot it holds it over its head
+/// (`FoxPath/Mole/Carrot`).
 private struct ThiefMoleView: View {
     let mole: MoleThiefVisual
 
@@ -181,7 +190,6 @@ private struct ThiefMoleView: View {
         Image(mole.holdsCarrot ? "FoxPath/Mole/Carrot" : "FoxPath/Mole/Standing")
             .resizable()
             .frame(width: size.width, height: size.height)
-            .rotationEffect(.degrees(Double(mole.towardBasket * 9 * stretch)), anchor: .bottom)
             .offset(y: size.height - shown - 6 * stretch)
             .frame(width: window.width, height: window.height, alignment: .bottom)
             .clipped()
