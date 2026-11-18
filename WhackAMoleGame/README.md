@@ -63,8 +63,10 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
   (`PatchReminder/<Character>PatchOn|Off`; a still picture with Reduce Motion). Once only the
   selected right eye has been consistently visible again for 1.5 seconds, the reminder closes
   and the game carries on by itself.
-- The pause screen has **Rest my eyes**, which ends the session straight away and shows the
-  summary. It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
+- The pause screen is the shared "Game paused" pop-up (`GamePausePopup`, also used by Veggie Dash
+  and Veggie Keeper): **Home** saves the game so far as `stopped` and goes back to the lobby start
+  screen, **Restart** starts a fresh game and **Play** (or the close button) carries on. Home is
+  the way to stop when the child's eyes are sore or tired, or the patch is uncomfortable.
 - Each saved session records why it ended: `timeUp`, `stopped` or `restBreak`.
 
 ## Gameplay
@@ -462,7 +464,7 @@ clinical improvement.
 - Manual checks on the iPad Pro 11-inch simulator:
   - patching setup, including the same-eye warning
   - play and hit animation
-  - pause and Rest my eyes
+  - the pause pop-up: Home, Restart and Play
   - finish screen: Restart, Next (opens Veggie Dash or Veggie Keeper) and Home (lobby start
     screen), and the high score kept after closing and reopening the app
   - DrStrange app navigation into the game

@@ -15,6 +15,9 @@ struct WhackAMoleGameView: View {
 
     @State private var viewModel: WhackAMoleGameViewModel
     @State private var isPausedForMissingPatch = false
+    /// Set when Home is chosen on the pause screen, so the finish screen does not flash up while
+    /// the game closes.
+    @State private var isLeavingForHome = false
     @State private var isPausedForRecalibration = false
     @State private var isPresentingRecalibration = false
     @Environment(\.scenePhase) private var scenePhase
@@ -36,7 +39,7 @@ struct WhackAMoleGameView: View {
 
     var body: some View {
         ZStack {
-            if viewModel.finishedSession != nil {
+            if viewModel.finishedSession != nil, !isLeavingForHome {
                 GameResultView(
                     score: viewModel.score,
                     previousHighScore: viewModel.highScore,
@@ -164,14 +167,19 @@ struct WhackAMoleGameView: View {
                 PatchReminderScreen()
                     .transition(.opacity)
             } else {
-                PauseOverlay(
-                    onResume: viewModel.resume,
-                    onRest: { viewModel.finishEarly(reason: .restBreak) }
-                )
+                GamePausePopup(onResume: viewModel.resume, onRestart: restart, onHome: leaveForHome)
             }
         default:
             EmptyView()
         }
+    }
+
+    /// Pause screen "Home": the game so far is saved as stopped early (it still counts for the
+    /// high score), then the game closes without showing the finish screen.
+    private func leaveForHome() {
+        isLeavingForHome = true
+        viewModel.finishEarly(reason: .stopped)
+        (onHome ?? onClose)()
     }
 
     private func restart() {
@@ -261,48 +269,6 @@ private struct RecalibrationPauseOverlay: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 520)
-            }
-            .padding(48)
-            .background(RoundedRectangle(cornerRadius: 36).fill(WhackAMolePalette.cream))
-        }
-    }
-}
-
-/// Pause screen. Besides resuming, it offers a clear way to stop and rest when the child's eyes
-/// are tired or uncomfortable.
-private struct PauseOverlay: View {
-    let onResume: () -> Void
-    let onRest: () -> Void
-
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.25).ignoresSafeArea()
-            VStack(spacing: 24) {
-                Image(systemName: "pause.circle.fill")
-                    .font(.system(size: 72))
-                    .foregroundStyle(WhackAMolePalette.accent)
-                    .accessibilityHidden(true)
-                Text("Paused")
-                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                HStack(spacing: 20) {
-                    Button(action: onRest) {
-                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
-                            .frame(minWidth: 200, minHeight: 56)
-                    }
-                    .buttonStyle(.bordered)
-                    Button(action: onResume) {
-                        Label("Play", systemImage: "play.fill")
-                            .frame(minWidth: 180, minHeight: 56)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(WhackAMolePalette.accent)
-                }
-                .font(.title2.weight(.bold))
-                Text("Grown-ups: if your child has sore or tired eyes, a headache, or the patch feels uncomfortable, choose Rest my eyes.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 460)
             }
             .padding(48)
             .background(RoundedRectangle(cornerRadius: 36).fill(WhackAMolePalette.cream))
