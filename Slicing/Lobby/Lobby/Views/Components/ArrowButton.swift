@@ -24,7 +24,7 @@ struct ArrowButton: View {
                         .shadow(color: .black.opacity(0.15), radius: 6, y: 4)
                 )
         }
-        .buttonStyle(PressableButtonStyle())
+        .buttonStyle(PressableButtonStyle(sound: .characterSelection))
         .accessibilityLabel(direction == .previous ? "Previous character" : "Next character")
     }
 }
