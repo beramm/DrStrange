@@ -41,6 +41,8 @@ struct RandomizerView: View {
     private let cardCenterY: CGFloat = 428
     /// Size of the cards that aren't popped up, compared with the popped-up one.
     private let smallCardScale: CGFloat = 0.765
+    /// The highlight sequence and its sound effect finish together at this time.
+    private let spinDurationMilliseconds: Int64 = 3_000
 
     var body: some View {
         GeometryReader { geo in
@@ -80,7 +82,7 @@ struct RandomizerView: View {
                             } label: {
                                 MiniGameCard(game: game, isLocked: isLocked, scale: s)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(PressableButtonStyle())
                             .disabled(manualSelectionPending)
                             // A locked game can't be opened: chooseManually ignores the tap.
                             // (Not .disabled here, which would also fade the lock.)
@@ -133,17 +135,37 @@ struct RandomizerView: View {
         highlighted = nil
         // Only open (unlocked) games can be picked.
         let pick = MiniGame.randomPick(avoiding: MiniGame(rawValue: lastGameID), gamesLocked: gamesLocked)
+        var randomizerSoundIsPlaying = false
 
         do {
             if !reduceMotion {
                 let games = MiniGame.allCases
                 // Two full rounds, then stop on the picked game.
                 let hops = games.count * 2 + (games.firstIndex(of: pick) ?? 0)
-                for step in 0...hops {
+                let delays = (0..<hops).map { 140 + $0 * 45 }
+                let totalDelay = delays.reduce(0, +)
+                let clock = ContinuousClock()
+                let start = clock.now
+
+                SoundEffectPlayer.shared.play(.randomizer)
+                randomizerSoundIsPlaying = true
+
+                highlighted = games[0]
+                var elapsedDelay = 0
+                for step in 1...hops {
+                    // Preserve the slowdown curve, normalized to exactly three seconds.
+                    elapsedDelay += delays[step - 1]
+                    let targetMilliseconds = Int64(
+                        (Double(elapsedDelay) / Double(totalDelay) * Double(spinDurationMilliseconds)).rounded()
+                    )
+                    try await clock.sleep(
+                        until: start.advanced(by: .milliseconds(targetMilliseconds))
+                    )
                     highlighted = games[step % games.count]
-                    // Each hop waits a little longer, so it slows down before stopping.
-                    try await Task.sleep(for: .milliseconds(140 + step * 45))
                 }
+
+                SoundEffectPlayer.shared.stop(.randomizer)
+                randomizerSoundIsPlaying = false
             }
 
             highlighted = pick
@@ -154,6 +176,9 @@ struct RandomizerView: View {
             onChosen(pick)
         } catch {
             // The child left this screen (for example with the back button); stop here.
+            if randomizerSoundIsPlaying {
+                SoundEffectPlayer.shared.stop(.randomizer)
+            }
         }
     }
 }
