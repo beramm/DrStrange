@@ -3,16 +3,15 @@ import SwiftUI
 /// Entry screen for the game: the high score and a big Play button for the child, and a panel
 /// for the adult with the patching session record and game options.
 struct GameHomeView: View {
-    private enum PresentedScreen: String, Identifiable {
+    private enum PresentedScreen {
         case calibration
         case game
-
-        var id: String { rawValue }
     }
 
     @State private var configuration = ConfigurationStore.standard.load()
     @State private var gazeController = GazeInputController()
-    @State private var presentedScreen: PresentedScreen?
+    @State private var presentedScreen: PresentedScreen = .calibration
+    @State private var isPresentingSession = false
     @State private var showsPatchingSetup = false
     @State private var highScore = HighScoreStore.standard.best
 
@@ -35,19 +34,19 @@ struct GameHomeView: View {
         .onChange(of: configuration.oneEyeEnforcerEnabled) { _, enabled in
             gazeController.setOneEyeEnforcerEnabled(enabled)
         }
-        .fullScreenCover(item: $presentedScreen) { screen in
-            switch screen {
+        .fullScreenCover(isPresented: $isPresentingSession) {
+            switch presentedScreen {
             case .calibration:
                 GazeCalibrationView(
                     controller: gazeController,
                     onCalibrated: { presentedScreen = .game },
-                    onCancel: { presentedScreen = nil }
+                    onCancel: { isPresentingSession = false }
                 )
             case .game:
                 WhackAMoleGameView(configuration: configuration, gazeController: gazeController) {
                     gazeController.stop()
                     highScore = HighScoreStore.standard.best
-                    presentedScreen = nil
+                    isPresentingSession = false
                 }
             }
         }
@@ -70,6 +69,7 @@ struct GameHomeView: View {
 
             Button {
                 presentedScreen = .calibration
+                isPresentingSession = true
             } label: {
                 Label("Calibrate & Play", systemImage: "eye.fill")
                     .font(.system(size: 36, weight: .heavy, design: .rounded))
