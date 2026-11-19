@@ -91,7 +91,8 @@ struct FoxPathResultView: View {
                     .minimumScaleFactor(0.5)
                     .frame(width: width * 0.78)
                     // The flat middle of the band sits a little above the picture's centre.
-                    .offset(y: -width * 0.035)
+                    // Tracking also adds space after the last letter: move right by half of it.
+                    .offset(x: 92 * s * 0.03 / 2, y: -width * 0.035)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Game completed")
@@ -209,7 +210,8 @@ struct FoxPathGameOverView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .frame(width: width * 0.7)
-                    .offset(y: -width * 0.035)
+                    // Tracking also adds space after the last letter: move right by half of it.
+                    .offset(x: 84 * s * 0.16 / 2, y: -width * 0.035)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Game over")
