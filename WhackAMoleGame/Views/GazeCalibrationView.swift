@@ -4,6 +4,7 @@ import UIKit
 
 /// Pre-game calibration using whichever prescribed eye remains uncovered.
 struct GazeCalibrationView: View {
+    static let calibrationBackground = Color.white
     let controller: GazeInputController
     let isRecalibration: Bool
     let onCalibrated: () -> Void
@@ -27,7 +28,7 @@ struct GazeCalibrationView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.white.ignoresSafeArea()
+                Self.calibrationBackground.ignoresSafeArea()
 
                 if let target = controller.activeCalibrationTarget {
                     CalibrationFixationTarget()
@@ -35,39 +36,59 @@ struct GazeCalibrationView: View {
                             x: target.x * geometry.size.width,
                             y: target.y * geometry.size.height
                         )
-                    if controller.calibrationNeedsGuidance {
-                        VStack {
-                            if target.y > 0.5 {
-                                guidanceBanner
-                                    .frame(maxWidth: 620)
-                                Spacer()
-                            } else {
-                                Spacer()
-                                guidanceBanner
-                                    .frame(maxWidth: 620)
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 32)
-                    }
+                        .animation(
+                            .easeInOut(duration: PaddyCalibrationCapture.targetTransitionSeconds),
+                            value: target
+                        )
                 } else if controller.isPreparingCalibration {
                     calibrationInstructions
                 } else {
                     setupPanel
                 }
+
+                VStack {
+                    if controller.activeCalibrationTarget?.y ?? 1 <= 0.10 {
+                        Spacer()
+                        calibrationControls
+                    } else {
+                        calibrationControls
+                        Spacer()
+                    }
+                }
+                .padding(24)
             }
         }
+        .ignoresSafeArea()
         .preferredColorScheme(.light)
         .statusBarHidden()
         .onAppear { controller.startCamera() }
-        .onChange(of: controller.isCalibrated) { _, calibrated in
-            guard calibrated, !didComplete else { return }
+        .onChange(of: controller.completedCalibrationCount) { _, _ in
+            guard controller.isCalibrated, !didComplete else { return }
             didComplete = true
             onCalibrated()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { controller.resumeForActiveScene() }
             else { controller.pauseForInactiveScene() }
+        }
+    }
+
+    private var calibrationControls: some View {
+        HStack {
+            if controller.activeCalibrationTarget != nil {
+                Text(controller.status)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.black)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Spacer(minLength: 12)
+            Button("Cancel") {
+                controller.stop()
+                onCancel()
+            }
+            .buttonStyle(.bordered)
+            .tint(.black)
         }
     }
 
@@ -99,33 +120,28 @@ struct GazeCalibrationView: View {
     }
 
     private var setupPanel: some View {
-        VStack(spacing: 18) {
-            Spacer(minLength: 36)
+        VStack(spacing: 12) {
+            Spacer(minLength: 0)
             Text("Get ready to play")
                 .font(.system(size: 42, weight: .heavy, design: .rounded))
-            HStack(spacing: 30) {
-                SetupStep(number: 1, text: "Face in oval")
-                SetupStep(number: 2, text: "Follow arrow")
-                SetupStep(number: 3, text: "Hold still")
-            }
+            Text("Face the iPad from about 45–60 cm away. Follow the yellow dots with your uncovered eye.")
+                .font(.title2)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 650)
 
             ZStack {
                 VolatileGazeCameraPreview(view: controller.cameraPreview)
-                if !controller.cameraStarted { Color.black }
-                FacePositionGuide(
-                    state: controller.sample.setupState,
-                    isReady: controller.isReadyToCalibrate,
-                    isCheckingPatch: controller.oneEyeEnforcerEnabled &&
-                        controller.patchWearState == .checking
-                )
+                FacePositionGuide(isReady: controller.isReadyToCalibrate)
             }
-            .frame(width: 520, height: 390)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(alignment: .bottom) {
-                guidanceBanner
-                    .padding(16)
+            .frame(width: 320, height: 320)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(.black.opacity(0.18), lineWidth: 2)
             }
+            .accessibilityLabel("Live camera preview with centered face guide")
+
+            guidanceBanner.frame(maxWidth: 620)
 
             HStack(spacing: 12) {
                 ReadinessBadge(
@@ -144,6 +160,11 @@ struct GazeCalibrationView: View {
                 )
             }
 
+            Text(controller.cameraStatus)
+                .font(.caption.monospaced())
+                .foregroundStyle(controller.cameraStatus.contains("active") ? .green : .secondary)
+                .accessibilityLabel("Active gaze model: \(controller.cameraStatus)")
+
             Button(controller.isPreparingCalibration ? "Get ready…" : "Let's start!") {
                 controller.startCalibration(preparationSeconds: isRecalibration ? 3 : 6)
             }
@@ -152,19 +173,24 @@ struct GazeCalibrationView: View {
             .tint(controller.isReadyToCalibrate ? .green : .gray)
             .disabled(!controller.isReadyToCalibrate || controller.isPreparingCalibration)
 
-            Button("Cancel") {
-                controller.stop()
-                onCancel()
-            }
-            .buttonStyle(.bordered)
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .padding(32)
+        .padding(24)
         .foregroundStyle(.black)
     }
 
     private var guidance: CalibrationGuidance {
+        if controller.sample.calibrationState == .failed ||
+            controller.sample.calibrationState == .invalid {
+            return .init(
+                id: "calibration-failed",
+                title: "Calibration didn't finish",
+                message: controller.status,
+                systemImage: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+        }
         if !controller.cameraStarted {
             return .init(
                 id: "camera",
@@ -328,12 +354,11 @@ struct GazeCalibrationView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
         .foregroundStyle(.primary)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
         .overlay {
             RoundedRectangle(cornerRadius: 18)
                 .stroke(guidance.tone.color.opacity(0.28), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 5)
         .id(guidance.id)
         .transition(.opacity.combined(with: .scale(scale: 0.98)))
         .animation(.smooth(duration: 0.3), value: guidance.id)
@@ -372,78 +397,33 @@ private struct ReadinessBadge: View {
         .foregroundStyle(isReady ? .green : .orange)
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(.thinMaterial, in: Capsule())
+        .background(Color.white, in: Capsule())
         .accessibilityLabel("\(title): \(isReady ? "ready" : "not ready")")
     }
 }
 
 private struct FacePositionGuide: View {
-    let state: SetupState
     let isReady: Bool
-    let isCheckingPatch: Bool
 
     private var color: Color {
-        if isReady { return .green }
-        if state == .stabilizing || isCheckingPatch { return .blue }
-        return .orange
-    }
-
-    private var label: String {
-        if isReady { return "Ready!" }
-        if state == .movingTooMuch { return "Too much movement" }
-        if state == .stabilizing || isCheckingPatch { return "Hold still…" }
-        return "Your face"
-    }
-
-    private var directionIcon: String? {
-        switch state {
-        case .lookUp: "arrow.up"
-        case .lookDown: "arrow.down"
-        case .turnLeft: "arrow.left"
-        case .turnRight: "arrow.right"
-        default: nil
-        }
-    }
-
-    private var directionOffset: CGSize {
-        switch state {
-        case .turnLeft: CGSize(width: -175, height: 0)
-        case .turnRight: CGSize(width: 175, height: 0)
-        default: CGSize(width: 175, height: 0)
-        }
+        isReady ? .mint : .yellow.opacity(0.85)
     }
 
     var body: some View {
         ZStack {
-            Ellipse()
+            Circle()
                 .stroke(
                     color,
-                    style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [12, 9])
+                    style: StrokeStyle(lineWidth: isReady ? 4 : 2, dash: [9, 7])
                 )
-                .frame(width: 220, height: 290)
-                .overlay(alignment: .top) {
-                    Text(label)
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(color.opacity(0.92), in: Capsule())
-                        .offset(y: -18)
-                }
-
-            if let directionIcon {
-                Image(systemName: directionIcon)
-                    .font(.system(size: 48, weight: .black))
-                    .foregroundStyle(.white)
-                    .frame(width: 76, height: 76)
-                    .background(.orange.opacity(0.95), in: Circle())
-                    .overlay { Circle().stroke(.white, lineWidth: 4) }
-                    .offset(directionOffset)
-                    .transition(.scale.combined(with: .opacity))
-            }
+                .frame(width: 240, height: 240)
+            Circle()
+                .fill(isReady ? .mint : .yellow)
+                .frame(width: 10, height: 10)
+                .shadow(color: .black.opacity(0.45), radius: 3)
         }
-        .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-        .animation(.smooth(duration: 0.25), value: state)
+        .animation(.easeInOut(duration: 0.2), value: isReady)
+        .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 }
@@ -478,16 +458,15 @@ private struct VolatileGazeCameraPreview: UIViewRepresentable {
 }
 
 private struct CalibrationFixationTarget: View {
-    @State private var contracted = false
-
     var body: some View {
         ZStack {
-            Circle().stroke(.black, lineWidth: 5).frame(width: 72, height: 72)
-            Circle().fill(.orange).frame(width: 30, height: 30)
-                .scaleEffect(contracted ? 0.35 : 1)
-                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: contracted)
+            Circle()
+                .stroke(.black, lineWidth: 3)
+                .frame(width: 46, height: 46)
+            Circle()
+                .fill(.yellow)
+                .frame(width: 30, height: 30)
         }
-        .onAppear { contracted = true }
         .accessibilityHidden(true)
     }
 }

@@ -14,8 +14,18 @@ final class GazeDwellSelectorTests: XCTestCase {
         )
     }
 
-    func testDefaultConfirmationIsOneSecond() {
-        XCTAssertEqual(GazeDwellSelector.defaultDwellNanoseconds, 1_000_000_000)
+    func testDefaultConfirmationIsHalfSecond() {
+        XCTAssertEqual(GazeDwellSelector.defaultDwellNanoseconds, 500_000_000)
+        var selector = GazeDwellSelector()
+        XCTAssertNil(selector.consume(
+            candidate: candidate(), timestampNanoseconds: 1_000_000_000, isUsable: true
+        ).activation)
+        XCTAssertNil(selector.consume(
+            candidate: candidate(), timestampNanoseconds: 1_499_999_999, isUsable: true
+        ).activation)
+        XCTAssertNotNil(selector.consume(
+            candidate: candidate(), timestampNanoseconds: 1_500_000_000, isUsable: true
+        ).activation)
     }
 
     func testActivatesOnlyAfterContinuousDwell() {
@@ -96,5 +106,17 @@ final class GazeDwellSelectorTests: XCTestCase {
         XCTAssertEqual(0.35 * GazeTargetGeometry.radiusScale, 0.42, accuracy: 0.0001)
         XCTAssertEqual(0.70 * GazeTargetGeometry.radiusScale, 0.84, accuracy: 0.0001)
         XCTAssertEqual(1.00 * GazeTargetGeometry.radiusScale, 1.20, accuracy: 0.0001)
+    }
+
+    func testCursorActivationMatches250PointBubble() {
+        XCTAssertEqual(GazeCursorGeometry.diameter, 250)
+        XCTAssertEqual(GazeCursorGeometry.radius, 125)
+        let cursor = CGPoint(x: 400, y: 300)
+        XCTAssertTrue(GazeCursorGeometry.contains(
+            target: CGPoint(x: 525, y: 300), around: cursor
+        ))
+        XCTAssertFalse(GazeCursorGeometry.contains(
+            target: CGPoint(x: 525.01, y: 300), around: cursor
+        ))
     }
 }
