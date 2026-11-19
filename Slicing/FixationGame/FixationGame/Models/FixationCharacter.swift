@@ -1,7 +1,7 @@
 //
 //  FixationCharacter.swift
 //  The three characters. The one the player picks keeps the stall;
-//  the other two are the thieves.
+//  the thief is a mole (MoleThiefView).
 //
 //  The choice comes from onboarding ("Choose your character") and is passed in
 //  through GameStartView.
@@ -22,23 +22,13 @@ nonisolated enum FixationCharacter: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The asset names start with the character's name: "FoxKeeperAwake", "BunnyThief1"…
+    /// The asset names start with the character's name: "FoxKeeperAwake"…
     private var prefix: String { name }
 
     // MARK: Keeping the stall
 
     var keeperAwakeImage: String { "\(prefix)KeeperAwake" }
     var keeperSleepImages: [String] { (1...3).map { "\(prefix)KeeperSleep\($0)" } }
-
-    // MARK: Stealing
-
-    /// Walking up to the stall, seen from the back.
-    var thiefWalkImages: [String] { (1...4).map { "\(prefix)Thief\($0)" } }
-    /// Running away, seen from the front.
-    var thiefRunImages: [String] { (1...4).map { "\(prefix)ThiefRun\($0)" } }
-
-    /// The other two characters, who come to steal.
-    var thieves: [FixationCharacter] { Self.allCases.filter { $0 != self } }
 
     // MARK: Sizes
 
@@ -50,14 +40,6 @@ nonisolated enum FixationCharacter: String, CaseIterable, Identifiable {
         case .fox: 0.28
         case .bunny: 0.293
         case .raccoon: 0.302
-        }
-    }
-
-    var thiefHeight: CGFloat {
-        switch self {
-        case .fox: 0.30
-        case .bunny: 0.32
-        case .raccoon: 0.332
         }
     }
 }

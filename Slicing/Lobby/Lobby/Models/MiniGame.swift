@@ -53,6 +53,17 @@ nonisolated enum MiniGame: String, CaseIterable, Hashable {
         gamesLocked && self != .whackAMole
     }
 
+    /// The game to go on to from a finish screen: one of the other two games, each equally
+    /// likely. After Whack a Mole that is Veggie Dash (smooth pursuit) or Veggie Keeper (fixation).
+    static func randomNext(after finished: MiniGame) -> MiniGame {
+        var generator = SystemRandomNumberGenerator()
+        return randomNext(after: finished, using: &generator)
+    }
+
+    static func randomNext<G: RandomNumberGenerator>(after finished: MiniGame, using generator: inout G) -> MiniGame {
+        allCases.filter { $0 != finished }.randomElement(using: &generator) ?? .veggieDash
+    }
+
     /// Picks a random open game, skipping `lastGame` when another open game is left.
     static func randomPick(avoiding lastGame: MiniGame?, gamesLocked: Bool) -> MiniGame {
         let open = allCases.filter { !$0.isLocked(whenGamesLocked: gamesLocked) }

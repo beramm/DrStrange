@@ -13,6 +13,14 @@ struct ContentView: View {
     @State private var showsSettings = false
     /// Setting "Random game": the Game Map picks the game by itself.
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
+    @AppStorage(MiniGame.lastGameStorageKey) private var lastGameID = ""
+    @AppStorage(AppSettings.backgroundVolumeKey)
+    private var backgroundMusicVolume = AppSettings.migratedBackgroundVolume()
+    @AppStorage(AppSettings.soundEffectsVolumeKey) private var soundEffectsVolume = 1.0
+    @Environment(\.scenePhase) private var scenePhase
+
+    private let music = BackgroundMusicPlayer.shared
+    private let soundEffects = SoundEffectPlayer.shared
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -31,7 +39,12 @@ struct ContentView: View {
                 case .randomizer:
                     RandomizerView(onChosen: { game in path.append(.game(game)) })
                 case .game(let game):
-                    SelectedGameView(game: game, onExit: leaveGame)
+                    SelectedGameView(
+                        game: game,
+                        onExit: leaveGame,
+                        onHome: goHome,
+                        onNextGame: { goToNextGame(after: game) }
+                    )
                 }
             }
         }
@@ -43,6 +56,24 @@ struct ContentView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: showsSettings)
+        .onAppear {
+            music.setVolume(backgroundMusicVolume)
+            soundEffects.setVolume(soundEffectsVolume)
+            music.setSceneActive(scenePhase == .active)
+            updateBackgroundMusic()
+        }
+        .onChange(of: path) {
+            updateBackgroundMusic()
+        }
+        .onChange(of: backgroundMusicVolume) { _, volume in
+            music.setVolume(volume)
+        }
+        .onChange(of: soundEffectsVolume) { _, volume in
+            soundEffects.setVolume(volume)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            music.setSceneActive(phase == .active)
+        }
     }
 
     /// Leaving a game. With "Random game" on, going back to the Game Map would
@@ -56,8 +87,33 @@ struct ContentView: View {
         }
     }
 
+    /// Finish screen "Home": back to the start screen, as when the app opens.
+    private func goHome() {
+        path.removeAll()
+    }
+
+    /// Finish screen "Next": one of the other games at random, opened in place of the game
+    /// just played. Picked on the tap, not when the finish screen appears.
+    private func goToNextGame(after finished: MiniGame) {
+        let next = MiniGame.randomNext(after: finished)
+        lastGameID = next.rawValue
+        if path.isEmpty {
+            path.append(.game(next))
+        } else {
+            path[path.count - 1] = .game(next)
+        }
+    }
+
     private func closeSettings() {
         showsSettings = false
+    }
+
+    private func updateBackgroundMusic() {
+        if case .game = path.last {
+            music.play(.gameSelected)
+        } else {
+            music.play(.lobby)
+        }
     }
 }
 

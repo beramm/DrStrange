@@ -16,6 +16,8 @@ nonisolated enum AppSettings {
     static let languageKey = "appLanguage"
     /// How loud the background music is, from 0 (silent) to 1 (full).
     static let backgroundVolumeKey = "backgroundSoundVolume"
+    /// Previous on/off setting, retained only to migrate existing installs.
+    private static let legacyBackgroundSoundKey = "backgroundSoundOn"
     /// How loud the sound effects are, from 0 (silent) to 1 (full).
     static let soundEffectsVolumeKey = "soundEffectsVolume"
     /// Whether the player wears an eye patch. Testing option: turn it off to play
@@ -27,4 +29,20 @@ nonisolated enum AppSettings {
     // Use a fresh key now that all three games are playable. Older installs saved
     // `gamesLocked = true` as the default while the other games were placeholders.
     static let gamesLockedKey = "gamesLockedAfterIntegration"
+
+    /// Returns the saved volume, converting the previous on/off preference once
+    /// when an existing install has not stored a volume yet.
+    static func migratedBackgroundVolume(defaults: UserDefaults = .standard) -> Double {
+        if let savedVolume = defaults.object(forKey: backgroundVolumeKey) as? NSNumber {
+            return savedVolume.doubleValue
+        }
+
+        guard defaults.object(forKey: legacyBackgroundSoundKey) != nil else {
+            return 1
+        }
+
+        let migratedVolume = defaults.bool(forKey: legacyBackgroundSoundKey) ? 1.0 : 0.0
+        defaults.set(migratedVolume, forKey: backgroundVolumeKey)
+        return migratedVolume
+    }
 }

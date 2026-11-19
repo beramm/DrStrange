@@ -19,7 +19,7 @@ struct MoleView: View {
     /// Three areas: left of the stall, in front of it, and right of it.
     private let areas: [[UnitPoint]] = [
         [UnitPoint(x: 0.14, y: 0.655), UnitPoint(x: 0.25, y: 0.705)],   // left
-        [UnitPoint(x: 0.33, y: 0.785), UnitPoint(x: 0.71, y: 0.785)],   // middle, in front of the stall
+        [UnitPoint(x: 0.30, y: 0.80), UnitPoint(x: 0.74, y: 0.80)],     // middle, in front of the stall (beside the thief's holes)
         [UnitPoint(x: 0.86, y: 0.655), UnitPoint(x: 0.76, y: 0.705)]    // right
     ]
     private let frameCount = 24

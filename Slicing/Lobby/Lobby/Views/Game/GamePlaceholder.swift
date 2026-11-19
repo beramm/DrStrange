@@ -20,6 +20,10 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Finish and pause screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
     /// The character chosen on character select.
     @AppStorage(GameCharacter.storageKey) private var characterID = GameCharacter.fox.id
@@ -56,6 +60,10 @@ struct SelectedGameView: View {
                     )
                 }
             }
+            .onChange(of: presentedScreen) { _, screen in
+                guard screen == .game else { return }
+                BackgroundMusicPlayer.shared.play(.whackAMole)
+            }
     }
 
     @ViewBuilder
@@ -68,7 +76,15 @@ struct SelectedGameView: View {
             whackAMoleLauncher
         case .veggieKeeper:
             // The player's character keeps the stall.
-            GameStartView(character: FixationCharacter(rawValue: characterID) ?? .fox, onExit: onExit)
+            GameStartView(
+                character: FixationCharacter(rawValue: characterID) ?? .fox,
+                onExit: onExit,
+                onGameplayStarted: {
+                    BackgroundMusicPlayer.shared.play(.veggieKeeper)
+                },
+                onHome: onHome,
+                onNextGame: onNextGame
+            )
         }
     }
 
@@ -102,6 +118,10 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Finish and pause screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
 
     var body: some View {

@@ -1,7 +1,7 @@
 //
 //  MarketSceneView.swift
 //  The Veggie Keeper picture: sky and grass, drifting clouds, the hot air
-//  balloon, the keeper behind the stall, the thieves and the moles.
+//  balloon, the keeper behind the stall, the mole thief and the distraction moles.
 //
 //  The artwork is drawn for a 4:3 screen (the 13-inch iPad). Everything sits on a
 //  4:3 "stage" that fills the screen, and each piece is placed with fractions of
@@ -11,7 +11,7 @@
 import SwiftUI
 
 struct MarketSceneView: View {
-    /// The character who keeps the stall. The other two are the thieves.
+    /// The character who keeps the stall (the player's character).
     let keeper: FixationCharacter
     let veggiesLeft: Int
     let keeperIsAwake: Bool
@@ -34,7 +34,7 @@ struct MarketSceneView: View {
     }
 
     /// How big the stall is (1 = its size in the original FULL PIC).
-    /// The stall, its shadow, the keeper and the thieves all shrink together.
+    /// The stall, its shadow and the keeper all shrink together.
     private let stallScale: CGFloat = 0.65
     /// Where the middle of the stall's base stands, as fractions of the stage.
     /// Smaller y = higher up on the screen. The horizon is at about 0.585, so the
@@ -58,9 +58,9 @@ struct MarketSceneView: View {
         let keeperHeight = keeper.keeperHeight * stallScale
         let stall = scaled(x: 0.520, y: 0.509)
         let gazeArea = scaled(x: 0.5185, y: 0.502)
-        // The thieves stand in front of the crates, with their feet here.
+        // The mole thief comes out of a hole in front of each basket.
         let crateX = [0.39, 0.515, 0.645].map { scaled(x: $0, y: 0).x }
-        let thiefFeetY = scaled(x: 0, y: 0.90).y
+        let thiefHoleY = scaled(x: 0, y: 0.92).y
 
         return ZStack(alignment: .topLeading) {
             Image("StallBG")
@@ -97,13 +97,12 @@ struct MarketSceneView: View {
                 .position(x: w * gazeArea.x, y: h * gazeArea.y)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { onStallFrameChange($0) }
 
-            ThiefView(
+            MoleThiefView(
                 isHere: thiefIsHere,
                 crate: thiefCrate,
-                thieves: keeper.thieves,
-                crateX: crateX,
-                feetY: thiefFeetY,
-                sizeScale: stallScale,
+                veggiesLeft: veggiesLeft,
+                holeX: crateX,
+                holeY: thiefHoleY,
                 stageWidth: w,
                 stageHeight: h
             )
