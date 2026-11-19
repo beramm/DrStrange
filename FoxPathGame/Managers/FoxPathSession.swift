@@ -64,6 +64,8 @@ struct FoxPathSession {
     let initialLives: Int
     let thiefSettings: ThiefSettings
     let mapSize: CGSize
+    /// The player's own character, always the one followed. Nil lets every walk draw it.
+    let player: PathCharacter?
 
     private(set) var phase: FoxPathSessionPhase = .ready
     /// Seconds of play since the first look at the character.
@@ -84,6 +86,7 @@ struct FoxPathSession {
 
     init(
         seed: UInt64,
+        player: PathCharacter? = nil,
         thiefSettings: ThiefSettings = ThiefSettings(),
         duration: TimeInterval = FoxPathConfiguration.sessionDuration,
         initialLives: Int = FoxPathConfiguration.initialLives,
@@ -93,9 +96,10 @@ struct FoxPathSession {
         self.initialLives = initialLives
         self.thiefSettings = thiefSettings
         self.mapSize = mapSize
+        self.player = player
         lives = initialLives
         generator = SeededGenerator(seed: seed)
-        roles = CharacterRoles.random(using: &generator)
+        roles = CharacterRoles.random(primary: player, using: &generator)
     }
 
     var remainingTime: TimeInterval { max(duration - clock, 0) }
@@ -120,7 +124,7 @@ struct FoxPathSession {
     /// A new walk on a new map. The first walk keeps the character drawn at the start; every later
     /// walk draws it again, so any of the three friends can be the one to follow.
     mutating func prepareWalk() {
-        if walksCompleted > 0 { roles = CharacterRoles.random(using: &generator) }
+        if walksCompleted > 0 { roles = CharacterRoles.random(primary: player, using: &generator) }
         thief = nil
         notFollowingTime = 0
         isWalking = false

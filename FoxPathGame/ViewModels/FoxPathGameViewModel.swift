@@ -77,9 +77,10 @@ final class FoxPathGameViewModel {
     @ObservationIgnored private var scriptClock: TimeInterval = 0
     #endif
 
-    init(configuration: FoxPathConfiguration, pointerTimeout: TimeInterval? = nil) {
+    /// - Parameter player: the player's character, always the one followed. Nil draws it at random.
+    init(configuration: FoxPathConfiguration, player: PathCharacter? = nil, pointerTimeout: TimeInterval? = nil) {
         let seed = configuration.randomSeed ?? UInt64.random(in: .min ... .max)
-        var session = FoxPathSession(seed: seed, thiefSettings: configuration.thief)
+        var session = FoxPathSession(seed: seed, player: player, thiefSettings: configuration.thief)
         let settings = configuration.settings
         let walk = Self.makeWalk(session: &session, settings: settings)
         self.configuration = configuration

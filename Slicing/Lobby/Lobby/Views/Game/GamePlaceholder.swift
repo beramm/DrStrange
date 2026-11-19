@@ -1,6 +1,7 @@
 //
 //  GamePlaceholder.swift
-//  Routes each lobby selection to its playable mini-game.
+//  Routes each lobby selection to its playable mini-game, with the character the
+//  player chose on character select: the same character in every game.
 //  Whack a Mole launches through the shared calibration flow; Veggie Dash and
 //  Veggie Keeper own their start and calibration screens.
 //
@@ -24,7 +25,11 @@ struct SelectedGameView: View {
     /// Finish screen "Next": on to another game, picked by ContentView.
     var onNextGame: () -> Void = {}
 
+    /// The character chosen on character select.
+    @AppStorage(GameCharacter.storageKey) private var characterID = GameCharacter.fox.id
     @State private var configuration = ConfigurationStore.standard.load()
+    /// The "Sound effect" slider in Settings.
+    @AppStorage(AppSettings.soundEffectsVolumeKey) private var soundEffectsVolume = 1.0
     @State private var gazeController = GazeInputController()
     @State private var presentedScreen: PresentedScreen?
     @State private var hasStarted = false
@@ -51,8 +56,10 @@ struct SelectedGameView: View {
                     )
                 case .game:
                     WhackAMoleGameView(
-                        configuration: configuration,
+                        configuration: configurationWithSoundSetting,
                         gazeController: gazeController,
+                        // The player's character swings the hammer.
+                        helper: HelperCharacter(rawValue: characterID) ?? .fox,
                         onClose: { closeGameFlow() }
                     )
                 }
@@ -67,11 +74,19 @@ struct SelectedGameView: View {
     private var selectedGame: some View {
         switch game {
         case .veggieDash:
-            FoxPathHomeView(onExit: onExit, onHome: onHome, onNextGame: onNextGame)
+            // The player's character is the one to follow.
+            FoxPathHomeView(
+                player: PathCharacter(rawValue: characterID) ?? .fox,
+                onExit: onExit,
+                onHome: onHome,
+                onNextGame: onNextGame
+            )
         case .whackAMole:
             whackAMoleLauncher
         case .veggieKeeper:
+            // The player's character keeps the stall.
             GameStartView(
+                character: FixationCharacter(rawValue: characterID) ?? .fox,
                 onExit: onExit,
                 onGameplayStarted: {
                     BackgroundMusicPlayer.shared.play(.veggieKeeper)
@@ -101,7 +116,15 @@ struct SelectedGameView: View {
         }
     }
 
-    private func closeGameFlow() {
+    /// Whack a Mole's hit sounds are short system sounds, which have no volume of their own:
+    /// they are switched off when the "Sound effect" slider is all the way down.
+    private var configurationWithSoundSetting: GameConfiguration {
+        var adjusted = configuration
+        if soundEffectsVolume <= 0 { adjusted.soundEnabled = false }
+        return adjusted
+    }
+
+        private func closeGameFlow() {
         gazeController.stop()
         presentedScreen = nil
         onExit()

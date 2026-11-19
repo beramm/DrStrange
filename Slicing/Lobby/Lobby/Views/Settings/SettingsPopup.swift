@@ -70,7 +70,7 @@ struct SettingsPopup: View {
                 .position(x: w * 0.5, y: h * 0.105)
                 .accessibilityAddTraits(.isHeader)
 
-            Button(action: onClose) {
+            Button(action: cancel) {
                 Image("ButtonClose")
                     .resizable()
                     .scaledToFit()
@@ -91,10 +91,20 @@ struct SettingsPopup: View {
 
             row("Background sound", y: 0.345, width: w, height: h) {
                 VolumeSlider(value: $backgroundVolume, width: w * 0.34, height: pillHeight)
+                    // Hear the music change while sliding.
+                    .onChange(of: backgroundVolume) { _, volume in
+                        BackgroundMusicPlayer.shared.setVolume(volume)
+                    }
             }
 
             row("Sound effect", y: 0.445, width: w, height: h) {
-                VolumeSlider(value: $soundEffectsVolume, width: w * 0.34, height: pillHeight)
+                VolumeSlider(value: $soundEffectsVolume, width: w * 0.34, height: pillHeight) {
+                    // A sample sound at the new volume when the finger lets go.
+                    SoundEffectPlayer.shared.play(.button)
+                }
+                .onChange(of: soundEffectsVolume) { _, volume in
+                    SoundEffectPlayer.shared.setVolume(volume)
+                }
             }
 
             // Testing option: NO lets someone play with both eyes open.
@@ -184,6 +194,13 @@ struct SettingsPopup: View {
     }
 
     /// Keeps the choices on the card, then closes it.
+    /// X: forgets the changes, and puts the volumes back to the saved ones.
+    private func cancel() {
+        BackgroundMusicPlayer.shared.setVolume(savedBackgroundVolume)
+        SoundEffectPlayer.shared.setVolume(savedSoundEffectsVolume)
+        onClose()
+    }
+
     private func save() {
         savedLanguage = language
         savedBackgroundVolume = backgroundVolume

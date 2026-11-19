@@ -30,8 +30,9 @@ struct WhackAMoleEngine {
     /// Compatibility accessor for callers interested only in the oldest active attack.
     var attack: FoxAttack? { attacks.first }
     private var lastAttackEndedAt: TimeInterval?
-    /// The helper for this whole game: waits in the corner and swings at every tap. Picked at
-    /// random when the game starts, every helper equally likely.
+    /// The helper for this whole game: waits in the corner and swings at every tap. The player's
+    /// own character when one is given (chosen in onboarding); otherwise picked at random when
+    /// the game starts, every helper equally likely.
     let helper: HelperCharacter
     private var holes: [OpenHole] = []
     private var nextHoleID = 0
@@ -124,7 +125,7 @@ struct WhackAMoleEngine {
         return .idle
     }
 
-    init(configuration: GameConfiguration, startedAt: Date = Date()) {
+    init(configuration: GameConfiguration, helper: HelperCharacter? = nil, startedAt: Date = Date()) {
         self.configuration = configuration
         let seed = configuration.randomSeed ?? UInt64.random(in: .min ... .max)
         var recordedConfiguration = configuration
@@ -134,7 +135,7 @@ struct WhackAMoleEngine {
         self.nextSpawnAt = configuration.spawnRules.leadInDelay
         // Its own generator, so the pick never changes where or when moles appear.
         var helperGenerator = SeededGenerator(seed: seed ^ 0x5EED_4E1F_E12C_0FF5)
-        self.helper = HelperCharacter.random(using: &helperGenerator)
+        self.helper = helper ?? HelperCharacter.random(using: &helperGenerator)
     }
 
     @discardableResult

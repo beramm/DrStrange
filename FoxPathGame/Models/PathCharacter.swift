@@ -83,8 +83,10 @@ enum PathCharacter: String, CaseIterable, Codable, Identifiable {
 struct CharacterRoles: Equatable {
     let primary: PathCharacter
 
-    /// The character to follow, drawn from all three.
-    static func random(using generator: inout SeededGenerator) -> CharacterRoles {
-        CharacterRoles(primary: PathCharacter.allCases.randomElement(using: &generator) ?? .fox)
+    /// The character to follow. When `primary` is given (the player's own character, chosen on
+    /// character select), it is always the one followed; otherwise it is drawn from all three.
+    static func random(primary chosen: PathCharacter? = nil, using generator: inout SeededGenerator) -> CharacterRoles {
+        if let chosen { return CharacterRoles(primary: chosen) }
+        return CharacterRoles(primary: PathCharacter.allCases.randomElement(using: &generator) ?? .fox)
     }
 }

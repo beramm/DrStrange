@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Entry screen for Follow the Fox: the three friends, what the game is about and a big Play button,
-/// centred on the meadow. The game uses the saved options (sound, haptics, gaze marker).
+/// Entry screen for Follow the Fox: the player's character (or all three friends in the standalone
+/// app), what the game is about and a big Play button, centred on the meadow. The game uses the
+/// saved options (sound, haptics, gaze marker).
 struct FoxPathHomeView: View {
     private enum PresentedScreen: String, Identifiable {
         case calibration
@@ -16,12 +17,21 @@ struct FoxPathHomeView: View {
     @State private var presentedScreen: PresentedScreen?
     /// Leaves the host app's game flow. Nil in the standalone Follow the Fox app.
     let onExit: (() -> Void)?
+    /// The player's character from onboarding: always the one followed. Nil in the standalone app,
+    /// where the one to follow is drawn at random.
+    let player: PathCharacter?
     /// Finish and pause screen "Home": back to the start of the host app. Nil stays here.
     let onHome: (() -> Void)?
     /// Finish screen "Next": on to another game in the host app. Nil hides the button.
     let onNextGame: (() -> Void)?
 
-    init(onExit: (() -> Void)? = nil, onHome: (() -> Void)? = nil, onNextGame: (() -> Void)? = nil) {
+    init(
+        player: PathCharacter? = nil,
+        onExit: (() -> Void)? = nil,
+        onHome: (() -> Void)? = nil,
+        onNextGame: (() -> Void)? = nil
+    ) {
+        self.player = player
         self.onExit = onExit
         self.onHome = onHome
         self.onNextGame = onNextGame
@@ -62,6 +72,7 @@ struct FoxPathHomeView: View {
                     FoxPathGameView(
                         configuration: configuration,
                         input: .gaze(gazeController),
+                        player: player,
                         onNextGame: onNextGame.map { next in { closeGame(then: next) } },
                         onHome: onHome.map { home in { closeGame(then: home) } }
                     ) {
@@ -71,6 +82,7 @@ struct FoxPathHomeView: View {
                     FoxPathGameView(
                         configuration: configuration,
                         input: .touch,
+                        player: player,
                         onNextGame: onNextGame.map { next in { closeGame(then: next) } },
                         onHome: onHome.map { home in { closeGame(then: home) } }
                     ) {
@@ -92,7 +104,7 @@ struct FoxPathHomeView: View {
     private var childPanel: some View {
         VStack(spacing: 28) {
             HStack(alignment: .bottom, spacing: 18) {
-                ForEach(PathCharacter.allCases) { character in
+                ForEach(player.map { [$0] } ?? PathCharacter.allCases) { character in
                     Image(character.standingAsset)
                         .resizable()
                         .scaledToFit()

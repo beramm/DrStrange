@@ -31,6 +31,8 @@ struct RandomizerView: View {
 
     /// The card that is popped up right now (nil before the spin starts).
     @State private var highlighted: MiniGame?
+    /// The picked game: its card flips over to show the full card.
+    @State private var revealed: MiniGame?
     @State private var manualSelectionPending = false
     @State private var manualSelectionTask: Task<Void, Never>?
 
@@ -75,12 +77,12 @@ struct RandomizerView: View {
                     let isLocked = game.isLocked(whenGamesLocked: gamesLocked)
                     Group {
                         if randomSpinEnabled {
-                            MiniGameCard(game: game, isLocked: isLocked, scale: s)
+                            MiniGameCard(game: game, isLocked: isLocked, isRevealed: game == revealed, scale: s)
                         } else {
                             Button {
                                 chooseManually(game)
                             } label: {
-                                MiniGameCard(game: game, isLocked: isLocked, scale: s)
+                                MiniGameCard(game: game, isLocked: isLocked, isRevealed: game == revealed, scale: s)
                             }
                             .buttonStyle(PressableButtonStyle())
                             .disabled(manualSelectionPending)
@@ -105,6 +107,7 @@ struct RandomizerView: View {
         .task(id: randomSpinEnabled) {
             guard randomSpinEnabled else {
                 highlighted = nil
+                revealed = nil
                 manualSelectionPending = false
                 return
             }
@@ -122,10 +125,12 @@ struct RandomizerView: View {
               !game.isLocked(whenGamesLocked: gamesLocked) else { return }
         manualSelectionPending = true
         highlighted = game
+        revealed = game
         lastGameID = game.rawValue
         manualSelectionTask?.cancel()
         manualSelectionTask = Task {
-            try? await Task.sleep(for: .milliseconds(350))
+            // Time for the card to flip over and for the child to see it.
+            try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
             onChosen(game)
         }
@@ -133,6 +138,7 @@ struct RandomizerView: View {
 
     private func spin() async {
         highlighted = nil
+        revealed = nil
         // Only open (unlocked) games can be picked.
         let pick = MiniGame.randomPick(avoiding: MiniGame(rawValue: lastGameID), gamesLocked: gamesLocked)
         var randomizerSoundIsPlaying = false
@@ -171,8 +177,12 @@ struct RandomizerView: View {
             highlighted = pick
             lastGameID = pick.rawValue
 
+            // The picked card flips over to show the full card.
+            try await Task.sleep(for: .milliseconds(250))
+            revealed = pick
+
             // Let the child see which game was picked, then open it.
-            try await Task.sleep(for: .seconds(1.5))
+            try await Task.sleep(for: .seconds(2.2))
             onChosen(pick)
         } catch {
             // The child left this screen (for example with the back button); stop here.

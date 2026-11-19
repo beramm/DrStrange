@@ -77,6 +77,19 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertGreaterThan(seen.count, 1, "the friend to follow changes between walks")
     }
 
+    func testThePlayersCharacterIsAlwaysTheOneFollowed() {
+        for player in PathCharacter.allCases {
+            // The thief is always the mole, so only the one to follow is fixed.
+            var session = FoxPathSession(seed: 3, player: player)
+            for _ in 0..<30 {
+                session.prepareWalk()
+                session.walkStarted()
+                XCTAssertEqual(session.roles.primary, player)
+                session.walkFinished()
+            }
+        }
+    }
+
     // MARK: - Clock
 
     func testClockStartsAtTheFirstLookAndStopsAfterTwoMinutes() {

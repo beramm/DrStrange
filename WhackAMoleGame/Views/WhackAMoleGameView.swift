@@ -7,6 +7,8 @@ struct WhackAMoleGameView: View {
 
     let configuration: GameConfiguration
     let gazeController: GazeInputController?
+    /// The player's character, who swings the hammer. Nil picks one at random (standalone app).
+    let helper: HelperCharacter?
     let onClose: () -> Void
 
     @State private var viewModel: WhackAMoleGameViewModel
@@ -19,18 +21,21 @@ struct WhackAMoleGameView: View {
     init(
         configuration: GameConfiguration,
         gazeController: GazeInputController? = nil,
+        helper: HelperCharacter? = nil,
         onClose: @escaping () -> Void
     ) {
         self.configuration = configuration
         self.gazeController = gazeController
+        self.helper = helper
         self.onClose = onClose
-        _viewModel = State(initialValue: WhackAMoleGameViewModel(configuration: configuration))
+        _viewModel = State(initialValue: WhackAMoleGameViewModel(configuration: configuration, helper: helper))
     }
 
     var body: some View {
         ZStack {
             if let session = viewModel.finishedSession {
                 GameResultView(
+                    helper: viewModel.helper,
                     session: session,
                     score: viewModel.score,
                     previousHighScore: viewModel.highScore,
@@ -178,7 +183,7 @@ struct WhackAMoleGameView: View {
 
     private func restart() {
         viewModel.stop()
-        viewModel = WhackAMoleGameViewModel(configuration: configuration)
+        viewModel = WhackAMoleGameViewModel(configuration: configuration, helper: helper)
         viewModel.start()
         respondToPatchState(gazeController?.patchWearState)
         respondToCalibrationState(gazeController?.isCalibrated)

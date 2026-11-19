@@ -88,6 +88,8 @@
 			membershipExceptions = (
 				App/WhackAMoleGameApp.swift,
 				README.md,
+				"Resources/paddy-gazeTrack.mlpackage",
+				Resources/THIRD_PARTY_NOTICES.md,
 			);
 			target = A1D500000000000000000013 /* FoxPathGame */;
 		};

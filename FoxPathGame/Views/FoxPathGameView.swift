@@ -21,6 +21,8 @@ struct FoxPathGameView: View {
 
     let configuration: FoxPathConfiguration
     let input: FoxPathInput
+    /// The player's character, always the one followed. Nil draws it at random (standalone app).
+    let player: PathCharacter?
     let onClose: () -> Void
     /// Finish screen "Next": goes on to another game. Nil hides the button (standalone app).
     let onNextGame: (() -> Void)?
@@ -35,20 +37,22 @@ struct FoxPathGameView: View {
     init(
         configuration: FoxPathConfiguration,
         input: FoxPathInput,
+        player: PathCharacter? = nil,
         onNextGame: (() -> Void)? = nil,
         onHome: (() -> Void)? = nil,
         onClose: @escaping () -> Void
     ) {
         self.configuration = configuration
         self.input = input
+        self.player = player
         self.onNextGame = onNextGame
         self.onHome = onHome
         self.onClose = onClose
-        _viewModel = State(initialValue: Self.makeViewModel(configuration: configuration, input: input))
+        _viewModel = State(initialValue: Self.makeViewModel(configuration: configuration, input: input, player: player))
     }
 
-    private static func makeViewModel(configuration: FoxPathConfiguration, input: FoxPathInput) -> FoxPathGameViewModel {
-        FoxPathGameViewModel(configuration: configuration, pointerTimeout: input.usesGaze ? gazeTimeout : nil)
+    private static func makeViewModel(configuration: FoxPathConfiguration, input: FoxPathInput, player: PathCharacter?) -> FoxPathGameViewModel {
+        FoxPathGameViewModel(configuration: configuration, player: player, pointerTimeout: input.usesGaze ? gazeTimeout : nil)
     }
 
     var body: some View {
@@ -160,7 +164,7 @@ struct FoxPathGameView: View {
     /// Every new game draws new maps and new roles.
     private func restart() {
         viewModel.stop()
-        viewModel = Self.makeViewModel(configuration: configuration, input: input)
+        viewModel = Self.makeViewModel(configuration: configuration, input: input, player: player)
         viewModel.start()
         isPausedForMissingPatch = false
         respondToPatchState(gazeController?.patchWearState)
