@@ -28,6 +28,8 @@ struct SelectedGameView: View {
     /// The character chosen on character select.
     @AppStorage(GameCharacter.storageKey) private var characterID = GameCharacter.fox.id
     @State private var configuration = ConfigurationStore.standard.load()
+    /// The "Sound effect" slider in Settings.
+    @AppStorage(AppSettings.soundEffectsVolumeKey) private var soundEffectsVolume = 1.0
     @State private var gazeController = GazeInputController()
     @State private var presentedScreen: PresentedScreen?
     @State private var hasStarted = false
@@ -52,7 +54,7 @@ struct SelectedGameView: View {
                     )
                 case .game:
                     WhackAMoleGameView(
-                        configuration: configuration,
+                        configuration: configurationWithSoundSetting,
                         gazeController: gazeController,
                         // The player's character swings the hammer.
                         helper: HelperCharacter(rawValue: characterID) ?? .fox,
@@ -107,7 +109,15 @@ struct SelectedGameView: View {
         }
     }
 
-    private func closeGameFlow() {
+    /// Whack a Mole's hit sounds are short system sounds, which have no volume of their own:
+    /// they are switched off when the "Sound effect" slider is all the way down.
+    private var configurationWithSoundSetting: GameConfiguration {
+        var adjusted = configuration
+        if soundEffectsVolume <= 0 { adjusted.soundEnabled = false }
+        return adjusted
+    }
+
+        private func closeGameFlow() {
         gazeController.stop()
         presentedScreen = nil
         onExit()

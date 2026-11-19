@@ -8,13 +8,15 @@ import SwiftUI
 
 struct CharacterPortrait: View {
     let imageName: String
-    /// Width of the blue circle.
+    /// Width of the circle.
     let diameter: CGFloat
+    /// Colour of the circle behind the character.
+    var circleColor = Color.portraitBlue
 
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color.portraitBlue)
+                .fill(circleColor)
                 .frame(width: diameter, height: diameter)
 
             // The full character image, enlarged and moved down so the head fills the circle.
