@@ -75,8 +75,8 @@ struct FoxFocusOverlay: View {
     }
 }
 
-/// Shown while a new path waits for the first look: who to follow, and who is after the
-/// vegetables this time.
+/// Shown while a new path waits for the first look: who to follow, and the mole that is after
+/// the vegetables.
 private struct RoleIntroCard: View {
     let roles: CharacterRoles
 
@@ -95,11 +95,11 @@ private struct RoleIntroCard: View {
                 .fill(FoxPathPalette.ink.opacity(0.15))
                 .frame(width: 2, height: 64)
             HStack(spacing: 10) {
-                Image(roles.thief.standingAsset)
+                Image("FoxPath/Mole/Standing")
                     .resizable()
                     .scaledToFit()
                     .frame(height: 60)
-                Text("\(roles.thief.name) wants\nthe veggies!")
+                Text("Mole wants\nthe veggies!")
                     .font(.system(.headline, design: .rounded).weight(.bold))
                     .foregroundStyle(FoxPathPalette.danger)
             }

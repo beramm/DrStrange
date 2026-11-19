@@ -104,6 +104,7 @@ struct WhackAMoleGameView: View {
 
             overlay
         }
+        .animation(.easeInOut(duration: 0.3), value: isPausedForMissingPatch)
         .confirmationDialog("Stop the game?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
             Button("Stop and see my stars") { viewModel.finishEarly(reason: .stopped) }
             Button("Keep playing", role: .cancel) { resumeAfterStopDialog() }
@@ -161,12 +162,9 @@ struct WhackAMoleGameView: View {
                     onRecalibrate: { isPresentingRecalibration = true },
                     onRest: { viewModel.finishEarly(reason: .restBreak) }
                 )
-            } else if isPausedForMissingPatch, let gazeController {
-                MissingPatchPauseOverlay(
-                    isPatchVerified: gazeController.isPatchVerified,
-                    onResume: resumeAfterPatchCheck,
-                    onRest: { viewModel.finishEarly(reason: .restBreak) }
-                )
+            } else if isPausedForMissingPatch, gazeController != nil {
+                PatchReminderScreen()
+                    .transition(.opacity)
             } else {
                 PauseOverlay(
                     onResume: viewModel.resume,
@@ -216,15 +214,20 @@ struct WhackAMoleGameView: View {
             }
             return
         }
-        guard state == .missing, viewModel.phase != .finished else { return }
-        isPausedForMissingPatch = true
-        viewModel.pause()
-    }
-
-    private func resumeAfterPatchCheck() {
-        guard gazeController?.isPatchVerified == true else { return }
-        isPausedForMissingPatch = false
-        viewModel.resume()
+        switch state {
+        case .missing:
+            guard viewModel.phase != .finished else { return }
+            isPausedForMissingPatch = true
+            viewModel.pause()
+        case .verified:
+            // The patch is back on: hide the reminder and carry on without a tap, unless the
+            // game is also waiting on recalibration or the stop dialog.
+            guard isPausedForMissingPatch else { return }
+            isPausedForMissingPatch = false
+            if !isPausedForRecalibration, !isConfirmingStop { viewModel.resume() }
+        default:
+            break
+        }
     }
 
     private func resumeAfterStopDialog() {
@@ -244,54 +247,6 @@ private struct RecalibrationPauseOverlay: View {
     var body: some View {
         // The shared "Time to check again" card; NEXT opens calibration, then the game carries on.
         RecalibrationNeededCard(onNext: onRecalibrate)
-    }
-}
-
-private struct MissingPatchPauseOverlay: View {
-    let isPatchVerified: Bool
-    let onResume: () -> Void
-    let onRest: () -> Void
-
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.32).ignoresSafeArea()
-            VStack(spacing: 20) {
-                Image(systemName: "eye.slash.fill")
-                    .font(.system(size: 68))
-                    .foregroundStyle(.orange)
-                    .accessibilityHidden(true)
-                Text("Patch check paused the game")
-                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                Text(isPatchVerified
-                     ? "The one-eye check passed again. You can keep playing."
-                     : "Grown-ups: put the prescribed patch back on, then keep the child's face centred while the camera checks it.")
-                    .font(.title3)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 560)
-                HStack(spacing: 20) {
-                    Button(action: onRest) {
-                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
-                            .frame(minWidth: 200, minHeight: 56)
-                    }
-                    .buttonStyle(.bordered)
-                    Button(action: onResume) {
-                        Label(isPatchVerified ? "Play" : "Checking…", systemImage: "play.fill")
-                            .frame(minWidth: 180, minHeight: 56)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(WhackAMolePalette.accent)
-                    .disabled(!isPatchVerified)
-                }
-                .font(.title2.weight(.bold))
-                Text("The camera only checks whether one eye stays visible; it cannot confirm that the correct prescribed eye is patched.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 520)
-            }
-            .padding(48)
-            .background(RoundedRectangle(cornerRadius: 36).fill(WhackAMolePalette.cream))
-        }
     }
 }
 

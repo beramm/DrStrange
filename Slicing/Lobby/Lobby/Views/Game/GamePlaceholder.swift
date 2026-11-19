@@ -37,7 +37,9 @@ struct SelectedGameView: View {
     var body: some View {
         selectedGame
             .toolbar(.hidden, for: .navigationBar)
-            .task {
+            // Keyed by the game: "Next" on a finish screen swaps the game in place, and the
+            // launcher must start again for the new one.
+            .task(id: game) {
                 guard game == .whackAMole, !hasStarted else { return }
                 hasStarted = true
                 // Apply the caregiver's saved gaze-testing setting before calibration.
@@ -73,7 +75,12 @@ struct SelectedGameView: View {
         switch game {
         case .veggieDash:
             // The player's character is the one to follow.
-            FoxPathHomeView(player: PathCharacter(rawValue: characterID) ?? .fox, onExit: onExit)
+            FoxPathHomeView(
+                player: PathCharacter(rawValue: characterID) ?? .fox,
+                onExit: onExit,
+                onHome: onHome,
+                onNextGame: onNextGame
+            )
         case .whackAMole:
             whackAMoleLauncher
         case .veggieKeeper:

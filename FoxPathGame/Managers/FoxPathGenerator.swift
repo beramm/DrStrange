@@ -2,28 +2,46 @@ import CoreGraphics
 import Foundation
 
 /// Builds a random map from a seed: a path that winds from the left edge to the right edge,
-/// then houses, lamps, rocks, gardens, stepping stones and grass details around it.
+/// then houses with stepping stones, lamps, a signpost, tree stumps, rocks, small gardens and grass details
+/// around it.
 ///
 /// The same seed and settings always give the same map. Scenery is placed so that nothing
 /// stands on the path and nothing is ever drawn over the fox.
 enum FoxPathGenerator {
-    /// Fewer houses or lamps than this and the generator tries again with a derived seed.
-    private static let wantedHouses = 3
+    /// Fewer houses or lamps than this, houses that are not balanced around the path, or no room
+    /// for the signpost, and the generator tries again with a derived seed.
+    private static let wantedHouses = 4
     private static let wantedLamps = 3
-    private static let maximumAttempts = 8
+    private static let maximumAttempts = 16
 
     static func makeMap(seed: UInt64, settings: FoxPathSettings) -> FoxPathMap {
         var best: FoxPathMap?
         func score(_ map: FoxPathMap) -> Int {
-            min(map.houses.count, wantedHouses) * 10 + min(map.lamps.count, wantedLamps)
+            let sides = houseSides(of: map)
+            let balance = 3 - min(abs(sides.above - sides.below), 3)
+            let sign = map.standingSprites.contains { $0.kind == .signpost } ? 50 : 0
+            return min(map.houses.count, wantedHouses) * 100 + min(map.lamps.count, wantedLamps) * 100 + balance * 10 + sign
         }
         for attempt in 0..<maximumAttempts {
             var generator = SeededGenerator(seed: seed &+ UInt64(attempt) &* 0xD6E8_FEB8_6659_FD93)
             let map = makeMap(seed: seed, settings: settings, using: &generator)
-            if map.houses.count >= wantedHouses, map.lamps.count >= wantedLamps { return map }
+            if map.houses.count >= wantedHouses, isBalanced(map), map.lamps.count >= wantedLamps,
+               map.standingSprites.contains(where: { $0.kind == .signpost }) { return map }
             if score(map) > best.map(score) ?? -1 { best = map }
         }
         return best!
+    }
+
+    /// Houses above the path (seen from the front, with a door) and below it (seen from behind).
+    static func houseSides(of map: FoxPathMap) -> (above: Int, below: Int) {
+        let above = map.houses.filter { $0.kind.doorCenter != nil }.count
+        return (above, map.houses.count - above)
+    }
+
+    /// `true` when there are houses on both sides of the path and at most one more on one side.
+    static func isBalanced(_ map: FoxPathMap) -> Bool {
+        let sides = houseSides(of: map)
+        return sides.above > 0 && sides.below > 0 && abs(sides.above - sides.below) <= 1
     }
 
     private static func makeMap(
@@ -38,8 +56,12 @@ enum FoxPathGenerator {
         scenery.placeHouses()
         scenery.placeLamps()
         scenery.placePathRocks()
-        scenery.fillOpenGrass()
         let grassPatches = scenery.makeGrassPatches(avoiding: Set(pathCells.map(\.cell)))
+        // Added after the rest, so they take the room that is left and never crowd out houses,
+        // lamps or rocks.
+        scenery.placeSignpost()
+        scenery.placeTreeStumps()
+        scenery.fillOpenGrass()
         scenery.scatterGrassDetails()
         generator = scenery.generator
         return FoxPathMap(
@@ -189,6 +211,7 @@ private struct SceneryBuilder {
     private(set) var standing: [MapSprite] = []
     private(set) var ground: [MapSprite] = []
     private var nextID = 0
+    private var yardStyles = ShuffleBag(YardStyle.allCases)
 
     private let mapSize = FoxPathMetrics.mapSize
     private let pathHalfWidth = FoxPathMetrics.pathHalfWidth
@@ -227,21 +250,26 @@ private struct SceneryBuilder {
 
     // MARK: Houses
 
-    /// Houses spread out along the map: each one first tries its own share of the width, so
-    /// they do not bunch up on one side.
+    /// Houses spread out along the map and take turns above and below the path, so both sides
+    /// have about as many houses and neither looks empty. Each one first tries its own share of
+    /// the width, so they do not bunch up on one side.
     mutating func placeHouses() {
-        let wanted = Int.random(in: 3...4, using: &generator)
+        let wanted = Int.random(in: 4...5, using: &generator)
         var styles = ShuffleBag(HouseStyle.allCases)
-        var above = Bool.random(using: &generator)
+        let firstAbove = Bool.random(using: &generator)
+        let share = 1 / CGFloat(wanted)
 
         for index in 0..<wanted {
             let style = styles.next(using: &generator)
-            let band = (CGFloat(index) / CGFloat(wanted))...(CGFloat(index + 1) / CGFloat(wanted))
-            // Try the preferred side first, then the other one, then anywhere along the map.
-            let placed = placeHouse(style, above: above, band: band)
-                || placeHouse(style, above: !above, band: band)
-                || placeHouse(style, above: above, band: 0...1)
-            if placed { above.toggle() }
+            let above = index.isMultiple(of: 2) == firstAbove
+            let band = (CGFloat(index) * share)...(CGFloat(index + 1) * share)
+            let wider = max(band.lowerBound - share / 2, 0)...min(band.upperBound + share / 2, 1)
+            // Its own side and share first, then a little more room, then another kind of house on
+            // the same side (a smaller one may fit where the path runs high or low), and only then
+            // the other side.
+            if placeHouse(style, above: above, band: band) || placeHouse(style, above: above, band: wider) { continue }
+            if HouseStyle.allCases.contains(where: { $0 != style && placeHouse($0, above: above, band: wider) }) { continue }
+            _ = placeHouse(style, above: !above, band: band) || placeHouse(style, above: above, band: 0...1)
         }
     }
 
@@ -255,7 +283,10 @@ private struct SceneryBuilder {
         for _ in 0..<40 {
             let centerX = CGFloat.random(in: lowest...highest, using: &generator)
             let minX = centerX - size.width / 2
-            let gap = CGFloat.random(in: above ? 14...88 : 8...56, using: &generator)
+            // A front door always has room for stepping stones, and sometimes for a long trail, as
+            // in the reference art.
+            // A house behind the path may stand farther down, so the lower part of the map is not empty.
+            let gap = CGFloat.random(in: above ? 46...150 : 8...220, using: &generator)
 
             // The stretch of path in line with the house's base decides how close it can stand.
             let baseStart = minX + size.width * kind.baseSpan.lowerBound - 12
@@ -276,101 +307,168 @@ private struct SceneryBuilder {
 
             let house = makeSprite(kind, frame: frame)
             guard FoxPathGenerator.isClear(house, of: pathPoints),
-                  !overlapsStanding(frame.insetBy(dx: -8, dy: -8)) else { continue }
+                  !overlapsStanding(frame.insetBy(dx: -30, dy: -12)) else { continue }
             standing.append(house)
-            addSteppingStones(from: house)
-            addDoorstep(for: house)
-            addRocks(around: house)
+            let stonesBefore = ground.count
+            addStones(for: house)
+            // A front door without a little path of stones looks unfinished: try another spot.
+            if house.kind.doorCenter != nil, ground.count - stonesBefore < 2 {
+                ground.removeLast(ground.count - stonesBefore)
+                standing.removeLast()
+                continue
+            }
             return true
         }
         return false
     }
 
-    /// A short trail of stones from a front door down to the path.
-    private mutating func addSteppingStones(from house: MapSprite) {
-        guard let door = house.kind.doorCenter else { return }
-        let doorX = house.frame.minX + house.frame.width * door
-        // Every stretch of path a stone could touch counts, so a trail next to a corner stops
-        // on the grass instead of running over the bend.
-        let stoneSize = MapSpriteKind.steppingStone.size
-        let reach = pathHalfWidth + stoneSize.width * 0.75
-        let pathBelow = pathPoints.filter { abs($0.x - doorX) < reach && $0.y > house.baseline }.map(\.y).min()
-        guard let pathBelow else { return }
+    // MARK: Stepping stones
 
-        let start = house.baseline + 4
-        let end = pathBelow - pathHalfWidth - stoneSize.height * 0.7
-        let length = end - start
-        guard length > 22 else { return }
-
-        let count = min(5, max(1, Int(length / 28)))
-        let drift = CGFloat.random(in: -16...16, using: &generator)
-        for index in 0..<count {
-            let fraction = (CGFloat(index) + 0.5) / CGFloat(count)
-            let scale = CGFloat.random(in: 0.9...1.25, using: &generator)
-            let size = MapSpriteKind.steppingStone.size
-            let center = CGPoint(
-                x: doorX + drift * (fraction - 0.5) * 2 + CGFloat.random(in: -5...5, using: &generator),
-                y: start + length * fraction
-            )
-            let frame = CGRect(
-                x: center.x - size.width * scale / 2,
-                y: center.y - size.height * scale / 2,
-                width: size.width * scale,
-                height: size.height * scale
-            )
-            ground.append(makeSprite(.steppingStone, frame: frame, isMirrored: Bool.random(using: &generator)))
-        }
+    /// How the stepping stones in front of a door are laid out. Neighbouring front doors get
+    /// different layouts.
+    private enum YardStyle: CaseIterable {
+        /// A winding trail from the door down to the path.
+        case trail
+        /// Two stones side by side below the door, sometimes with a third below them.
+        case pair
+        /// A trail that leaves the door at a slant and ends on the grass.
+        case slanted
     }
 
-    /// Two stepping stones either side of the trail, just below a front door, like a little
-    /// front yard.
-    private mutating func addDoorstep(for house: MapSprite) {
-        guard let door = house.kind.doorCenter else { return }
+    /// Stepping stones in front of a door, or a stone or two beside a house seen from behind.
+    private mutating func addStones(for house: MapSprite) {
+        guard let door = house.kind.doorCenter else { return addStonesBeside(house) }
         let doorX = house.frame.minX + house.frame.width * door
+        var placed: Int
+        switch yardStyles.next(using: &generator) {
+        case .trail: placed = addTrail(from: house, doorX: doorX)
+        case .pair: placed = addPair(below: house, doorX: doorX)
+        case .slanted: placed = addSlantedTrail(from: house, doorX: doorX)
+        }
+        if placed < 2 { placed += addPair(below: house, doorX: doorX) }
+        if placed < 2 { addDoorstep(for: house, doorX: doorX) }
+    }
+
+    /// A trail of stones of different sizes that wiggles from the door down to the path.
+    private mutating func addTrail(from house: MapSprite, doorX: CGFloat) -> Int {
         let size = MapSpriteKind.steppingStone.size
+        // Every stretch of path a stone could touch counts, so a trail next to a corner stops
+        // on the grass instead of running over the bend.
+        let reach = pathHalfWidth + size.width * 0.75
+        guard let pathBelow = pathPoints.filter({ abs($0.x - doorX) < reach && $0.y > house.baseline }).map(\.y).min() else { return 0 }
+        let start = house.baseline + 8
+        let end = pathBelow - pathHalfWidth - size.height * 0.75
+        let length = end - start
+        guard length > 34 else { return 0 }
+
+        let count = min(6, Int(length / 36) + 1)
+        let drift = CGFloat.random(in: -40...40, using: &generator)
+        let wiggle = CGFloat.random(in: 6...16, using: &generator)
+        var side: CGFloat = Bool.random(using: &generator) ? 1 : -1
+        var placed = 0
+        let bigFirst = Bool.random(using: &generator)
+        for index in 0..<count {
+            let fraction = CGFloat(index) / CGFloat(count - 1)
+            let center = CGPoint(
+                x: doorX + drift * fraction + (index == 0 ? 0 : side * wiggle),
+                y: start + length * fraction
+            )
+            side = -side
+            // Small and large stones take turns, so the trail never looks uniform.
+            let scale = index.isMultiple(of: 2) == bigFirst
+                ? CGFloat.random(in: 1.0...1.25, using: &generator)
+                : CGFloat.random(in: 0.7...0.9, using: &generator)
+            if addStone(at: center, scale: scale, owner: house) { placed += 1 }
+        }
+        return placed
+    }
+
+    /// Two stones of different sizes side by side below the door, and sometimes one more below.
+    private mutating func addPair(below house: MapSprite, doorX: CGFloat) -> Int {
+        let width = MapSpriteKind.steppingStone.size.width
+        let y = house.baseline + CGFloat.random(in: 8...16, using: &generator)
+        let gap = CGFloat.random(in: 4...12, using: &generator)
+        let small = CGFloat.random(in: 0.7...0.9, using: &generator)
+        let large = CGFloat.random(in: 0.95...1.2, using: &generator)
+        let (left, right) = Bool.random(using: &generator) ? (small, large) : (large, small)
+        var placed = 0
+        if addStone(at: CGPoint(x: doorX - gap / 2 - width * left / 2, y: y + CGFloat.random(in: -3...3, using: &generator)), scale: left, owner: house) { placed += 1 }
+        if addStone(at: CGPoint(x: doorX + gap / 2 + width * right / 2, y: y + CGFloat.random(in: -3...3, using: &generator)), scale: right, owner: house) { placed += 1 }
+        if Bool.random(using: &generator),
+           addStone(at: CGPoint(x: doorX + CGFloat.random(in: -24...24, using: &generator), y: y + 38), scale: CGFloat.random(in: 0.75...1.05, using: &generator), owner: house) {
+            placed += 1
+        }
+        return placed
+    }
+
+    /// Stones that leave the door at a slant to one side, a little bigger with each step, and
+    /// stop on the grass before the path.
+    private mutating func addSlantedTrail(from house: MapSprite, doorX: CGFloat) -> Int {
+        let direction: CGFloat = Bool.random(using: &generator) ? 1 : -1
+        let count = Int.random(in: 3...5, using: &generator)
+        var center = CGPoint(x: doorX, y: house.baseline + 8)
+        var scale = CGFloat.random(in: 0.65...0.8, using: &generator)
+        var placed = 0
+        for _ in 0..<count {
+            guard addStone(at: center, scale: scale, owner: house) else { break }
+            placed += 1
+            center.x += direction * CGFloat.random(in: 34...56, using: &generator)
+            center.y += CGFloat.random(in: 32...40, using: &generator)
+            scale = min(scale + CGFloat.random(in: 0.06...0.14, using: &generator), 1.25)
+        }
+        return placed
+    }
+
+    /// Two smaller stones either side of a door that stands close to the path.
+    private mutating func addDoorstep(for house: MapSprite, doorX: CGFloat) {
+        let smallSide: CGFloat = Bool.random(using: &generator) ? 1 : -1
         for side: CGFloat in [-1, 1] {
-            let scale = CGFloat.random(in: 0.75...0.95, using: &generator)
             let center = CGPoint(
                 x: doorX + side * CGFloat.random(in: 62...82, using: &generator),
                 y: house.baseline + CGFloat.random(in: 2...16, using: &generator)
             )
-            let frame = CGRect(
-                x: center.x - size.width * scale / 2,
-                y: center.y - size.height * scale / 2,
-                width: size.width * scale,
-                height: size.height * scale
-            )
-            guard pathLine.distance(to: center) > pathHalfWidth + frame.width / 2 + 6,
-                  !ground.contains(where: { $0.frame.insetBy(dx: -4, dy: -4).intersects(frame) }),
-                  !standing.contains(where: { $0.footprint.intersects(frame) }) else { continue }
-            ground.append(makeSprite(.steppingStone, frame: frame, isMirrored: Bool.random(using: &generator)))
+            let scale = side == smallSide ? CGFloat.random(in: 0.7...0.8, using: &generator) : CGFloat.random(in: 0.88...1.0, using: &generator)
+            addStone(at: center, scale: scale, owner: house)
         }
     }
 
-    /// A few grey rocks on the grass in front of a house.
-    private mutating func addRocks(around house: MapSprite) {
-        let stone = MapSpriteKind.pathRock.size
+    /// Sometimes one or two stones on the grass beside a house seen from behind.
+    private mutating func addStonesBeside(_ house: MapSprite) {
+        guard Double.random(in: 0..<1, using: &generator) < 0.6 else { return }
+        let width = MapSpriteKind.steppingStone.size.width
         let span = house.kind.baseSpan
-        let isFront = house.kind.doorCenter != nil
-        let wanted = Int.random(in: 3...5, using: &generator)
-        var placed = 0
-        for _ in 0..<(wanted * 8) where placed < wanted {
-            let scale = CGFloat.random(in: 0.8...1.3, using: &generator)
-            let size = CGSize(width: stone.width * scale, height: stone.height * scale)
-            let center = CGPoint(
-                x: house.frame.minX + house.frame.width * CGFloat.random(in: (span.lowerBound - 0.2)...(span.upperBound + 0.2), using: &generator),
-                y: house.baseline + (isFront
-                    ? CGFloat.random(in: 6...52, using: &generator)
-                    : CGFloat.random(in: -24...24, using: &generator))
-            )
-            let frame = CGRect(x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width, height: size.height)
-            guard frame.minX >= 4, frame.maxX <= mapSize.width - 4, frame.maxY <= mapSize.height - 4,
-                  pathLine.distance(to: center) > pathHalfWidth + size.width / 2 + 6,
-                  !ground.contains(where: { $0.frame.insetBy(dx: -4, dy: -4).intersects(frame) }),
-                  !standing.contains(where: { $0.footprint.intersects(frame) }) else { continue }
-            ground.append(makeSprite(.pathRock, frame: frame, isMirrored: Bool.random(using: &generator)))
-            placed += 1
+        let side: CGFloat = Bool.random(using: &generator) ? 1 : -1
+        let edge = house.frame.minX + house.frame.width * (side < 0 ? span.lowerBound : span.upperBound)
+        let x = edge + side * (width / 2 + CGFloat.random(in: 8...28, using: &generator))
+        let bottom = min(house.baseline, mapSize.height - 24) - 24
+        for index in 0..<Int.random(in: 1...2, using: &generator) {
+            let center = CGPoint(x: x + CGFloat.random(in: -10...10, using: &generator), y: bottom - CGFloat(index) * 38)
+            addStone(at: center, scale: CGFloat.random(in: 0.7...1.05, using: &generator), owner: house)
         }
+    }
+
+    /// Puts one stepping stone centred on `center` when it fits: on the map, off the path and
+    /// clear of other ground pieces and of anything standing except its own house.
+    @discardableResult
+    private mutating func addStone(at center: CGPoint, scale: CGFloat, owner: MapSprite) -> Bool {
+        let size = MapSpriteKind.steppingStone.size
+        let frame = CGRect(
+            x: center.x - size.width * scale / 2,
+            y: center.y - size.height * scale / 2,
+            width: size.width * scale,
+            height: size.height * scale
+        )
+        let points = [
+            center,
+            CGPoint(x: frame.minX, y: frame.minY), CGPoint(x: frame.maxX, y: frame.minY),
+            CGPoint(x: frame.minX, y: frame.maxY), CGPoint(x: frame.maxX, y: frame.maxY),
+        ]
+        guard frame.minX >= 4, frame.maxX <= mapSize.width - 4, frame.minY >= 4, frame.maxY <= mapSize.height - 4,
+              points.allSatisfy({ pathLine.distance(to: $0) > pathHalfWidth + 4 }),
+              !ground.contains(where: { $0.frame.insetBy(dx: -3, dy: -3).intersects(frame) }),
+              !standing.contains(where: { $0.id != owner.id && $0.footprint.intersects(frame) }) else { return false }
+        ground.append(makeSprite(.steppingStone, frame: frame, isMirrored: Bool.random(using: &generator)))
+        return true
     }
 
     // MARK: Rocks by the path
@@ -381,7 +479,7 @@ private struct SceneryBuilder {
         let size = MapSpriteKind.pathRock.size
         var side: CGFloat = Bool.random(using: &generator) ? 1 : -1
         for index in 0..<wanted {
-            for _ in 0..<12 {
+            for _ in 0..<24 {
                 let along = (CGFloat(index) + CGFloat.random(in: 0.15...0.85, using: &generator)) / CGFloat(wanted)
                 let (point, tangent) = route.sample(at: route.length * along)
                 let scale = CGFloat.random(in: 0.75...1.25, using: &generator)
@@ -417,7 +515,7 @@ private struct SceneryBuilder {
         let size = MapSpriteKind.lamp.size
 
         for index in 0..<wanted {
-            for _ in 0..<24 {
+            for _ in 0..<40 {
                 let along = (CGFloat(index) + CGFloat.random(in: 0.1...0.9, using: &generator)) / CGFloat(wanted)
                 let (point, tangent) = route.sample(at: route.length * along)
                 let side: CGFloat = Bool.random(using: &generator) ? 1 : -1
@@ -440,6 +538,67 @@ private struct SceneryBuilder {
         }
     }
 
+    // MARK: Signpost and tree stumps
+
+    /// The top bar covers about this much of the top of the map at 1×, so the signpost and the
+    /// stumps stay below it.
+    private let topBarClearance: CGFloat = 96
+
+    /// The one signpost stands on the grass beside the first part of the path, pointing the way
+    /// to the veggie stall.
+    mutating func placeSignpost() {
+        let size = MapSpriteKind.signpost.size
+        for attempt in 0..<400 {
+            // The first part of the walk first; if that is full of houses, a little further on.
+            let along = CGFloat.random(in: 0.02...(attempt < 200 ? 0.45 : 0.6), using: &generator)
+            let (point, tangent) = route.sample(at: route.length * along)
+            // Only beside a level stretch: next to a climb the sign would stand in front of the fox.
+            guard abs(tangent.dx) > 0.9 else { continue }
+            // Above the path it stands just behind the fox; below it, it stands far enough down that
+            // its top stays on the grass and never covers the fox's feet.
+            let isAbove = Bool.random(using: &generator)
+            let gap = isAbove
+                ? pathHalfWidth + CGFloat.random(in: 12...80, using: &generator)
+                : size.height + pathHalfWidth + CGFloat.random(in: 6...40, using: &generator)
+            let base = CGPoint(x: point.x, y: point.y + (isAbove ? -gap : gap))
+            let frame = CGRect(x: base.x - size.width / 2, y: base.y - size.height, width: size.width, height: size.height)
+            let sign = makeSprite(.signpost, frame: frame)
+            guard frame.minX >= 8, frame.maxX <= mapSize.width - 8, frame.minY >= topBarClearance,
+                  frame.maxY <= mapSize.height - 4,
+                  FoxPathGenerator.isClear(sign, of: pathPoints),
+                  !overlapsStanding(frame.insetBy(dx: -16, dy: -8)),
+                  !ground.contains(where: { $0.frame.intersects(sign.footprint) }) else { continue }
+            standing.append(sign)
+            return
+        }
+    }
+
+    /// A few tree stumps at random spots on the grass, away from the path and from each other.
+    mutating func placeTreeStumps() {
+        let wanted = Int.random(in: 2...4, using: &generator)
+        let size = MapSpriteKind.treeStump.size
+        var placed = 0
+        for _ in 0..<(wanted * 40) where placed < wanted {
+            let scale = CGFloat.random(in: 0.85...1.15, using: &generator)
+            let width = size.width * scale, height = size.height * scale
+            let base = CGPoint(
+                x: CGFloat.random(in: (width / 2 + 8)...(mapSize.width - width / 2 - 8), using: &generator),
+                y: CGFloat.random(in: (topBarClearance + height)...(mapSize.height - 4), using: &generator)
+            )
+            let frame = CGRect(x: base.x - width / 2, y: base.y - height, width: width, height: height)
+            let stump = makeSprite(.treeStump, frame: frame, isMirrored: Bool.random(using: &generator))
+            let isOffPath = [CGPoint(x: frame.minX, y: frame.maxY), CGPoint(x: frame.maxX, y: frame.maxY),
+                             CGPoint(x: frame.midX, y: frame.minY), CGPoint(x: frame.midX, y: frame.maxY)]
+                .allSatisfy { pathLine.distance(to: $0) > pathHalfWidth + 20 }
+            guard isOffPath,
+                  FoxPathGenerator.isClear(stump, of: pathPoints),
+                  !overlapsStanding(frame.insetBy(dx: -24, dy: -16)),
+                  !ground.contains(where: { $0.frame.intersects(frame.insetBy(dx: -6, dy: -6)) }) else { continue }
+            standing.append(stump)
+            placed += 1
+        }
+    }
+
     // MARK: Gardens
 
     private enum GardenStyle: CaseIterable {
@@ -447,22 +606,23 @@ private struct SceneryBuilder {
         case onionBed
         /// A clump of leafy plants.
         case leafyClump
-        /// Baskets and a crate of vegetables, as if just picked.
+        /// Leafy plants with the baskets beside them.
+        case leafyWithBaskets
+        /// The baskets beside a few onions, as if picking has just started.
         case harvest
-        /// Leafy plants with a basket beside them.
-        case leafyWithBasket
     }
 
     /// Open grass farther than this from any house, lamp, stall or garden gets a garden.
-    private static let openGrassDistance: CGFloat = 165
+    private static let openGrassDistance: CGFloat = 100
     private static let maximumGardens = 12
 
     /// Fills the open grass with small gardens, always in the emptiest spot left, until no
-    /// large empty area remains. Nothing lands on the path or in front of the characters.
+    /// large empty area remains. Nothing lands on the path, under the top bar or in front of the
+    /// characters.
     mutating func fillOpenGrass() {
         let spacing: CGFloat = 48
         var spots: [CGPoint] = []
-        for y in stride(from: CGFloat(110), through: mapSize.height - 20, by: spacing) {
+        for y in stride(from: topBarClearance + 90, through: mapSize.height - 20, by: spacing) {
             for x in stride(from: CGFloat(60), through: mapSize.width - 60, by: spacing) {
                 let point = CGPoint(x: x, y: y)
                 if pathLine.distance(to: point) > pathHalfWidth + 70 { spots.append(point) }
@@ -481,13 +641,15 @@ private struct SceneryBuilder {
             guard let spot = spots.max(by: { openness($0) < openness($1) }),
                   openness(spot) > Self.openGrassDistance else { return }
             tried.append(spot)
-            let style = styles.next(using: &generator)
-            _ = placeGarden(style, at: spot)
+            // When one kind of garden does not fit here, try the others before moving on.
+            for _ in GardenStyle.allCases where !placeGarden(styles.next(using: &generator), at: spot) {}
             if standing.filter(\.kind.isGardenPiece).count >= Self.maximumGardens * 4 { return }
         }
     }
 
-    /// Places the pieces of one garden around `spot`. Returns `true` when at least one landed.
+    /// Places the pieces of one garden around `spot`, skipping any piece that does not fit.
+    /// Returns `true` when at least one piece landed.
+    @discardableResult
     private mutating func placeGarden(_ style: GardenStyle, at spot: CGPoint) -> Bool {
         var pieces: [(MapSpriteKind, CGPoint)] = []
         switch style {
@@ -496,23 +658,25 @@ private struct SceneryBuilder {
             let rows = Int.random(in: 1...2, using: &generator)
             for row in 0..<rows {
                 for column in 0..<columns {
-                    let x = spot.x + (CGFloat(column) - CGFloat(columns - 1) / 2) * 64 + (row == 1 ? 32 : 0)
-                    pieces.append((.onionSprout, CGPoint(x: x, y: spot.y + CGFloat(row) * 42)))
+                    let x = spot.x + (CGFloat(column) - CGFloat(columns - 1) / 2) * 82 + (row == 1 ? 41 : 0)
+                    pieces.append((.onionSprout, CGPoint(x: x, y: spot.y + CGFloat(row) * 54)))
                 }
             }
         case .leafyClump:
             let count = Int.random(in: 2...3, using: &generator)
             for index in 0..<count {
-                let x = spot.x + (CGFloat(index) - CGFloat(count - 1) / 2) * 70
+                let x = spot.x + (CGFloat(index) - CGFloat(count - 1) / 2) * 86
                 pieces.append((.leafyPlant, CGPoint(x: x, y: spot.y + (index.isMultiple(of: 2) ? 0 : 20))))
             }
+        case .leafyWithBaskets:
+            pieces.append((.leafyPlant, CGPoint(x: spot.x - 70, y: spot.y)))
+            pieces.append((.leafyPlant, CGPoint(x: spot.x + 12, y: spot.y + 26)))
+            pieces.append((.baskets, CGPoint(x: spot.x + 118, y: spot.y + 16)))
         case .harvest:
-            pieces.append((.baskets, CGPoint(x: spot.x - 46, y: spot.y)))
-            pieces.append((.veggieCrate, CGPoint(x: spot.x + 60, y: spot.y + 18)))
-        case .leafyWithBasket:
-            pieces.append((.leafyPlant, CGPoint(x: spot.x - 56, y: spot.y)))
-            pieces.append((.leafyPlant, CGPoint(x: spot.x + 10, y: spot.y + 22)))
-            pieces.append((.baskets, CGPoint(x: spot.x + 94, y: spot.y + 14)))
+            pieces.append((.baskets, CGPoint(x: spot.x - 76, y: spot.y)))
+            pieces.append((.onionSprout, CGPoint(x: spot.x + 36, y: spot.y - 12)))
+            pieces.append((.onionSprout, CGPoint(x: spot.x + 112, y: spot.y + 6)))
+            pieces.append((.onionSprout, CGPoint(x: spot.x + 70, y: spot.y + 48)))
         }
 
         var placedAny = false
@@ -523,10 +687,19 @@ private struct SceneryBuilder {
             // `base` is where the piece touches the ground.
             let jitter = CGPoint(x: CGFloat.random(in: -6...6, using: &generator), y: CGFloat.random(in: -4...4, using: &generator))
             let frame = CGRect(x: base.x + jitter.x - size.width / 2, y: base.y + jitter.y - size.height, width: size.width, height: size.height)
-            guard frame.minX >= 4, frame.maxX <= mapSize.width - 4, frame.minY >= 0, frame.maxY <= mapSize.height - 4 else { continue }
-            let piece = makeSprite(kind, frame: frame, isMirrored: kind == .veggieCrate ? false : (mirrored != Bool.random(using: &generator)))
+            guard frame.minX >= 4, frame.maxX <= mapSize.width - 4, frame.minY >= topBarClearance,
+                  frame.maxY <= mapSize.height - 4 else { continue }
+            let piece = makeSprite(kind, frame: frame, isMirrored: mirrored != Bool.random(using: &generator))
+            // Pieces of one garden may touch a little; anything else keeps a small gap.
             guard FoxPathGenerator.isClear(piece, of: pathPoints),
-                  !standing.contains(where: { $0.frame.insetBy(dx: -4, dy: -4).intersects(frame.insetBy(dx: 6, dy: 6)) }) else { continue }
+                  !standing.contains(where: { other in
+                      other.kind.isGardenPiece
+                          ? other.frame.insetBy(dx: -4, dy: -4).intersects(frame.insetBy(dx: 6, dy: 6))
+                          : other.frame.insetBy(dx: -8, dy: -8).intersects(frame)
+                  }),
+                  // Stones and rocks stay in sight: no piece stands on them.
+                  !ground.contains(where: { $0.kind != .soilSpeck && $0.frame.intersects(frame.insetBy(dx: 0, dy: frame.height * 0.3)) })
+            else { continue }
             standing.append(piece)
             placedAny = true
             if kind == .onionSprout || kind == .leafyPlant {
