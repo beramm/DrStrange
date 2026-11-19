@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Finish screen shown when a Whack-a-Mole game ends: a cream sign hanging on two vines, three
-/// stars on its top edge with light shining from behind them, a "Great job" ribbon, the final
-/// score with the Whack-a-Mole high score, and three round buttons to play again, go on to
-/// another game or go home.
+/// Finish screen shown when a Whack-a-Mole game ends: a cream sign hanging on two vines with
+/// sunlight shining from behind it, a wide green "Great job" ribbon, the final score with the
+/// Whack-a-Mole high score, and three round buttons to play again, go on to another game or go
+/// home.
 ///
 /// The session itself is still saved for caregivers by the game; this screen only shows the score.
 struct GameResultView: View {
@@ -47,8 +47,9 @@ struct GameResultView: View {
 
             ZStack {
                 Self.sky
+                // Same sunlight as the Veggie Dash finish screen: its glow peeks over the ribbon.
                 shine(scale: s)
-                    .position(at(0, -337))
+                    .position(at(0, -370))
                 // The right vine ends higher in the picture (674 of 737 pixels) than the left one
                 // (728), so the vines are lowered until both ends are tucked behind the panel.
                 ropes(scale: s)
@@ -60,16 +61,13 @@ struct GameResultView: View {
                     .position(c)
                     .accessibilityHidden(true)
 
-                star(width: 150 * s).position(at(-197, -311))
-                star(width: 150 * s).position(at(197, -311))
-                star(width: 200 * s).position(at(0, -337))
-
                 ribbon(scale: s)
-                    .position(at(0, -137))
+                    .position(at(0, -297))
                 Text("Your Score")
-                    .font(.custom("DaysOne-Regular", size: 38 * s))
+                    .font(.custom("DaysOne-Regular", size: 54 * s))
                     .foregroundStyle(Self.ink)
-                    .position(at(0, -42))
+                    .shadow(color: Self.ink.opacity(0.25), radius: 0, x: 0, y: 3 * s)
+                    .position(at(0, -157))
                 Text("\(score)")
                     .font(.custom("DaysOne-Regular", size: 118 * s))
                     .monospacedDigit()
@@ -78,10 +76,10 @@ struct GameResultView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .frame(width: panel.width * 0.8)
-                    .position(at(0, 48))
+                    .position(at(0, -62))
                     .accessibilityLabel("Your score \(score)")
                 highScoreLine(scale: s)
-                    .position(at(0, 120))
+                    .position(at(0, 83))
 
                 buttons(scale: s)
                     .position(at(0, 205))
@@ -92,17 +90,9 @@ struct GameResultView: View {
         .ignoresSafeArea()
     }
 
-    // MARK: - Stars, shine, ropes and ribbon
+    // MARK: - Shine, ropes and ribbon
 
-    private func star(width: CGFloat) -> some View {
-        Image("FinishScreen/Star")
-            .resizable()
-            .scaledToFit()
-            .frame(width: width)
-            .accessibilityHidden(true)
-    }
-
-    /// Soft rays turning slowly behind the stars, over a warm glow that gently breathes.
+    /// Soft rays turning slowly behind the top of the sign, over a warm glow that gently breathes.
     private func shine(scale s: CGFloat) -> some View {
         let radius = 470 * s
         return TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
@@ -146,7 +136,7 @@ struct GameResultView: View {
     }
 
     private func ribbon(scale s: CGFloat) -> some View {
-        let width = 570 * s
+        let width = 950 * s
         return Image("FinishScreen/Ribbon")
             .resizable()
             .scaledToFit()
@@ -154,12 +144,12 @@ struct GameResultView: View {
             .overlay {
                 Text("Great job")
                     .textCase(.uppercase)
-                    .font(.custom("DoodleChalkDemoRegular", size: 56 * s))
-                    .tracking(56 * s * 0.025)
+                    .font(.custom("DoodleChalkDemoRegular", size: 92 * s))
+                    .tracking(92 * s * 0.2)
                     .foregroundStyle(Self.ribbonText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                    .frame(width: width * 0.7)
+                    .frame(width: width * 0.75)
                     // The flat middle of the band sits a little above the picture's centre.
                     .offset(y: -width * 0.035)
             }
@@ -178,14 +168,14 @@ struct GameResultView: View {
                 Image("FinishScreen/Star")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 24 * s)
+                    .frame(width: 32 * s)
                     .accessibilityHidden(true)
                 Text("New High Score: \(best)")
             } else {
                 Text("High Score: \(best)")
             }
         }
-        .font(.custom("DaysOne-Regular", size: 22 * s))
+        .font(.custom("DaysOne-Regular", size: 30 * s))
         .foregroundStyle(Self.ink.opacity(isNewHighScore ? 0.9 : 0.6))
         .accessibilityElement(children: .combine)
     }
@@ -222,7 +212,7 @@ struct GameResultView: View {
     }
 }
 
-/// Rays fanning out from the centre, like light behind the stars.
+/// Rays fanning out from the centre, like light behind the sign.
 private struct SunRays: Shape {
     let count: Int
 
