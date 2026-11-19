@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Entry screen for Follow the Fox: the three friends and a big Play button for the child, and a
-/// panel with game options for the adult.
+/// Entry screen for Follow the Fox: the three friends, what the game is about and a big Play button,
+/// centred on the meadow. The game uses the saved options (sound, haptics, gaze marker).
 struct FoxPathHomeView: View {
     private enum PresentedScreen: String, Identifiable {
         case calibration
@@ -28,63 +28,56 @@ struct FoxPathHomeView: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            childPanel
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            settingsPanel
-                .frame(width: 440)
-        }
-        .background(WhackAMolePalette.meadow.ignoresSafeArea())
-        .overlay(alignment: .topLeading) {
-            if let onExit {
-                Button(action: onExit) {
-                    Label("Back", systemImage: "chevron.backward")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 28, weight: .heavy))
-                        .frame(width: 56, height: 56)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(FoxPathPalette.accent)
-                .clipShape(Circle())
-                .padding(24)
-            }
-        }
-        .navigationTitle("Follow the Fox")
-        .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: configuration) { _, newValue in
-            FoxPathConfigurationStore.standard.save(newValue)
-        }
-        .fullScreenCover(item: $presentedScreen) { screen in
-            switch screen {
-            case .calibration:
-                GazeCalibrationView(
-                    controller: gazeController,
-                    onCalibrated: { presentedScreen = .gazeGame },
-                    onCancel: {
-                        gazeController.stop()
-                        presentedScreen = nil
+        childPanel
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(WhackAMolePalette.meadow.ignoresSafeArea())
+            .overlay(alignment: .topLeading) {
+                if let onExit {
+                    Button(action: onExit) {
+                        Label("Back", systemImage: "chevron.backward")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 28, weight: .heavy))
+                            .frame(width: 56, height: 56)
                     }
-                )
-            case .gazeGame:
-                FoxPathGameView(
-                    configuration: configuration,
-                    input: .gaze(gazeController),
-                    onNextGame: onNextGame.map { next in { closeGame(then: next) } },
-                    onHome: onHome.map { home in { closeGame(then: home) } }
-                ) {
-                    closeGame()
-                }
-            case .touchGame:
-                FoxPathGameView(
-                    configuration: configuration,
-                    input: .touch,
-                    onNextGame: onNextGame.map { next in { closeGame(then: next) } },
-                    onHome: onHome.map { home in { closeGame(then: home) } }
-                ) {
-                    closeGame()
+                    .buttonStyle(.borderedProminent)
+                    .tint(FoxPathPalette.accent)
+                    .clipShape(Circle())
+                    .padding(24)
                 }
             }
-        }
+            .navigationTitle("Follow the Fox")
+            .navigationBarTitleDisplayMode(.inline)
+            .fullScreenCover(item: $presentedScreen) { screen in
+                switch screen {
+                case .calibration:
+                    GazeCalibrationView(
+                        controller: gazeController,
+                        onCalibrated: { presentedScreen = .gazeGame },
+                        onCancel: {
+                            gazeController.stop()
+                            presentedScreen = nil
+                        }
+                    )
+                case .gazeGame:
+                    FoxPathGameView(
+                        configuration: configuration,
+                        input: .gaze(gazeController),
+                        onNextGame: onNextGame.map { next in { closeGame(then: next) } },
+                        onHome: onHome.map { home in { closeGame(then: home) } }
+                    ) {
+                        closeGame()
+                    }
+                case .touchGame:
+                    FoxPathGameView(
+                        configuration: configuration,
+                        input: .touch,
+                        onNextGame: onNextGame.map { next in { closeGame(then: next) } },
+                        onHome: onHome.map { home in { closeGame(then: home) } }
+                    ) {
+                        closeGame()
+                    }
+                }
+            }
     }
 
     /// Stops the camera, closes the game and, for Home or Next, hands over to the host app.
@@ -94,7 +87,7 @@ struct FoxPathHomeView: View {
         destination?()
     }
 
-    // MARK: - Child panel
+    // MARK: - Content
 
     private var childPanel: some View {
         VStack(spacing: 28) {
@@ -141,41 +134,5 @@ struct FoxPathHomeView: View {
             .clipShape(Capsule())
         }
         .padding(32)
-    }
-
-    // MARK: - Adult panel
-
-    private var settingsPanel: some View {
-        Form {
-            Section {
-                Toggle("Sound", isOn: $configuration.soundEnabled)
-                Toggle("Haptics", isOn: $configuration.hapticsEnabled)
-                Toggle("Show where the eyes point", isOn: $configuration.showsGazeMarker)
-            } header: {
-                Text("Game")
-            } footer: {
-                Text("Every path is new, and the fox, the bunny and the raccoon swap roles at random. Pinch the map or use the magnifier buttons to zoom.")
-            }
-
-            Section {
-                LabeledContent("Game length", value: "\(Int(FoxPathConfiguration.sessionDuration / 60)) min")
-                LabeledContent("Hearts", value: "\(FoxPathConfiguration.initialLives)")
-                LabeledContent("Walking speed", value: speedText)
-                LabeledContent("Look-away allowance", value: String(format: "%.2f s", settings.lookAwayGrace))
-                LabeledContent("Time to refocus", value: String(format: "%.2f s", settings.refocusDwell))
-            } header: {
-                Text("How the game works (for grown-ups)")
-            } footer: {
-                ClinicalNote("Follow the Fox is a game. It does not diagnose, measure or treat vision, and these are game settings that still need clinical review. The 2 minutes are one game, not a recommended play time. Patching and play time follow your child's eye doctor.")
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(WhackAMolePalette.cream.opacity(0.6))
-    }
-
-    private var settings: FoxPathSettings { configuration.settings }
-
-    private var speedText: String {
-        String(format: "%.1f tiles/s", settings.foxSpeed / Double(FoxPathMetrics.cellSize.width))
     }
 }
