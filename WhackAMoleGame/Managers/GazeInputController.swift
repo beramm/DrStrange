@@ -36,6 +36,7 @@ final class GazeInputController {
     @ObservationIgnored private var pendingSetupState: SetupState?
     @ObservationIgnored private var pendingSetupFrameCount = 0
     @ObservationIgnored private var lastImageOrientation: CGImagePropertyOrientation?
+    @ObservationIgnored private var lastAnalysisUptime: TimeInterval?
     @ObservationIgnored private var isCollectingSamples = false
     @ObservationIgnored private var rawSamples: [GazeCoordinate] = []
     @ObservationIgnored private var stableWindowStartedAt: TimeInterval?
@@ -118,23 +119,26 @@ final class GazeInputController {
         }
     }
 
-    func startCalibration(preparationSeconds: Int = 6) {
+    static func countdownValues(preparationSeconds: Int) -> [Int] {
+        Array(stride(from: max(preparationSeconds, 1) - 1, through: 0, by: -1))
+    }
+
+    func startCalibration(preparationSeconds: Int = 4) {
         guard isReadyToCalibrate, calibrationTask == nil else { return }
-        runtime.setPreviewEnabled(false)
-        runtime.previewView.clear()
         let preparationSeconds = max(preparationSeconds, 1)
+        let countdownValues = Self.countdownValues(preparationSeconds: preparationSeconds)
         calibration = nil
         calibrationState = .readyForTarget
         unclampedCalibratedPoint = nil
         isPreparingCalibration = true
-        calibrationCountdown = preparationSeconds
+        calibrationCountdown = countdownValues[0]
         activeCalibrationTarget = nil
         status = "Hold still — calibration begins in \(preparationSeconds) seconds"
         publishWithoutPrediction(trackingState: .limited)
 
         calibrationTask = Task { [weak self] in
             guard let self else { return }
-            for remaining in stride(from: preparationSeconds, through: 1, by: -1) {
+            for remaining in countdownValues {
                 guard !Task.isCancelled else { return }
                 calibrationCountdown = remaining
                 try? await Task.sleep(for: .seconds(1))
@@ -165,6 +169,7 @@ final class GazeInputController {
         pendingSetupState = nil
         pendingSetupFrameCount = 0
         lastImageOrientation = nil
+        lastAnalysisUptime = nil
         isSceneTooDark = false
         isFrameCaptureReady = false
         status = "Stopped; volatile gaze and calibration data discarded"
@@ -212,7 +217,12 @@ final class GazeInputController {
         var attempt = 1
         while !Task.isCancelled {
             let isMoving = movesFromPreviousTarget && attempt == 1
+            let isFirstTarget = activeCalibrationTarget == nil
             activeCalibrationTarget = target
+            if isFirstTarget {
+                runtime.setPreviewEnabled(false)
+                runtime.previewView.clear()
+            }
             calibrationState = .collecting
             isCollectingSamples = false
             rawSamples = []
@@ -303,11 +313,14 @@ final class GazeInputController {
     }
 
     func consume(_ analysis: PaddyFrameAnalysis) {
+        guard analysis.hostUptime.isFinite, analysis.hostUptime >= 0 else { return }
+        if let lastAnalysisUptime, analysis.hostUptime <= lastAnalysisUptime { return }
+        lastAnalysisUptime = analysis.hostUptime
         if let lastImageOrientation, lastImageOrientation != analysis.imageOrientation {
             invalidateCalibrationForOrientationChange()
         }
         lastImageOrientation = analysis.imageOrientation
-        if cameraStarted, !isPreparingCalibration, activeCalibrationTarget == nil,
+        if cameraStarted, activeCalibrationTarget == nil,
            let previewImage = analysis.previewImage {
             runtime.previewView.display(previewImage)
         }

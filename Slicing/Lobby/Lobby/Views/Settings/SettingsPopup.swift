@@ -178,8 +178,10 @@ struct SettingsPopup: View {
         randomSpin = savedRandomSpin
         gamesLocked = savedGamesLocked
         #if canImport(DrStrangeGazeTracker)
-        // In the Paddy app, Whack-a-Mole keeps this choice in its own settings.
-        wearsEyePatch = ConfigurationStore.standard.load().oneEyeEnforcerEnabled
+        // Keep the old Whack-a-Mole preference only until a global choice is saved.
+        wearsEyePatch = AppSettings.wearsEyePatch(
+            fallback: ConfigurationStore.standard.load().oneEyeEnforcerEnabled
+        )
         #endif
     }
 

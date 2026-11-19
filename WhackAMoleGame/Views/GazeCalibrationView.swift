@@ -25,7 +25,7 @@ struct GazeCalibrationView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     /// Seconds the face must stay ready before the dots start by themselves.
-    private static let readyHoldSeconds = 1.0
+    private static let readyHoldSeconds = 2.0
 
     init(
         controller: GazeInputController,
@@ -129,7 +129,7 @@ struct GazeCalibrationView: View {
             try? await Task.sleep(for: .seconds(Self.readyHoldSeconds))
             guard !Task.isCancelled, controller.isReadyToCalibrate,
                   !controller.isPreparingCalibration, !controller.isCalibrated else { return }
-            controller.startCalibration(preparationSeconds: isRecalibration ? 3 : 6)
+            controller.startCalibration(preparationSeconds: 4)
         }
     }
 
@@ -145,7 +145,9 @@ struct GazeCalibrationView: View {
         CalibrationCardScreen(
             title: "Stare at the dots",
             firstLine: "Sit still and don't move your head",
-            secondLine: "Follow the dots with only your eye"
+            secondLine: controller.oneEyeEnforcerEnabled
+                ? "Follow the dots with only your eye"
+                : "Follow the dots with your eyes"
         ) {
             withAnimation(.easeInOut(duration: 0.25)) { showsCamera = true }
         }
@@ -155,7 +157,9 @@ struct GazeCalibrationView: View {
 
     private func cameraStep(sx: CGFloat, sy: CGFloat, s: CGFloat) -> some View {
         ZStack {
-            Text("Keep Your Head in The Circle")
+            Text(controller.isPreparingCalibration
+                 ? "Get Ready for the First Dot"
+                 : "Keep Your Head in The Circle")
                 .font(.custom("DoodleChalkDemoRegular", size: 76 * s))
                 .tracking(76 * s * 0.025)
                 .foregroundStyle(CalibrationCardScreen.titleBrown)
@@ -171,13 +175,15 @@ struct GazeCalibrationView: View {
             ZStack {
                 VolatileGazeCameraPreview(view: controller.cameraPreview)
                 if !controller.cameraStarted { Color.black }
-                FacePositionGuide(
-                    state: controller.sample.setupState,
-                    isReady: controller.isReadyToCalibrate,
-                    isCheckingPatch: controller.oneEyeEnforcerEnabled &&
-                        controller.patchWearState == .checking
-                )
-                .scaleEffect(1.25 * s)
+                if !controller.isPreparingCalibration {
+                    FacePositionGuide(
+                        state: controller.sample.setupState,
+                        isReady: controller.isReadyToCalibrate,
+                        isCheckingPatch: controller.oneEyeEnforcerEnabled &&
+                            controller.patchWearState == .checking
+                    )
+                    .scaleEffect(1.25 * s)
+                }
                 if controller.isPreparingCalibration {
                     countdown(s: s)
                 }
@@ -199,10 +205,10 @@ struct GazeCalibrationView: View {
         }
     }
 
-    /// "First dot in 3, 2, 1" over the camera, once the face is ready.
+    /// The four-second countdown shows 3, 2, 1, 0 over the live camera.
     private func countdown(s: CGFloat) -> some View {
         VStack(spacing: 8 * s) {
-            Text("Get ready for the first dot")
+            Text("Stay still")
                 .font(.custom("DaysOne-Regular", size: 34 * s))
             Text("\(controller.calibrationCountdown)")
                 .font(.custom("DaysOne-Regular", size: 110 * s))
@@ -380,9 +386,9 @@ struct GazeCalibrationView: View {
         }
 
         return .init(
-            id: "ready",
-            title: "Ready!",
-            message: "Keep still, the dots start soon.",
+            id: "ready-hold",
+            title: "Stay still",
+            message: "Keep your head in the circle for 2 seconds.",
             systemImage: "checkmark.circle.fill",
             tone: .success
         )
@@ -434,7 +440,7 @@ private struct FacePositionGuide: View {
     }
 
     private var label: String {
-        if isReady { return "Ready!" }
+        if isReady { return "Stay still" }
         if state == .movingTooMuch { return "Too much movement" }
         if state == .stabilizing || isCheckingPatch { return "Hold still…" }
         return "Your face"

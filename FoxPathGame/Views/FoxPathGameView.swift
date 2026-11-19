@@ -92,12 +92,16 @@ struct FoxPathGameView: View {
 
             FoxFocusOverlay(viewModel: viewModel, usesGaze: input.usesGaze)
 
-            if configuration.showsGazeMarker, let point = viewModel.pointer {
+            if !input.usesGaze, configuration.showsGazeMarker, let point = viewModel.pointer {
                 FoxPointerMarker(point: point)
             }
 
             if case let .gaze(controller) = input {
-                GazePointerFeed(controller: controller, viewModel: viewModel)
+                GazePointerFeed(
+                    controller: controller,
+                    viewModel: viewModel,
+                    showsCursor: configuration.showsGazeMarker
+                )
             }
 
             FoxPathHUDView(viewModel: viewModel, onExit: requestStop)
@@ -186,15 +190,30 @@ struct FoxPathGameView: View {
     }
 }
 
-/// Passes each gaze sample to the game as a screen point. Samples are used for the current
-/// frame only and are never stored.
+/// Passes filtered gaze to the game and draws the shared cursor. Its short
+/// smoothing and trail history stays in memory and is never saved.
 private struct GazePointerFeed: View {
     let controller: GazeInputController
     let viewModel: FoxPathGameViewModel
+    let showsCursor: Bool
+
+    @State private var smoother = GazePointSmoother()
+    @State private var smoothedNormalizedPoint: CGPoint?
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
+                if showsCursor {
+                    PaddyGazeCursorVisual(
+                        pointNormalized: smoothedNormalizedPoint,
+                        isTracking: controller.hasUsableGaze,
+                        mayHoldBriefLoss: controller.sample.trackingState == .lost &&
+                            controller.isCalibrated &&
+                            controller.isPatchVerified &&
+                            !controller.isSceneTooDark
+                    )
+                }
+
                 if !controller.isCalibrated {
                     Text("Eye control needs recalibration")
                         .font(.headline)
@@ -211,20 +230,28 @@ private struct GazePointerFeed: View {
                 consumeSample(in: proxy.frame(in: .global))
             }
         }
+        .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    /// The tracker reports gaze as a fraction of the safe-area rectangle it was calibrated on.
+    /// The shared tracker reports a full-screen normalized point. The same
+    /// filtered point drives both the game and the visible bubble.
     private func consumeSample(in frame: CGRect) {
-        guard controller.hasUsableGaze, let gaze = controller.sample.pointNormalized else {
+        let raw = controller.sample.pointNormalized.map { CGPoint(x: $0.x, y: $0.y) }
+        smoothedNormalizedPoint = smoother.consume(
+            point: raw,
+            timestampNanoseconds: controller.sample.timestamp.uptimeNanoseconds,
+            isUsable: controller.hasUsableGaze
+        )
+        guard let gaze = smoothedNormalizedPoint else {
             viewModel.pointerLost()
             return
         }
-        viewModel.pointerMoved(to: CGPoint(
-            x: frame.minX + gaze.x * frame.width,
-            y: frame.minY + gaze.y * frame.height
-        ))
+        viewModel.pointerMoved(
+            to: PaddyGazeScreenGeometry.point(gaze, in: frame),
+            alreadySmoothed: true
+        )
     }
 }
 

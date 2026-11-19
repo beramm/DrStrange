@@ -45,6 +45,7 @@ struct ContentView: View {
                         onHome: goHome,
                         onNextGame: { goToNextGame(after: game) }
                     )
+                    .id(game)
                 }
             }
         }

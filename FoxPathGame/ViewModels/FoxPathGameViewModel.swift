@@ -167,9 +167,9 @@ final class FoxPathGameViewModel {
     // MARK: - Pointer
 
     /// A new gaze or finger position, in the coordinates of the full-screen game view.
-    func pointerMoved(to point: CGPoint) {
+    func pointerMoved(to point: CGPoint, alreadySmoothed: Bool = false) {
         let now = CACurrentMediaTime()
-        if let previous = pointer, pointerIsDown, let last = lastPointerTime {
+        if !alreadySmoothed, let previous = pointer, pointerIsDown, let last = lastPointerTime {
             let blend = 1 - exp(-(now - last) / Self.pointerSmoothing)
             pointer = CGPoint(
                 x: previous.x + (point.x - previous.x) * blend,

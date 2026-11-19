@@ -19,9 +19,15 @@ struct FoxPathHomeView: View {
     /// The player's character from onboarding: always the one followed; the thief is one of the
     /// other two. Nil in the standalone app, where all three swap roles at random.
     let player: PathCharacter?
+    let oneEyeEnforcerEnabled: Bool
 
-    init(player: PathCharacter? = nil, onExit: (() -> Void)? = nil) {
+    init(
+        player: PathCharacter? = nil,
+        oneEyeEnforcerEnabled: Bool = true,
+        onExit: (() -> Void)? = nil
+    ) {
         self.player = player
+        self.oneEyeEnforcerEnabled = oneEyeEnforcerEnabled
         self.onExit = onExit
     }
 
@@ -51,6 +57,9 @@ struct FoxPathHomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: configuration) { _, newValue in
             FoxPathConfigurationStore.standard.save(newValue)
+        }
+        .onChange(of: oneEyeEnforcerEnabled, initial: true) { _, enabled in
+            gazeController.setOneEyeEnforcerEnabled(enabled)
         }
         .fullScreenCover(item: $presentedScreen) { screen in
             switch screen {
@@ -101,6 +110,7 @@ struct FoxPathHomeView: View {
                 .foregroundStyle(FoxPathPalette.heart)
 
             Button {
+                gazeController.setOneEyeEnforcerEnabled(oneEyeEnforcerEnabled)
                 presentedScreen = .calibration
             } label: {
                 Label("Calibrate & Play", systemImage: "eye.fill")

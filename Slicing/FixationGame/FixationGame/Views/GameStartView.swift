@@ -28,15 +28,18 @@ struct GameStartView: View {
     let onNextGame: (() -> Void)?
     /// Who keeps the stall (the player's character). The thief is a mole.
     let character: FixationCharacter
+    let oneEyeEnforcerEnabled: Bool
 
     init(
         character: FixationCharacter = .fox,
+        oneEyeEnforcerEnabled: Bool = true,
         onExit: (() -> Void)? = nil,
         onGameplayStarted: (() -> Void)? = nil,
         onHome: (() -> Void)? = nil,
         onNextGame: (() -> Void)? = nil
     ) {
         self.character = character
+        self.oneEyeEnforcerEnabled = oneEyeEnforcerEnabled
         self.onExit = onExit
         self.onGameplayStarted = onGameplayStarted
         self.onHome = onHome
@@ -61,9 +64,7 @@ struct GameStartView: View {
 
                 Button {
                     #if !VEGGIE_KEEPER_STANDALONE
-                    // Apply the caregiver's saved one-eye check setting before calibration, as
-                    // Whack-a-Mole does.
-                    gaze.setOneEyeEnforcerEnabled(ConfigurationStore.standard.load().oneEyeEnforcerEnabled)
+                    gaze.setOneEyeEnforcerEnabled(oneEyeEnforcerEnabled)
                     #endif
                     screen = .calibration
                 } label: {
@@ -132,6 +133,11 @@ struct GameStartView: View {
             guard screen == .gazeGame || screen == .fingerGame else { return }
             onGameplayStarted?()
         }
+        #if !VEGGIE_KEEPER_STANDALONE
+        .onChange(of: oneEyeEnforcerEnabled, initial: true) { _, enabled in
+            gaze.setOneEyeEnforcerEnabled(enabled)
+        }
+        #endif
     }
 
     /// Stops the camera, closes the game and hands over to `destination` (by default the usual

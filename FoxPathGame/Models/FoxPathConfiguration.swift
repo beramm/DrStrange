@@ -21,7 +21,7 @@ struct FoxPathSettings: Codable, Equatable {
     static let standard = FoxPathSettings(
         foxSpeed: 100,
         followRadius: 190,
-        lookAwayGrace: 0.55,
+        lookAwayGrace: 0.44,
         refocusDwell: 0.4,
         straightRunRange: 2...3,
         turnHeightRange: 1...3
@@ -35,7 +35,7 @@ struct FoxPathSettings: Codable, Equatable {
 struct ThiefSettings: Codable, Equatable {
     /// Seconds the child must keep not following (on top of the look-away grace) before a
     /// thief comes, so a quick glance away does not bring one.
-    var triggerDelay: Double = 0.5
+    var triggerDelay: Double = 0.4
     /// Seconds after a thief has left before another one can come.
     var cooldown: Double = 4
     /// No new thief comes when fewer seconds than this are left in the game.
@@ -44,10 +44,10 @@ struct ThiefSettings: Codable, Equatable {
     /// (map units), because the walk is about to end.
     var minimumWalkLeft: Double = 100
     /// Seconds the thief takes to come into view.
-    var appearDuration: Double = 1
+    var appearDuration: Double = 0.8
     /// Seconds of not following that take the thief from where it lurks to the character. Short,
     /// so the thief rushes in.
-    var approachDuration: Double = 1
+    var approachDuration: Double = 0.8
     /// While the child follows, the thief backs away at this fraction of its approach speed.
     var backOffRate: Double = 0.6
     /// Seconds of following without a break that chase a thief off before it reaches the
@@ -70,7 +70,7 @@ struct FoxPathConfiguration: Codable, Equatable {
 
     var soundEnabled: Bool = true
     var hapticsEnabled: Bool = true
-    /// Shows a small dot where the tracker thinks the child is looking.
+    /// Shows the gaze cursor where the tracker thinks the child is looking.
     var showsGazeMarker: Bool = true
     /// Fixed seed for reproducible maps, roles and thieves (research / QA). `nil` draws new ones
     /// every game.

@@ -211,6 +211,32 @@ final class FoxPathSessionTests: XCTestCase {
 
     // MARK: - What the thief does
 
+    func testStandardLookAwayReachesTheCharacterInAboutTwoPointFourFourSeconds() {
+        let settings = FoxPathSettings.standard
+        var engine = FoxPathEngine(settings: settings, routeLength: 10_000)
+        var session = makeSession()
+        for _ in 0..<Int((settings.refocusDwell + 2 * step) / step) {
+            _ = engine.advance(by: step, reading: .onFox)
+        }
+        XCTAssertEqual(engine.state, .following)
+
+        var appearedAt: TimeInterval?
+        var caughtAt: TimeInterval?
+        for tick in 1...Int(4 / step) {
+            _ = engine.advance(by: step, reading: .away)
+            let attention: PlayerAttentionState = engine.state == .offTrack ? .notFollowing : .following
+            for event in session.advance(by: step, attention: attention, walk: walk) {
+                if case .thiefAppeared = event { appearedAt = Double(tick) * step }
+                if case .lifeLost = event { caughtAt = Double(tick) * step }
+            }
+            if caughtAt != nil { break }
+        }
+
+        XCTAssertEqual(appearedAt ?? .nan, 0.84, accuracy: 2 * step)
+        XCTAssertEqual(caughtAt ?? .nan, 2.44, accuracy: 2 * step)
+        XCTAssertEqual(session.lives, FoxPathConfiguration.initialLives - 1)
+    }
+
     func testThiefGoesForTheCharacterNotTheStall() throws {
         var session = makeSession()
         waitForThief(&session)
