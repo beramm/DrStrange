@@ -137,6 +137,7 @@ struct GameResultView: View {
 
     private func ribbon(scale s: CGFloat) -> some View {
         let width = 950 * s
+        let tracking = 92 * s * 0.2
         return Image("FinishScreen/Ribbon")
             .resizable()
             .scaledToFit()
@@ -145,13 +146,15 @@ struct GameResultView: View {
                 Text("Great job")
                     .textCase(.uppercase)
                     .font(.custom("DoodleChalkDemoRegular", size: 92 * s))
-                    .tracking(92 * s * 0.2)
+                    .tracking(tracking)
                     .foregroundStyle(Self.ribbonText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .frame(width: width * 0.75)
-                    // The flat middle of the band sits a little above the picture's centre.
-                    .offset(y: -width * 0.035)
+                    // Tracking also adds space after the last letter, so the words are moved
+                    // right by half of it to sit in the middle. The flat middle of the band sits
+                    // a little above the picture's centre.
+                    .offset(x: tracking / 2, y: -width * 0.035)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Great job")
