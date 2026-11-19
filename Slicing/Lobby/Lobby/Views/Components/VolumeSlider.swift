@@ -14,6 +14,8 @@ struct VolumeSlider: View {
     @Binding var value: Double
     let width: CGFloat
     let height: CGFloat
+    /// Called when the finger lets go, for example to play a sample sound.
+    var onRelease: () -> Void = {}
 
     var body: some View {
         HStack(spacing: height * 0.2) {
@@ -66,10 +68,12 @@ struct VolumeSlider: View {
             .frame(height: knob)
             .contentShape(Rectangle())
             .gesture(
-                DragGesture(minimumDistance: 0).onChanged { drag in
-                    let position = (drag.location.x - knob / 2) / travel
-                    value = min(max(position, 0), 1)
-                }
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        let position = (drag.location.x - knob / 2) / travel
+                        value = min(max(position, 0), 1)
+                    }
+                    .onEnded { _ in onRelease() }
             )
         }
         .frame(height: height)

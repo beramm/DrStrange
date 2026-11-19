@@ -22,7 +22,7 @@ struct CharacterInfoCard: View {
             Image("Card")
                 .resizable()
 
-            CharacterPortrait(imageName: character.imageName, diameter: 186 * s)
+            CharacterPortrait(imageName: character.imageName, diameter: 186 * s, circleColor: character.portraitColor)
                 .position(x: 211 * s, y: 161 * s)
 
             Text(character.name)
@@ -44,6 +44,17 @@ struct CharacterInfoCard: View {
                 .position(x: 211 * s, y: 464 * s)
         }
         .frame(width: 421 * s, height: 570 * s)
+    }
+}
+
+extension GameCharacter {
+    /// Colour of the circle behind the character on its card.
+    var portraitColor: Color {
+        switch id {
+        case GameCharacter.fox.id: Color(red: 0xFC / 255, green: 0xCC / 255, blue: 0x69 / 255)   // FCCC69
+        case GameCharacter.bunny.id: Color(red: 0x9B / 255, green: 0xB5 / 255, blue: 0x8D / 255) // 9BB58D
+        default: .portraitBlue                                                                  // raccoon
+        }
     }
 }
 
