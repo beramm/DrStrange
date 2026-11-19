@@ -240,42 +240,8 @@ private struct RecalibrationPauseOverlay: View {
     let onRest: () -> Void
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.32).ignoresSafeArea()
-            VStack(spacing: 20) {
-                Image(systemName: "viewfinder.circle.fill")
-                    .font(.system(size: 68))
-                    .foregroundStyle(.orange)
-                    .accessibilityHidden(true)
-                Text("Eye control needs recalibration")
-                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                Text("Your position changed too much. Set up eye control again before continuing.")
-                    .font(.title3)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 560)
-                HStack(spacing: 20) {
-                    Button(action: onRest) {
-                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
-                            .frame(minWidth: 200, minHeight: 56)
-                    }
-                    .buttonStyle(.bordered)
-                    Button(action: onRecalibrate) {
-                        Label("Calibrate again", systemImage: "eye.fill")
-                            .frame(minWidth: 220, minHeight: 56)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(WhackAMolePalette.accent)
-                }
-                .font(.title2.weight(.bold))
-                Text("Your score and remaining play time will stay paused while you recalibrate.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 520)
-            }
-            .padding(48)
-            .background(RoundedRectangle(cornerRadius: 36).fill(WhackAMolePalette.cream))
-        }
+        // The shared "Time to check again" card; NEXT opens calibration, then the game carries on.
+        RecalibrationNeededCard(onNext: onRecalibrate)
     }
 }
 

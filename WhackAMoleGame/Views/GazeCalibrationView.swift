@@ -23,10 +23,6 @@ struct GazeCalibrationView: View {
     @State private var showsCamera: Bool
     @Environment(\.scenePhase) private var scenePhase
 
-    /// Size of the design frame.
-    private static let design = CGSize(width: 1366, height: 1024)
-    private static let background = Color(red: 0.984, green: 0.890, blue: 0.682)
-    private static let titleBrown = Color(red: 0.600, green: 0.357, blue: 0.220)
     /// Seconds the face must stay ready before the dots start by themselves.
     private static let readyHoldSeconds = 1.0
 
@@ -45,8 +41,8 @@ struct GazeCalibrationView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let sx = geometry.size.width / Self.design.width
-            let sy = geometry.size.height / Self.design.height
+            let sx = geometry.size.width / CalibrationCardScreen.design.width
+            let sy = geometry.size.height / CalibrationCardScreen.design.height
             let s = min(sx, sy)
 
             ZStack {
@@ -74,11 +70,11 @@ struct GazeCalibrationView: View {
                         .padding(.vertical, 32)
                     }
                 } else {
-                    Self.background.ignoresSafeArea()
+                    CalibrationCardScreen.background.ignoresSafeArea()
                     if showsCamera {
                         cameraStep(sx: sx, sy: sy, s: s)
                     } else {
-                        instructionsStep(sx: sx, sy: sy, s: s)
+                        instructionsStep
                     }
                     closeButton(s: s)
                         .position(x: 70 * sx, y: 70 * sy)
@@ -115,56 +111,13 @@ struct GazeCalibrationView: View {
 
     // MARK: - Step 1: Stare at the dots
 
-    private func instructionsStep(sx: CGFloat, sy: CGFloat, s: CGFloat) -> some View {
-        ZStack {
-            card(sx: sx, sy: sy)
-
-            Text("Stare at the dots")
-                .textCase(.uppercase)
-                .font(.custom("DoodleChalkDemoRegular", size: 92 * s))
-                .tracking(92 * s * 0.025)
-                .foregroundStyle(Self.titleBrown)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .frame(width: 880 * sx)
-                .position(x: 683 * sx, y: 300 * sy)
-                .accessibilityAddTraits(.isHeader)
-
-            Text("Sit still and don't move your head")
-                .font(.custom("DaysOne-Regular", size: 38 * s))
-                .foregroundStyle(.black)
-                .position(x: 683 * sx, y: 455 * sy)
-
-            Text("Follow the dots with only your eye")
-                .font(.custom("DaysOne-Regular", size: 38 * s))
-                .foregroundStyle(.black)
-                .position(x: 683 * sx, y: 567 * sy)
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) { showsCamera = true }
-            } label: {
-                Image("ButtonBoard")
-                    .resizable()
-                    .scaledToFit()
-                    .overlay {
-                        Text("Next")
-                            .textCase(.uppercase)
-                            .font(.custom("DoodleChalkDemoRegular", size: 62 * s))
-                            .tracking(62 * s * 0.025)
-                            .foregroundStyle(Color(red: 0.98, green: 0.93, blue: 0.88))
-                            // The board's thick bottom edge: lift the word a little.
-                            .offset(y: -6 * s)
-                    }
-                    .frame(width: 280 * s)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Next")
-            .position(x: 676 * sx, y: 735 * sy)
-
-            houses(carrot: CGRect(x: 130, y: 622, width: 155, height: 268),
-                   onion: CGRect(x: 1030, y: 688, width: 180, height: 202),
-                   sx: sx, sy: sy)
+    private var instructionsStep: some View {
+        CalibrationCardScreen(
+            title: "Stare at the dots",
+            firstLine: "Sit still and don't move your head",
+            secondLine: "Follow the dots with only your eye"
+        ) {
+            withAnimation(.easeInOut(duration: 0.25)) { showsCamera = true }
         }
     }
 
@@ -175,14 +128,14 @@ struct GazeCalibrationView: View {
             Text("Keep Your Head in The Circle")
                 .font(.custom("DoodleChalkDemoRegular", size: 76 * s))
                 .tracking(76 * s * 0.025)
-                .foregroundStyle(Self.titleBrown)
+                .foregroundStyle(CalibrationCardScreen.titleBrown)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .frame(width: 1060 * sx)
                 .position(x: 683 * sx, y: 100 * sy)
                 .accessibilityAddTraits(.isHeader)
 
-            card(sx: sx, sy: sy)
+            CalibrationCardScreen.card(sx: sx, sy: sy)
 
             // The camera, inside the card.
             ZStack {
@@ -210,7 +163,7 @@ struct GazeCalibrationView: View {
             }
             .position(x: 683 * sx, y: 511.5 * sy)
 
-            houses(carrot: CGRect(x: 128, y: 607, width: 154, height: 268),
+            CalibrationCardScreen.houses(carrot: CGRect(x: 128, y: 607, width: 154, height: 268),
                    onion: CGRect(x: 1048, y: 670, width: 180, height: 202),
                    sx: sx, sy: sy)
         }
@@ -235,31 +188,6 @@ struct GazeCalibrationView: View {
     }
 
     // MARK: - Shared pieces
-
-    /// The cream card with the brown border, same place on both steps.
-    private func card(sx: CGFloat, sy: CGFloat) -> some View {
-        Image("SettingsCard")
-            .resizable()
-            .frame(width: 962 * sx, height: 698 * sy)
-            .position(x: 684 * sx, y: 511 * sy)
-            .accessibilityHidden(true)
-    }
-
-    /// The carrot house bottom left and the onion house bottom right.
-    private func houses(carrot: CGRect, onion: CGRect, sx: CGFloat, sy: CGFloat) -> some View {
-        ZStack {
-            Image("FoxPath/HouseCarrotFront")
-                .resizable()
-                .frame(width: carrot.width * sx, height: carrot.height * sy)
-                .position(x: carrot.midX * sx, y: carrot.midY * sy)
-            Image("FoxPath/HouseOnionFront")
-                .resizable()
-                .frame(width: onion.width * sx, height: onion.height * sy)
-                .position(x: onion.midX * sx, y: onion.midY * sy)
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
 
     /// Leaves calibration (and the game) before the dots start.
     private func closeButton(s: CGFloat) -> some View {
