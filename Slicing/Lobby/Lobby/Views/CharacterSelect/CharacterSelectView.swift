@@ -54,11 +54,12 @@ struct CharacterSelectView: View {
                 RoundIconButton(systemImage: "gearshape.fill", label: "Settings", size: 62 * s, action: onSettings)
                     .position(x: 1128 * sx, y: 83 * sy)
 
-                // The chosen character standing on the podium.
+                // The chosen character standing on the podium (a tree stump). The
+                // character's feet are on the middle of the stump's flat top.
                 Image("Podium")
                     .resizable()
-                    .frame(width: 374 * s, height: 161 * s)
-                    .position(x: 339 * sx, y: 643 * sy)
+                    .frame(width: 440 * s, height: 190 * s)
+                    .position(x: 356 * sx, y: 662 * sy)
 
                 // The character walks on the spot, and turns around when the arrows
                 // change it. The pictures have empty space around the drawing, so this

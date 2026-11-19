@@ -1,6 +1,7 @@
 //
 //  GamePlaceholder.swift
-//  Routes each lobby selection to its playable mini-game.
+//  Routes each lobby selection to its playable mini-game, with the character the
+//  player chose on character select: the same character in every game.
 //  Whack a Mole launches through the shared calibration flow; Veggie Dash and
 //  Veggie Keeper own their start and calibration screens.
 //
@@ -19,12 +20,16 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
-    /// Whack-a-Mole finish screen "Home": back to the start screen.
+    /// Finish and pause screen "Home": back to the start screen.
     var onHome: () -> Void = {}
-    /// Whack-a-Mole finish screen "Next": on to another game, picked by ContentView.
+    /// Finish screen "Next": on to another game, picked by ContentView.
     var onNextGame: () -> Void = {}
 
+    /// The character chosen on character select.
+    @AppStorage(GameCharacter.storageKey) private var characterID = GameCharacter.fox.id
     @State private var configuration = ConfigurationStore.standard.load()
+    /// The "Sound effect" slider in Settings.
+    @AppStorage(AppSettings.soundEffectsVolumeKey) private var soundEffectsVolume = 1.0
     @State private var gazeController = GazeInputController()
     @State private var presentedScreen: PresentedScreen?
     @State private var hasStarted = false
@@ -49,10 +54,12 @@ struct SelectedGameView: View {
                     )
                 case .game:
                     WhackAMoleGameView(
-                        configuration: configuration,
+                        configuration: configurationWithSoundSetting,
                         gazeController: gazeController,
                         onNextGame: { closeGameFlow(then: onNextGame) },
                         onHome: { closeGameFlow(then: onHome) },
+                        // The player's character swings the hammer.
+                        helper: HelperCharacter(rawValue: characterID) ?? .fox,
                         onClose: { closeGameFlow() }
                     )
                 }
@@ -67,11 +74,14 @@ struct SelectedGameView: View {
     private var selectedGame: some View {
         switch game {
         case .veggieDash:
-            FoxPathHomeView(onExit: onExit)
+            // The player's character is the one to follow.
+            FoxPathHomeView(player: PathCharacter(rawValue: characterID) ?? .fox, onExit: onExit)
         case .whackAMole:
             whackAMoleLauncher
         case .veggieKeeper:
+            // The player's character keeps the stall.
             GameStartView(
+                character: FixationCharacter(rawValue: characterID) ?? .fox,
                 onExit: onExit,
                 onGameplayStarted: {
                     BackgroundMusicPlayer.shared.play(.veggieKeeper)
@@ -101,6 +111,14 @@ struct SelectedGameView: View {
         }
     }
 
+    /// Whack a Mole's hit sounds are short system sounds, which have no volume of their own:
+    /// they are switched off when the "Sound effect" slider is all the way down.
+    private var configurationWithSoundSetting: GameConfiguration {
+        var adjusted = configuration
+        if soundEffectsVolume <= 0 { adjusted.soundEnabled = false }
+        return adjusted
+    }
+
     /// Stops the camera, closes the game and hands over to `destination` (by default the usual
     /// exit).
     private func closeGameFlow(then destination: (() -> Void)? = nil) {
@@ -114,9 +132,9 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
-    /// Whack-a-Mole finish screen "Home": back to the start screen.
+    /// Finish and pause screen "Home": back to the start screen.
     var onHome: () -> Void = {}
-    /// Whack-a-Mole finish screen "Next": on to another game, picked by ContentView.
+    /// Finish screen "Next": on to another game, picked by ContentView.
     var onNextGame: () -> Void = {}
 
 

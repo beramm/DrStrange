@@ -1,6 +1,6 @@
 //
 //  FixationGameResultView.swift
-//  End screen, styled like Whack-a-Mole's: the fox, a friendly headline,
+//  End screen, styled like Whack-a-Mole's: the player's character, a friendly headline,
 //  how many veggies were kept safe, and Play again.
 //  Always encouraging, never a "you lost" message.
 //
@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct FixationGameResultView: View {
+    /// The player's character, shown next to the headline.
+    var character = FixationCharacter.fox
     let veggiesSaved: Int
     let totalVeggies: Int
     /// True when the child stopped early to rest (pause → Rest my eyes, or ✕).
@@ -22,7 +24,7 @@ struct FixationGameResultView: View {
 
             VStack(spacing: 40) {
                 HStack(spacing: 24) {
-                    Image("Fox")
+                    Image(character.keeperAwakeImage)
                         .resizable()
                         .scaledToFit()
                         .frame(width: 260, height: 260)

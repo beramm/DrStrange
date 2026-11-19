@@ -149,6 +149,7 @@ struct FixationGameView: View {
         #if VEGGIE_KEEPER_STANDALONE
         // The standalone Veggie Keeper project has no shared finish screen or its pictures.
         FixationGameResultView(
+            character: character,
             veggiesSaved: veggiesLeft,
             totalVeggies: totalVeggies,
             stoppedEarly: stoppedEarly,
@@ -372,7 +373,7 @@ struct FixationGameView: View {
                     thiefIsHere = true
                     try await Task.sleep(for: .seconds(thiefSeconds))
                     veggiesLeft -= 1
-                    // The thief walks back with the veggies, then comes up under the next crate.
+                    // The mole shows the veggies and goes back down, then comes up at the next basket.
                     thiefIsHere = false
                     try await Task.sleep(for: .seconds(1.6))
                 }

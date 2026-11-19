@@ -3,8 +3,8 @@
 //  First screen of the game. Leads to eye control (calibrate, then play) or,
 //  for testing without the front camera (e.g. in the simulator), to finger play.
 //  Same flow as the Whack-a-Mole game: calibration → game.
-//  The stall keeper is the fox for now. Later the player's character will come
-//  from onboarding ("Choose your character") and be passed in here.
+//  The stall keeper is the player's character from onboarding ("Choose your
+//  character"). The standalone Veggie Keeper app uses the fox.
 //
 
 import SwiftUI
@@ -26,16 +26,17 @@ struct GameStartView: View {
     let onHome: (() -> Void)?
     /// Finish screen "Next": on to another game in the host app. Nil hides the button.
     let onNextGame: (() -> Void)?
-    /// Who keeps the stall; the other two characters are the thieves.
-    /// Fox for now. Later this will be the character chosen in onboarding.
-    private let character = FixationCharacter.fox
+    /// Who keeps the stall (the player's character). The thief is a mole.
+    let character: FixationCharacter
 
     init(
+        character: FixationCharacter = .fox,
         onExit: (() -> Void)? = nil,
         onGameplayStarted: (() -> Void)? = nil,
         onHome: (() -> Void)? = nil,
         onNextGame: (() -> Void)? = nil
     ) {
+        self.character = character
         self.onExit = onExit
         self.onGameplayStarted = onGameplayStarted
         self.onHome = onHome
@@ -47,7 +48,8 @@ struct GameStartView: View {
             GameBackground()
 
             VStack(spacing: 32) {
-                Image("Fox")
+                // The player's own character.
+                Image(character.keeperAwakeImage)
                     .resizable()
                     .scaledToFit()
                     .frame(height: 260)

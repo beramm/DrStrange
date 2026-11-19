@@ -13,6 +13,7 @@ import UIKit
 ///
 /// Positions come from the 1366 × 1024 design frame and are scaled to the screen.
 struct GazeCalibrationView: View {
+    static let calibrationBackground = Color.white
     let controller: GazeInputController
     let isRecalibration: Bool
     let onCalibrated: () -> Void
@@ -48,11 +49,15 @@ struct GazeCalibrationView: View {
             ZStack {
                 if let target = controller.activeCalibrationTarget {
                     // Step 3: the dots.
-                    Color.white.ignoresSafeArea()
+                    Self.calibrationBackground.ignoresSafeArea()
                     CalibrationFixationTarget()
                         .position(
                             x: target.x * geometry.size.width,
                             y: target.y * geometry.size.height
+                        )
+                        .animation(
+                            .easeInOut(duration: PaddyCalibrationCapture.targetTransitionSeconds),
+                            value: target
                         )
                     if controller.calibrationNeedsGuidance {
                         VStack {
@@ -69,6 +74,26 @@ struct GazeCalibrationView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 32)
                     }
+                    VStack {
+                        if target.y <= 0.10 { Spacer() }
+                        HStack(spacing: 12) {
+                            if !controller.calibrationNeedsGuidance {
+                                Text(controller.status)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.black)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            Button("Cancel") {
+                                controller.stop()
+                                onCancel()
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.black)
+                        }
+                        if target.y > 0.10 { Spacer() }
+                    }
+                    .padding(24)
                 } else {
                     CalibrationCardScreen.background.ignoresSafeArea()
                     if showsCamera {
@@ -84,8 +109,8 @@ struct GazeCalibrationView: View {
         .preferredColorScheme(.light)
         .statusBarHidden()
         .onAppear { controller.startCamera() }
-        .onChange(of: controller.isCalibrated) { _, calibrated in
-            guard calibrated, !didComplete else { return }
+        .onChange(of: controller.completedCalibrationCount) { _, _ in
+            guard controller.isCalibrated, !didComplete else { return }
             didComplete = true
             onCalibrated()
         }
@@ -94,12 +119,16 @@ struct GazeCalibrationView: View {
             else { controller.pauseForInactiveScene() }
         }
         // Step 2: once the face is in place and still for a moment, start the dots by themselves.
-        .task(id: ReadyState(showsCamera: showsCamera, isReady: controller.isReadyToCalibrate)) {
+        .task(id: ReadyState(
+            showsCamera: showsCamera,
+            isReady: controller.isReadyToCalibrate,
+            calibrationState: controller.sample.calibrationState
+        )) {
             guard showsCamera, controller.isReadyToCalibrate, !controller.isPreparingCalibration,
-                  controller.activeCalibrationTarget == nil else { return }
+                  controller.activeCalibrationTarget == nil, !controller.isCalibrated else { return }
             try? await Task.sleep(for: .seconds(Self.readyHoldSeconds))
             guard !Task.isCancelled, controller.isReadyToCalibrate,
-                  !controller.isPreparingCalibration else { return }
+                  !controller.isPreparingCalibration, !controller.isCalibrated else { return }
             controller.startCalibration(preparationSeconds: isRecalibration ? 3 : 6)
         }
     }
@@ -107,6 +136,7 @@ struct GazeCalibrationView: View {
     private struct ReadyState: Equatable {
         let showsCamera: Bool
         let isReady: Bool
+        let calibrationState: CalibrationState
     }
 
     // MARK: - Step 1: Stare at the dots
@@ -206,6 +236,16 @@ struct GazeCalibrationView: View {
     }
 
     private var guidance: CalibrationGuidance {
+        if controller.sample.calibrationState == .failed ||
+            controller.sample.calibrationState == .invalid {
+            return .init(
+                id: "calibration-failed",
+                title: "Calibration didn't finish",
+                message: controller.status,
+                systemImage: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+        }
         if !controller.cameraStarted {
             return .init(
                 id: "camera",
