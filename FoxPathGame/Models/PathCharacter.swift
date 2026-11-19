@@ -1,7 +1,8 @@
 import CoreGraphics
 import Foundation
 
-/// The three friends of the game. Any of them can be the one the child follows or the thief.
+/// The three friends of the game. Any of them can be the one the child follows; none of them is
+/// ever the thief (that is the mole).
 enum PathCharacter: String, CaseIterable, Codable, Identifiable {
     case fox
     case bunny
@@ -77,24 +78,15 @@ enum PathCharacter: String, CaseIterable, Codable, Identifiable {
     func backAsset(frame: Int) -> String { "\(assetPrefix)Back\(frame)" }
 }
 
-/// Who the child follows and who tries to steal the vegetables on one walk. They are always
-/// two different characters.
+/// Who the child follows on one walk. Any of the three friends can be the one to follow; the
+/// thief is always the mole, never one of the friends.
 struct CharacterRoles: Equatable {
     let primary: PathCharacter
-    let thief: PathCharacter
 
-    init(primary: PathCharacter, thief: PathCharacter) {
-        precondition(primary != thief, "The thief must be a different character")
-        self.primary = primary
-        self.thief = thief
-    }
-
-    /// Any character can be either role: the primary is drawn from all three and the thief from
-    /// the other two. When `primary` is given (the player's own character, chosen in onboarding),
-    /// it is always the one followed and only the thief is drawn.
+    /// The character to follow. When `primary` is given (the player's own character, chosen on
+    /// character select), it is always the one followed; otherwise it is drawn from all three.
     static func random(primary chosen: PathCharacter? = nil, using generator: inout SeededGenerator) -> CharacterRoles {
-        let primary = chosen ?? PathCharacter.allCases.randomElement(using: &generator) ?? .fox
-        let others = PathCharacter.allCases.filter { $0 != primary }
-        return CharacterRoles(primary: primary, thief: others.randomElement(using: &generator) ?? others[0])
+        if let chosen { return CharacterRoles(primary: chosen) }
+        return CharacterRoles(primary: PathCharacter.allCases.randomElement(using: &generator) ?? .fox)
     }
 }

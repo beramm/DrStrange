@@ -16,7 +16,8 @@ enum FoxPathSessionPhase: Equatable {
 }
 
 enum FoxPathSessionEvent: Equatable {
-    case thiefAppeared(PathCharacter)
+    /// The mole's hole opened under the basket.
+    case thiefAppeared
     case lifeLost(remaining: Int)
     case thiefLeft
     case timeUp
@@ -27,8 +28,9 @@ enum FoxPathSessionEvent: Equatable {
 struct WalkProgress: Equatable {
     /// Map units the followed character still has to walk to the stall.
     let distanceLeft: Double
-    /// The followed character's feet, in map units.
-    let feet: CGPoint
+    /// Where a mole's hole would open: on the ground under the followed character's basket
+    /// (`FoxWalkPose.bagHolePoint`), in map units.
+    let bagHole: CGPoint
 }
 
 /// Gameplay summary of one game. These numbers describe the game only; they are not a
@@ -48,12 +50,12 @@ struct FoxPathResult: Equatable {
     let walksCompleted: Int
     /// How many times the character had to stop and wait.
     let offTrackCount: Int
-    /// Times a thief reached the character (one heart each).
+    /// Carrots the mole took (one heart each).
     let catches: Int
 }
 
-/// The game around the walks: the 2-minute clock, the hearts, who plays which role, and when a
-/// thief comes. A thief comes only when
+/// The game around the walks: the 2-minute clock, the hearts, who the child follows, and when the
+/// mole comes. A mole comes only when
 /// the child has stopped following for a moment; never because of a timer and never because
 /// gaze readings are missing. Driven by a game clock so it can be tested without a screen; it
 /// never reads the pointer itself.
@@ -74,9 +76,9 @@ struct FoxPathSession {
     private(set) var walksCompleted = 0
     private(set) var offTrackCount = 0
     private(set) var catches = 0
-    /// Seconds the child has been not following without a break, while no thief is around.
+    /// Seconds the child has been not following without a break, while no mole is around.
     private(set) var notFollowingTime: TimeInterval = 0
-    /// Clock time before which no new thief can come.
+    /// Clock time before which no new mole can come.
     private(set) var thiefCooldownUntil: TimeInterval = 0
 
     private var isWalking = false
@@ -119,9 +121,8 @@ struct FoxPathSession {
         UInt64.random(in: .min ... .max, using: &generator)
     }
 
-    /// A new walk on a new map. The first walk keeps the roles
-    /// drawn at the start; every later walk draws them again, so any character can be followed
-    /// or be the thief.
+    /// A new walk on a new map. The first walk keeps the character drawn at the start; every later
+    /// walk draws it again, so any of the three friends can be the one to follow.
     mutating func prepareWalk() {
         if walksCompleted > 0 { roles = CharacterRoles.random(primary: player, using: &generator) }
         thief = nil
@@ -136,7 +137,7 @@ struct FoxPathSession {
         isWalking = true
     }
 
-    /// The character reached the stall. A thief still on its way runs off.
+    /// The character reached the stall. A mole that has not taken a carrot yet goes back down.
     mutating func walkFinished() {
         guard !phase.isOver else { return }
         walksCompleted += 1
@@ -165,7 +166,7 @@ struct FoxPathSession {
         if var current = thief {
             for event in current.advance(by: delta, attention: attention) {
                 switch event {
-                case .caughtCharacter:
+                case .stoleCarrot:
                     catches += 1
                     lives = max(lives - 1, 0)
                     events.append(.lifeLost(remaining: lives))
@@ -200,12 +201,19 @@ struct FoxPathSession {
             notFollowingTime = 0
         }
         if let walk, notFollowingTime >= thiefSettings.triggerDelay, canSendThief(walkLeft: walk.distanceLeft) {
-            let approach = ThiefApproach.make(around: walk.feet, mapSize: mapSize, using: &generator)
-            thief = FoxPathThief(character: roles.thief, approach: approach, settings: thiefSettings)
+            thief = FoxPathThief(hole: onMap(walk.bagHole), settings: thiefSettings)
             notFollowingTime = 0
-            events.append(.thiefAppeared(roles.thief))
+            events.append(.thiefAppeared)
         }
         return events
+    }
+
+    /// Keeps the hole, and the mole above it, on the map.
+    private func onMap(_ point: CGPoint) -> CGPoint {
+        CGPoint(
+            x: min(max(point.x, 50), mapSize.width - 50),
+            y: min(max(point.y, 130), mapSize.height - 20)
+        )
     }
 
     private func canSendThief(walkLeft: Double) -> Bool {

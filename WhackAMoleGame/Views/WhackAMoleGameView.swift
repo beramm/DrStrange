@@ -228,6 +228,19 @@ struct WhackAMoleGameView: View {
             // The patch is back on: hide the reminder and carry on without a tap, unless the
             // game is also waiting on recalibration.
             guard isPausedForMissingPatch else { return }
+            // game is also waiting on recalibration or the stop dialog.
+            guard isPausedForMissingPatch else { return }
+            isPausedForMissingPatch = false
+            if !isPausedForRecalibration, !isConfirmingStop { viewModel.resume() }
+        default:
+            break
+        }
+    }
+
+    private func resumeAfterStopDialog() {
+        guard !isPausedForRecalibration else { return }
+        if isPausedForMissingPatch {
+            guard gazeController?.isPatchVerified == true else { return }
             isPausedForMissingPatch = false
             if !isPausedForRecalibration { viewModel.resume() }
         default:

@@ -16,6 +16,41 @@ struct FoxWalkPose: Equatable {
         FoxWalkPose(character: character, feet: feet, facing: .front, assetName: character.standingAsset)
     }
 
+    /// The followed character on its path for a tracking state.
+    ///
+    /// - Walking: faces the way it walks, with the walk-cycle picture for the distance walked.
+    /// - Stopped because the child looked away: stays exactly where it stopped and keeps facing
+    ///   the way it was walking (it never turns round), standing with its feet together.
+    /// - Waiting for the first look, or at the stall: stands facing the player.
+    static func onPath(
+        _ character: PathCharacter,
+        state: FoxTrackingState,
+        feet: CGPoint,
+        tangent: CGVector,
+        distance: CGFloat
+    ) -> FoxWalkPose {
+        switch state {
+        case .following:
+            let facing = FoxFacing.walking(along: tangent)
+            return FoxWalkPose(
+                character: character,
+                feet: feet,
+                facing: facing,
+                assetName: FoxWalkAnimation.assetName(for: character, facing: facing, distance: distance)
+            )
+        case .offTrack:
+            let facing = FoxFacing.walking(along: tangent)
+            return FoxWalkPose(
+                character: character,
+                feet: feet,
+                facing: facing,
+                assetName: FoxWalkAnimation.restingAssetName(for: character, facing: facing)
+            )
+        case .waiting, .finished:
+            return .standing(character, at: feet)
+        }
+    }
+
     /// Where the picture is drawn so the feet land on `feet`.
     var frame: CGRect {
         let size = character.size(facing: facing)
@@ -62,6 +97,15 @@ enum FoxWalkAnimation {
             return character.frontAsset(frame: step(distance, cycleLength: frontCycleLength, count: 4) + 1)
         case .back:
             return character.backAsset(frame: step(distance, cycleLength: frontCycleLength, count: 4) + 1)
+        }
+    }
+
+    /// The picture for standing still while facing `facing`: feet together.
+    static func restingAssetName(for character: PathCharacter, facing: FoxFacing) -> String {
+        switch facing {
+        case .side: character.sideAsset(frame: character.sideSequence[0])
+        case .front: character.frontAsset(frame: 1)
+        case .back: character.backAsset(frame: 1)
         }
     }
 

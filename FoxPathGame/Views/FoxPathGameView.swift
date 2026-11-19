@@ -13,8 +13,8 @@ enum FoxPathInput {
     }
 }
 
-/// Full-screen gameplay. Shows the result screen in place when the game ends: time is up, the
-/// last heart is gone, or the game was stopped early.
+/// Full-screen gameplay. Shows the result screen in place when the game ends: the finish screen
+/// when time is up or the game was stopped early, the Game Over screen when the last carrot is gone.
 struct FoxPathGameView: View {
     /// Seconds without a gaze sample before the pointer counts as lost.
     private static let gazeTimeout: TimeInterval = 0.5
@@ -24,17 +24,29 @@ struct FoxPathGameView: View {
     /// The player's character, always the one followed. Nil draws it at random (standalone app).
     let player: PathCharacter?
     let onClose: () -> Void
+    /// Finish screen "Next": goes on to another game. Nil hides the button (standalone app).
+    let onNextGame: (() -> Void)?
+    /// Finish and pause screen "Home": back to the start of the app. Nil falls back to `onClose`.
+    let onHome: (() -> Void)?
 
     @State private var viewModel: FoxPathGameViewModel
-    @State private var isConfirmingStop = false
     @State private var isPausedForMissingPatch = false
     @State private var zoomAtPinchStart: CGFloat?
     @Environment(\.scenePhase) private var scenePhase
 
-    init(configuration: FoxPathConfiguration, input: FoxPathInput, player: PathCharacter? = nil, onClose: @escaping () -> Void) {
+    init(
+        configuration: FoxPathConfiguration,
+        input: FoxPathInput,
+        player: PathCharacter? = nil,
+        onNextGame: (() -> Void)? = nil,
+        onHome: (() -> Void)? = nil,
+        onClose: @escaping () -> Void
+    ) {
         self.configuration = configuration
         self.input = input
         self.player = player
+        self.onNextGame = onNextGame
+        self.onHome = onHome
         self.onClose = onClose
         _viewModel = State(initialValue: Self.makeViewModel(configuration: configuration, input: input, player: player))
     }
@@ -45,12 +57,15 @@ struct FoxPathGameView: View {
 
     var body: some View {
         ZStack {
-            if let result = viewModel.result {
+            if let result = viewModel.result, result.endReason == .noLivesLeft {
+                // All three carrots are gone: the session already ended the game.
+                FoxPathGameOverView(onRestart: restart, onHome: goHome)
+                    .transition(.opacity)
+            } else if viewModel.result != nil {
                 FoxPathResultView(
-                    result: result,
-                    character: viewModel.roles.primary,
-                    onPlayAgain: restart,
-                    onDone: onClose
+                    onRestart: restart,
+                    onNext: onNextGame,
+                    onHome: goHome
                 )
                 .transition(.opacity)
             } else {
@@ -86,6 +101,24 @@ struct FoxPathGameView: View {
 
     private var gameplay: some View {
         ZStack {
+            playfield
+
+            if viewModel.phase == .paused {
+                if isPausedForMissingPatch, gazeController != nil {
+                    PatchReminderScreen()
+                        .transition(.opacity)
+                } else {
+                    GamePausePopup(onResume: viewModel.resume, onRestart: restart, onHome: goHome)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: isPausedForMissingPatch)
+    }
+
+    /// The map, the guidance, the pointer and the top bar.
+    @ViewBuilder
+    private var playfield: some View {
+        ZStack {
             FoxPathMapView(viewModel: viewModel)
                 .gesture(input.usesGaze ? nil : fingerGesture)
                 .simultaneousGesture(pinchGesture)
@@ -100,7 +133,7 @@ struct FoxPathGameView: View {
                 GazePointerFeed(controller: controller, viewModel: viewModel)
             }
 
-            FoxPathHUDView(viewModel: viewModel, onExit: requestStop)
+            FoxPathHUDView(viewModel: viewModel)
                 .frame(maxHeight: .infinity, alignment: .top)
 
             if viewModel.phase == .paused, !isConfirmingStop {
@@ -136,9 +169,10 @@ struct FoxPathGameView: View {
             .onEnded { _ in zoomAtPinchStart = nil }
     }
 
-    private func requestStop() {
-        viewModel.pause()
-        isConfirmingStop = true
+    /// Leaves the game for the start of the app (or the Fox Path home in the standalone app).
+    private func goHome() {
+        viewModel.stop()
+        (onHome ?? onClose)()
     }
 
     /// Every new game draws new maps and new roles.
@@ -183,9 +217,13 @@ struct FoxPathGameView: View {
     private func resumeAfterStopDialog() {
         if isPausedForMissingPatch {
             guard gazeController?.isPatchVerified == true else { return }
+            // The patch is back on: hide the reminder and carry on without a tap.
+            guard isPausedForMissingPatch else { return }
             isPausedForMissingPatch = false
+            viewModel.resume()
+        default:
+            break
         }
-        viewModel.resume()
     }
 }
 

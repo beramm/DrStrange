@@ -57,6 +57,7 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
 
 - The top bar shows only the stars, the time bar and the painted **pause** button (top right).
   Pause freezes the game clock. Leaving the app pauses automatically.
+- **Pause** (top right) freezes the game clock. Leaving the app pauses automatically.
 - If both eyes remain visible for 1 second, the game pauses behind a full-screen patch reminder
   (`PatchReminderScreen`, "Do not forget to use your patch"): three copies of the character the
   child picked on the character select screen keep lifting their patch and putting it back on
@@ -67,6 +68,9 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
   and Veggie Keeper): **Home** saves the game so far as `stopped` and goes back to the lobby start
   screen, **Restart** starts a fresh game and **Play** (or the close button) carries on. Home is
   the way to stop when the child's eyes are sore or tired, or the patch is uncomfortable.
+- The pause screen has **Rest my eyes**, which ends the session straight away and shows the
+  summary. It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
+- **✕** (top left) asks "Stop the game?" and then also shows the summary.
 - Each saved session records why it ended: `timeUp`, `stopped` or `restBreak`.
 
 ## Gameplay
