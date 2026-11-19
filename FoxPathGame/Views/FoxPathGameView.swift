@@ -13,8 +13,8 @@ enum FoxPathInput {
     }
 }
 
-/// Full-screen gameplay. Shows the result screen in place when the game ends: time is up, the
-/// last heart is gone, or the game was stopped early.
+/// Full-screen gameplay. Shows the result screen in place when the game ends: the finish screen
+/// when time is up or the game was stopped early, the Game Over screen when the last carrot is gone.
 struct FoxPathGameView: View {
     /// Seconds without a gaze sample before the pointer counts as lost.
     private static let gazeTimeout: TimeInterval = 0.5
@@ -53,7 +53,11 @@ struct FoxPathGameView: View {
 
     var body: some View {
         ZStack {
-            if let result = viewModel.result {
+            if let result = viewModel.result, result.endReason == .noLivesLeft {
+                // All three carrots are gone: the session already ended the game.
+                FoxPathGameOverView(onRestart: restart, onHome: goHome)
+                    .transition(.opacity)
+            } else if let result = viewModel.result {
                 FoxPathResultView(
                     livesLeft: result.livesLeft,
                     onRestart: restart,
