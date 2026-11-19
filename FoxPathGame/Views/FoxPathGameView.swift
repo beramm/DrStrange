@@ -57,9 +57,8 @@ struct FoxPathGameView: View {
                 // All three carrots are gone: the session already ended the game.
                 FoxPathGameOverView(onRestart: restart, onHome: goHome)
                     .transition(.opacity)
-            } else if let result = viewModel.result {
+            } else if viewModel.result != nil {
                 FoxPathResultView(
-                    livesLeft: result.livesLeft,
                     onRestart: restart,
                     onNext: onNextGame,
                     onHome: goHome

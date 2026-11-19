@@ -1,11 +1,9 @@
 import SwiftUI
 
-/// Finish screen shown when a Veggie Dash game ends with carrots left: a cream sign hanging on two vines, three gold
-/// stars on its top edge with light shining from behind them, a "Great job" ribbon, the carrots left
-/// under "Life Remaining", and three round buttons to play again, go on to another game or go home.
+/// Finish screen shown when a Veggie Dash game ends with carrots left: a cream sign hanging on two
+/// vines with sunlight shining from behind it, a green "Game Completed" ribbon, "Great Job! Paddy
+/// made it!", and three round buttons to play again, go on to another game or go home.
 struct FoxPathResultView: View {
-    /// Carrots (lives) left at the end, 0…`FoxPathConfiguration.initialLives`.
-    let livesLeft: Int
     let onRestart: () -> Void
     /// Goes on to another game. Nil where there is no other game to go to (the standalone app),
     /// which hides the button.
@@ -17,20 +15,12 @@ struct FoxPathResultView: View {
 
     /// The layout was drawn on a 1366 × 1024 point screen (iPad Pro 12.9" in landscape).
     private static let design = CGSize(width: 1366, height: 1024)
-    /// `SettingsCard` is 1933 × 1405 pixels; `LobbyRope` is 748 × 737; the carrots are 400 × 123.
+    /// `SettingsCard` is 1933 × 1405 pixels; `LobbyRope` is 748 × 737.
     private static let panelAspect: CGFloat = 1933 / 1405
     private static let ropeAspect: CGFloat = 748 / 737
-    private static let carrotsAspect: CGFloat = 400 / 123
     private static let sky = Color(red: 0.90, green: 0.96, blue: 0.99)
     private static let ink = Color(red: 0.24, green: 0.13, blue: 0.06)
     private static let ribbonText = Color(red: 0.99, green: 0.96, blue: 0.90)
-
-    /// Lives shown, kept within the painted carrot states.
-    private var lives: Int { Self.clampedLives(livesLeft) }
-
-    static func clampedLives(_ livesLeft: Int) -> Int {
-        min(max(livesLeft, 0), FoxPathConfiguration.initialLives)
-    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -44,7 +34,7 @@ struct FoxPathResultView: View {
             ZStack {
                 Self.sky
                 FoxPathFinishShine(scale: s)
-                    .position(at(0, -337))
+                    .position(at(0, -370))
                 // The right vine ends higher in the picture (674 of 737 pixels) than the left one
                 // (728), so the vines are lowered until both ends are tucked behind the panel.
                 Image("LobbyRope")
@@ -59,21 +49,21 @@ struct FoxPathResultView: View {
                     .position(c)
                     .accessibilityHidden(true)
 
-                star(width: 150 * s).position(at(-197, -311))
-                star(width: 150 * s).position(at(197, -311))
-                star(width: 200 * s).position(at(0, -337))
-
                 ribbon(scale: s)
-                    .position(at(0, -137))
-                Text("Life Remaining")
-                    .font(.custom("DaysOne-Regular", size: 38 * s))
-                    .foregroundStyle(Self.ink)
-                    .position(at(0, -38))
-                Image("FoxPath/Carrots\(lives)")
-                    .resizable()
-                    .frame(width: 327 * s, height: 327 * s / Self.carrotsAspect)
-                    .position(at(0, 60))
-                    .accessibilityLabel("\(lives) of \(FoxPathConfiguration.initialLives) carrots left")
+                    .position(at(0, -297))
+                // Two lines set closer together than the font's own line height, as on the design.
+                VStack(spacing: -16 * s) {
+                    Text("Great Job! Paddy")
+                    Text("made it!")
+                }
+                .font(.custom("DaysOne-Regular", size: 58 * s))
+                .foregroundStyle(Self.ink)
+                .shadow(color: .black.opacity(0.18), radius: 0, x: 0, y: 3 * s)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .frame(width: panel.width * 0.85)
+                .accessibilityElement(children: .combine)
+                .position(at(0, -30))
 
                 buttons(scale: s)
                     .position(at(0, 205))
@@ -84,37 +74,27 @@ struct FoxPathResultView: View {
         .ignoresSafeArea()
     }
 
-    // MARK: - Stars, shine and ribbon
-
-    /// The stars stay gold whatever the result.
-    private func star(width: CGFloat) -> some View {
-        Image("FinishScreen/Star")
-            .resizable()
-            .scaledToFit()
-            .frame(width: width)
-            .accessibilityHidden(true)
-    }
+    // MARK: - Ribbon
 
     private func ribbon(scale s: CGFloat) -> some View {
-        let width = 570 * s
+        let width = 950 * s
         return Image("FinishScreen/Ribbon")
             .resizable()
             .scaledToFit()
             .frame(width: width)
             .overlay {
-                Text("Great job")
-                    .textCase(.uppercase)
-                    .font(.custom("DoodleChalkDemoRegular", size: 56 * s))
-                    .tracking(56 * s * 0.025)
+                Text("Game Completed")
+                    .font(.custom("DoodleChalkDemoRegular", size: 92 * s))
+                    .tracking(92 * s * 0.03)
                     .foregroundStyle(Self.ribbonText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                    .frame(width: width * 0.7)
+                    .frame(width: width * 0.78)
                     // The flat middle of the band sits a little above the picture's centre.
                     .offset(y: -width * 0.035)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Great job")
+            .accessibilityLabel("Game completed")
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -150,8 +130,8 @@ struct FoxPathResultView: View {
     }
 }
 
-/// Game Over screen shown when the last carrot is gone: the same cream sign on two vines with the
-/// sunlight behind it, a red "Game over" ribbon, "Let's Try Again!", and buttons to play again or go
+/// Game Over screen shown when the last carrot is gone: the same cream sign on two vines, without
+/// the sunlight, a red "Game over" ribbon, "Let's Try Again!", and buttons to play again or go
 /// home. There is no "Next" here: the child tries this game again or leaves.
 struct FoxPathGameOverView: View {
     let onRestart: () -> Void
@@ -178,8 +158,6 @@ struct FoxPathGameOverView: View {
 
             ZStack {
                 Self.sky
-                FoxPathFinishShine(scale: s)
-                    .position(at(0, -415))
                 // Same vines as the finish screen, ends tucked behind the panel.
                 Image("LobbyRope")
                     .resizable()
@@ -332,7 +310,7 @@ private struct RoundArtButtonStyle: ButtonStyle {
 }
 
 #Preview(traits: .landscapeLeft) {
-    FoxPathResultView(livesLeft: 2, onRestart: {}, onNext: {}, onHome: {})
+    FoxPathResultView(onRestart: {}, onNext: {}, onHome: {})
 }
 
 #Preview("Game over", traits: .landscapeLeft) {

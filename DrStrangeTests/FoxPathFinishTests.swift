@@ -17,20 +17,10 @@ final class FoxPathFinishTests: XCTestCase {
         }
     }
 
-    func testCarrotsShownStayWithinThePaintedStates() {
-        for lives in 0...FoxPathConfiguration.initialLives {
-            XCTAssertEqual(FoxPathResultView.clampedLives(lives), lives)
-        }
-        XCTAssertEqual(FoxPathResultView.clampedLives(-1), 0)
-        XCTAssertEqual(FoxPathResultView.clampedLives(5), FoxPathConfiguration.initialLives)
-    }
-
     func testFinishAndPauseArtworkIsInTheAssetCatalog() {
-        var names = ["FinishScreen/Star", "FinishScreen/Ribbon", "FinishScreen/ButtonRestart",
+        let names = ["FinishScreen/Ribbon", "FoxPath/GameOver/Ribbon", "FinishScreen/ButtonRestart",
                      "FinishScreen/ButtonNext", "FinishScreen/ButtonHome", "FinishScreen/ButtonPlay",
                      "FinishScreen/ButtonClose", "SettingsCard", "LobbyRope"]
-        // Every number of carrots the finish screen can show.
-        names += (0...FoxPathConfiguration.initialLives).map { "FoxPath/Carrots\($0)" }
         for name in names {
             XCTAssertNotNil(UIImage(named: name), name)
         }
