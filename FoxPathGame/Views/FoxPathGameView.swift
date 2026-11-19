@@ -72,6 +72,13 @@ struct FoxPathGameView: View {
         .onChange(of: gazeController?.patchWearState, initial: true) { _, state in
             respondToPatchState(state)
         }
+        // Calibration lost: pause, show "Time to check again", calibrate, then carry on.
+        .recalibratesWhenNeeded(
+            controller: gazeController,
+            isActive: viewModel.result == nil,
+            pause: viewModel.pause,
+            resume: viewModel.resume
+        )
     }
 
     private var gameplay: some View {

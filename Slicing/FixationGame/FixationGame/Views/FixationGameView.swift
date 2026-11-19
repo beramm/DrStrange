@@ -70,6 +70,8 @@ struct FixationGameView: View {
     @State private var isPausedForMissingPatch = false
     /// Where to go back to once the patch is on again: waiting or playing.
     @State private var phaseBeforePatchPause = Phase.waiting
+    /// Where the game was when calibration was lost, to carry on from there afterwards.
+    @State private var phaseBeforeRecalibration = Phase.waiting
     @Environment(\.scenePhase) private var scenePhase
 
     private var usesGaze: Bool { gaze != nil }
@@ -122,7 +124,24 @@ struct FixationGameView: View {
         .onChange(of: gaze?.patchWearState, initial: true) { _, state in
             respondToPatchState(state)
         }
+        // Calibration lost: pause, show "Time to check again", calibrate, then carry on.
+        .recalibratesWhenNeeded(
+            controller: gaze,
+            isActive: !isFinished,
+            pause: pauseForRecalibration,
+            resume: { phase = phaseBeforeRecalibration }
+        )
         #endif
+    }
+
+    private var isFinished: Bool {
+        if case .finished = phase { return true }
+        return false
+    }
+
+    private func pauseForRecalibration() {
+        if phase != .paused { phaseBeforeRecalibration = phase }
+        phase = .paused
     }
 
     @ViewBuilder
