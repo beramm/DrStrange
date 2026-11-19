@@ -149,6 +149,11 @@ the basket.
 
 ### Comfort and stopping
 
+- **Pause** freezes the game clock, the walk and the thief. Leaving the app pauses the game and the gaze camera
+  automatically; the camera starts again on return and the game waits for **Resume**.
+- The pause screen has **Rest my eyes**, which ends the game straight away and shows the result.
+  It is meant for sore or tired eyes, a headache, or an uncomfortable patch.
+- **✕** asks "Stop the game?" first.
 - **Pause** (the painted wooden button, top right) freezes the game clock, the walk and the mole. Leaving the app pauses the game and the gaze camera
   automatically; the camera starts again on return and the game waits on the pause screen.
 - The pause screen is the shared "Game paused" pop-up (`GamePausePopup`, also used by Whack-a-Mole

@@ -135,6 +135,20 @@ struct FoxPathGameView: View {
 
             FoxPathHUDView(viewModel: viewModel)
                 .frame(maxHeight: .infinity, alignment: .top)
+
+            if viewModel.phase == .paused, !isConfirmingStop {
+                if isPausedForMissingPatch, gazeController != nil {
+                    PatchReminderScreen()
+                        .transition(.opacity)
+                } else {
+                    PauseOverlay(onResume: viewModel.resume, onRest: viewModel.finishEarly)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: isPausedForMissingPatch)
+        .confirmationDialog("Stop the game?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
+            Button("Stop the game") { viewModel.finishEarly() }
+            Button("Keep playing", role: .cancel) { resumeAfterStopDialog() }
         }
     }
 
@@ -190,6 +204,19 @@ struct FoxPathGameView: View {
             isPausedForMissingPatch = true
             viewModel.pause()
         case .verified:
+            // The patch is back on: hide the reminder and carry on without a tap, unless the
+            // stop dialog is open.
+            guard isPausedForMissingPatch else { return }
+            isPausedForMissingPatch = false
+            if !isConfirmingStop { viewModel.resume() }
+        default:
+            break
+        }
+    }
+
+    private func resumeAfterStopDialog() {
+        if isPausedForMissingPatch {
+            guard gazeController?.isPatchVerified == true else { return }
             // The patch is back on: hide the reminder and carry on without a tap.
             guard isPausedForMissingPatch else { return }
             isPausedForMissingPatch = false
@@ -239,5 +266,48 @@ private struct GazePointerFeed: View {
             x: frame.minX + gaze.x * frame.width,
             y: frame.minY + gaze.y * frame.height
         ))
+    }
+}
+
+/// Pause screen. Besides resuming, it offers a clear way to stop and rest when the child's eyes
+/// are tired or uncomfortable.
+private struct PauseOverlay: View {
+    let onResume: () -> Void
+    let onRest: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.25).ignoresSafeArea()
+            VStack(spacing: 24) {
+                Image(systemName: "pause.circle.fill")
+                    .font(.system(size: 72))
+                    .foregroundStyle(FoxPathPalette.accent)
+                    .accessibilityHidden(true)
+                Text("Paused")
+                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
+                    .foregroundStyle(FoxPathPalette.ink)
+                HStack(spacing: 20) {
+                    Button(action: onRest) {
+                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
+                            .frame(minWidth: 200, minHeight: 56)
+                    }
+                    .buttonStyle(.bordered)
+                    Button(action: onResume) {
+                        Label("Play", systemImage: "play.fill")
+                            .frame(minWidth: 180, minHeight: 56)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(FoxPathPalette.accent)
+                }
+                .font(.title2.weight(.bold))
+                Text("Grown-ups: if your child has sore or tired eyes, a headache, or the patch feels uncomfortable, choose Rest my eyes.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 460)
+            }
+            .padding(48)
+            .background(RoundedRectangle(cornerRadius: 36).fill(FoxPathPalette.cream))
+        }
     }
 }

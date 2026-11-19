@@ -58,6 +58,8 @@ struct SelectedGameView: View {
                     WhackAMoleGameView(
                         configuration: configurationWithSoundSetting,
                         gazeController: gazeController,
+                        onNextGame: { closeGameFlow(then: onNextGame) },
+                        onHome: { closeGameFlow(then: onHome) },
                         // The player's character swings the hammer.
                         helper: HelperCharacter(rawValue: characterID) ?? .fox,
                         onClose: { closeGameFlow() }
@@ -124,10 +126,12 @@ struct SelectedGameView: View {
         return adjusted
     }
 
-        private func closeGameFlow() {
+    /// Stops the camera, closes the game and hands over to `destination` (by default the usual
+    /// exit).
+    private func closeGameFlow(then destination: (() -> Void)? = nil) {
         gazeController.stop()
         presentedScreen = nil
-        onExit()
+        (destination ?? onExit)()
     }
 }
 #else

@@ -1,10 +1,10 @@
 import SwiftUI
 import UIKit
 
-/// One mole, drawn from the provided 24-frame rise animation (`Characters/MoleRise/Frame01…24`).
-/// The frames play forwards as it climbs out and backwards as it goes down. When the hammer lands,
-/// the 24-frame hit animation (`Characters/MoleHit/Frame01…24`) plays instead and takes it back down.
-/// Sleeping moles (decoys) are drawn in grey with a "z z" bubble.
+/// One mole, drawn from the two provided pictures: `Mole/Appear` while it climbs out of its hole and
+/// waits, and `Mole/Disappear` (the sad mole) once the hammer has landed. The hole view slides the
+/// picture up and down and hides whatever is below the hole's front edge, so no frame sequence is
+/// needed. Sleeping moles (decoys) are drawn in grey with a "z z" bubble.
 struct CharacterView: View {
     let target: ActiveTarget
     let visual: MoleVisual
@@ -14,65 +14,31 @@ struct CharacterView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    static func assetName(_ frame: Int) -> String {
-        String(format: "MoleRise/Frame%02d", min(max(frame, 1), MoleVisual.frameCount))
-    }
-
-    static func hitAssetName(_ frame: Int) -> String {
-        String(format: "MoleHit/Frame%02d", min(max(frame, 1), MoleVisual.frameCount))
-    }
-
     private var isAsleep: Bool { target.role == .decoy }
 
-    /// With Reduce Motion the mole fades in and out instead of climbing or sinking.
-    private var riseAssetName: String {
-        Self.assetName(reduceMotion ? MoleVisual.frameCount : visual.frame)
-    }
-
-    private var hitFrameBlend: MoleVisual.FrameBlend? {
-        guard let blend = visual.hitFrameBlend else { return nil }
-        return reduceMotion
-            ? MoleVisual.FrameBlend(current: 1, next: 1, fraction: 0)
-            : blend
-    }
-
-    private var opacity: Double {
-        guard reduceMotion else { return 1 }
-        if let progress = visual.hitProgress { return 1 - progress }
-        return Double(visual.frame) / Double(MoleVisual.frameCount)
+    /// A small squash right after the hammer lands; none with Reduce Motion.
+    private var squash: CGFloat {
+        guard !reduceMotion, let progress = visual.hitProgress else { return 1 }
+        return 1 - 0.07 * CGFloat(sin(.pi * min(progress / 0.12, 1)))
     }
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack {
-                if let blend = hitFrameBlend {
-                    sprite(Self.hitAssetName(blend.current), size: proxy.size)
-                        .opacity(1 - blend.fraction)
-                    if blend.next != blend.current {
-                        sprite(Self.hitAssetName(blend.next), size: proxy.size)
-                            .opacity(blend.fraction)
+            Image(MoleArt.picture(isHit: visual.isHit).assetName)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .scaleEffect(x: 1, y: squash, anchor: .bottom)
+                .grayscale(isAsleep ? 1 : 0)
+                .overlay(alignment: .topTrailing) {
+                    if isAsleep && visual.rise >= 0.9 {
+                        SleepBubble()
+                            .frame(width: proxy.size.width * 0.3, height: proxy.size.width * 0.2)
+                            .offset(x: -proxy.size.width * 0.03, y: proxy.size.height * 0.03)
                     }
-                } else {
-                    sprite(riseAssetName, size: proxy.size)
                 }
-            }
-            .grayscale(isAsleep ? 1 : 0)
-            .opacity(opacity)
-            .overlay(alignment: .topTrailing) {
-                if isAsleep && visual.frame >= MoleVisual.frameCount - 2 {
-                    SleepBubble()
-                        .frame(width: proxy.size.width * 0.38, height: proxy.size.width * 0.26)
-                }
-            }
         }
         .accessibilityHidden(true)
-    }
-
-    private func sprite(_ name: String, size: CGSize) -> some View {
-        Image(name)
-            .resizable()
-            .interpolation(.high)
-            .frame(width: size.width, height: size.height)
     }
 }
 
