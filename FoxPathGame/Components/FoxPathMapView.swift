@@ -17,8 +17,8 @@ struct FoxPathMapView: View {
                 FoxPathStandingView(
                     sprites: viewModel.map.standingSprites,
                     fox: viewModel.foxPose,
-                    thief: viewModel.thiefPose,
-                    thiefVisibility: viewModel.thiefVisibility
+                    mole: viewModel.mole,
+                    decoy: viewModel.decoy
                 )
             }
             .frame(width: mapSize.width, height: mapSize.height, alignment: .topLeading)
@@ -108,12 +108,13 @@ private struct FoxPathGroundView: View, Equatable {
     }
 }
 
-/// Houses, lamps, gardens, the finish stall and the characters, drawn back to front by where they touch the ground so a character walks in front of things behind it.
+/// Houses, lamps, gardens, the finish stall, the character and the mole, drawn back to front by
+/// where they touch the ground so a character walks in front of things behind it.
 private struct FoxPathStandingView: View {
     let sprites: [MapSprite]
     let fox: FoxWalkPose
-    let thief: FoxWalkPose?
-    let thiefVisibility: Double
+    let mole: MoleThiefVisual?
+    let decoy: MoleThiefVisual?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -125,21 +126,24 @@ private struct FoxPathStandingView: View {
                 .zIndex(Double(fox.feet.y) - 0.5)
             FoxSpriteView(pose: fox)
                 .zIndex(Double(fox.feet.y))
-            if let thief {
-                Group {
-                    GroundMarker(feet: thief.feet, width: thief.frame.width, color: FoxPathPalette.danger)
-                        .zIndex(Double(thief.feet.y) - 0.5)
-                    FoxSpriteView(pose: thief)
-                        .zIndex(Double(thief.feet.y))
-                }
-                .opacity(thiefVisibility)
+            if let decoy {
+                ThiefHoleView(mole: decoy)
+                    .zIndex(-1)
+                ThiefMoleView(mole: decoy)
+                    .zIndex(Double(decoy.hole.y) + 0.25)
+            }
+            if let mole {
+                // The hole lies flat on the ground, under everything that stands.
+                ThiefHoleView(mole: mole)
+                    .zIndex(-1)
+                ThiefMoleView(mole: mole)
+                    .zIndex(Double(mole.hole.y) + 0.25)
             }
         }
     }
 }
 
-/// Soft oval on the ground under a character: white under the friend the child follows, red
-/// under the thief, so the two roles are easy to tell apart whoever plays them.
+/// Soft white oval on the ground under the friend the child follows.
 private struct GroundMarker: View {
     let feet: CGPoint
     let width: CGFloat
@@ -151,6 +155,45 @@ private struct GroundMarker: View {
             .overlay(Ellipse().strokeBorder(color.opacity(0.8), lineWidth: 3))
             .frame(width: width * 0.85, height: width * 0.28)
             .position(feet)
+    }
+}
+
+/// The hole the mole comes out of (`Holes/Hole1`, the supplied mole hole), opening and closing.
+private struct ThiefHoleView: View {
+    let mole: MoleThiefVisual
+
+    /// Drawn size in map units (the picture is 400 × 166 pixels).
+    private static let size = CGSize(width: 96, height: 40)
+
+    var body: some View {
+        Image("Holes/Hole1")
+            .resizable()
+            .frame(width: Self.size.width, height: Self.size.height)
+            .scaleEffect(0.4 + 0.6 * mole.holeOpenness)
+            .opacity(mole.holeOpenness)
+            .position(mole.hole)
+    }
+}
+
+/// The mole coming up out of its hole: everything below the middle of the hole is hidden, so it
+/// rises out of the ground and sinks back into it. It always stays upright; while it reaches up to
+/// the basket it stretches up a little, and once it has the carrot it holds it over its head
+/// (`FoxPath/Mole/Carrot`).
+private struct ThiefMoleView: View {
+    let mole: MoleThiefVisual
+
+    var body: some View {
+        let size = mole.holdsCarrot ? MoleThiefVisual.carrotSize : MoleThiefVisual.standingSize
+        let window = CGSize(width: size.width * 1.6, height: size.height * 1.25)
+        let shown = CGFloat(mole.rise) * MoleThiefVisual.highestRise * size.height
+        let stretch = CGFloat(sin(mole.reach * .pi))
+        Image(mole.holdsCarrot ? "FoxPath/Mole/Carrot" : "FoxPath/Mole/Standing")
+            .resizable()
+            .frame(width: size.width, height: size.height)
+            .offset(y: size.height - shown - 6 * stretch)
+            .frame(width: window.width, height: window.height, alignment: .bottom)
+            .clipped()
+            .position(x: mole.hole.x, y: mole.hole.y - window.height / 2)
     }
 }
 

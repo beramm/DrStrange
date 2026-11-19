@@ -93,12 +93,41 @@ final class FoxPathGeneratorTests: XCTestCase {
         }
     }
 
+    func testHousesAreBalancedAroundThePath() {
+        for seed in seeds {
+            let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
+            let sides = FoxPathGenerator.houseSides(of: map)
+            XCTAssertGreaterThanOrEqual(map.houses.count, 4, "seed \(seed)")
+            XCTAssertTrue(FoxPathGenerator.isBalanced(map), "seed \(seed): \(sides.above) above, \(sides.below) below")
+            // Spread along the map: both halves have a house.
+            XCTAssertTrue(map.houses.contains { $0.frame.midX < map.size.width / 2 }, "seed \(seed)")
+            XCTAssertTrue(map.houses.contains { $0.frame.midX > map.size.width / 2 }, "seed \(seed)")
+        }
+    }
+
+    func testSceneryUsesTheVillagePiecesAndGardensWithoutCrates() {
+        let kinds = Set(seeds.flatMap { seed -> [MapSpriteKind] in
+            let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
+            return (map.standingSprites + map.groundSprites).map(\.kind)
+        })
+        XCTAssertEqual(kinds.filter { !$0.isHouse }, Set<MapSpriteKind>([
+            .lamp, .finishStall, .signpost, .treeStump, .steppingStone, .pathRock, .grassTuft1, .grassTuft2,
+            .soilSpeck, .leafyPlant, .onionSprout, .baskets,
+        ]))
+        XCTAssertFalse(MapSpriteKind.allCases.contains { $0.assetName.localizedCaseInsensitiveContains("crate") })
+    }
+
     func testGardensFillTheOpenGrass() {
+        var kindsUsed = Set<MapSpriteKind>()
         for seed in seeds {
             let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
             let pieces = map.standingSprites.filter(\.kind.isGardenPiece)
             XCTAssertGreaterThanOrEqual(pieces.count, 4, "seed \(seed)")
-            XCTAssertGreaterThanOrEqual(Set(pieces.map(\.kind)).count, 2, "seed \(seed): more than one kind")
+            kindsUsed.formUnion(pieces.map(\.kind))
+            for piece in pieces {
+                XCTAssertGreaterThanOrEqual(piece.frame.minY, 96, "seed \(seed) \(piece.kind): under the top bar")
+                XCTAssertTrue(CGRect(origin: .zero, size: map.size).contains(piece.frame), "seed \(seed) \(piece.kind)")
+            }
 
             // No big empty area is left: every open spot has scenery nearby.
             let line = FoxPathGenerator.pathLine(for: map.route)
@@ -117,6 +146,59 @@ final class FoxPathGeneratorTests: XCTestCase {
             }
             XCTAssertLessThan(widest, 300, "seed \(seed): open grass \(widest) units from any scenery")
         }
+        XCTAssertEqual(kindsUsed, [.leafyPlant, .onionSprout, .baskets])
+    }
+
+    func testOneSignpostAndRandomTreeStumpsStayOffThePath() {
+        var stumpCounts = Set<Int>()
+        var stumpSpots = Set<String>()
+        for seed in seeds {
+            let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
+            let signs = map.standingSprites.filter { $0.kind == .signpost }
+            let stumps = map.standingSprites.filter { $0.kind == .treeStump }
+            XCTAssertEqual(signs.count, 1, "seed \(seed)")
+            // In the first part of the walk.
+            if let sign = signs.first { XCTAssertLessThan(sign.frame.midX, map.size.width * 0.65, "seed \(seed)") }
+            XCTAssertTrue((2...4).contains(stumps.count), "seed \(seed): \(stumps.count) stumps")
+            let pathPoints = FoxPathGenerator.pathLine(for: map.route).samples(spacing: 6)
+            for sprite in signs + stumps {
+                XCTAssertTrue(FoxPathGenerator.isClear(sprite, of: pathPoints), "seed \(seed) \(sprite.kind)")
+                XCTAssertTrue(CGRect(origin: .zero, size: map.size).contains(sprite.frame), "seed \(seed) \(sprite.kind)")
+                XCTAssertGreaterThanOrEqual(sprite.frame.minY, 96, "seed \(seed) \(sprite.kind): under the top bar")
+                let others = map.standingSprites.filter { $0.id != sprite.id }
+                XCTAssertFalse(others.contains { $0.frame.intersects(sprite.frame) }, "seed \(seed) \(sprite.kind)")
+            }
+            stumpCounts.insert(stumps.count)
+            stumpSpots.insert(stumps.map { "\(Int($0.frame.midX / 100)),\(Int($0.frame.midY / 100))" }.sorted().joined(separator: ";"))
+        }
+        // The stumps change from map to map, in number and in place.
+        XCTAssertGreaterThan(stumpCounts.count, 1)
+        XCTAssertGreaterThan(stumpSpots.count, seeds.count / 2)
+    }
+
+    func testSteppingStonesInFrontOfDoorsVary() {
+        var layouts = Set<String>()
+        for seed in seeds {
+            let map = FoxPathGenerator.makeMap(seed: seed, settings: settings)
+            let stones = map.groundSprites.filter { $0.kind == .steppingStone }
+            var yardWidths: [CGFloat] = []
+            for house in map.houses {
+                guard let door = house.kind.doorCenter else { continue }
+                let doorX = house.frame.minX + house.frame.width * door
+                let yard = stones.filter {
+                    abs($0.frame.midX - doorX) < 260 && $0.frame.midY > house.baseline - 20 && $0.frame.midY < house.baseline + 260
+                }
+                XCTAssertGreaterThanOrEqual(yard.count, 2, "seed \(seed): stones in front of \(house.kind)")
+                guard !yard.isEmpty else { continue }
+                yardWidths += yard.map(\.frame.width)
+                // Rough shape of the layout: how many stones and which way they lead from the door.
+                let lean = yard.map { $0.frame.midX - doorX }.reduce(0, +) / CGFloat(yard.count)
+                layouts.insert("\(yard.count) \(lean < -25 ? "left" : (lean > 25 ? "right" : "down"))")
+            }
+            guard let widest = yardWidths.max(), let narrowest = yardWidths.min() else { continue }
+            XCTAssertGreaterThan(widest / narrowest, 1.1, "seed \(seed): stones of different sizes")
+        }
+        XCTAssertGreaterThanOrEqual(layouts.count, 6, "front yards should not all look alike: \(layouts)")
     }
 
     func testRocksAndStonesStayOffThePath() {
@@ -164,6 +246,7 @@ final class FoxPathGeneratorTests: XCTestCase {
 
     func testEveryPictureIsInTheAssetCatalog() {
         var names = MapSpriteKind.allCases.map(\.assetName)
+        names += ["FoxPath/PauseButton", "FoxPath/Carrots0", "FoxPath/Carrots1", "FoxPath/Carrots2", "FoxPath/Carrots3"]
         names += ["FoxPath/PathHorizontal", "FoxPath/PathVertical", "FoxPath/PathCurve", "FoxPath/GrassPatch1", "FoxPath/GrassPatch2"]
         for character in PathCharacter.allCases {
             names.append(character.standingAsset)

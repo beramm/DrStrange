@@ -31,16 +31,17 @@ struct SelectedGameView: View {
         fallback: ConfigurationStore.standard.load().oneEyeEnforcerEnabled
     )
     @State private var configuration = ConfigurationStore.standard.load()
+    /// The "Sound effect" slider in Settings.
+    @AppStorage(AppSettings.soundEffectsVolumeKey) private var soundEffectsVolume = 1.0
     @State private var gazeController = GazeInputController()
     @State private var presentedScreen: PresentedScreen?
-    @State private var hasStarted = false
 
     var body: some View {
         gameLauncher
             .toolbar(.hidden, for: .navigationBar)
-            .task {
-                guard !hasStarted else { return }
-                hasStarted = true
+            // Keyed by the game: "Next" on a finish screen swaps the game in place, and the
+            // shared calibration must start again for the new one.
+            .task(id: game) {
                 // Apply the caregiver's saved gaze-testing setting before calibration.
                 gazeController.setOneEyeEnforcerEnabled(wearsEyePatch)
                 presentedScreen = .calibration
@@ -78,23 +79,27 @@ struct SelectedGameView: View {
                 configuration: FoxPathConfigurationStore.standard.load(),
                 input: .gaze(gazeController),
                 player: PathCharacter(rawValue: characterID) ?? .fox,
-                onClose: closeGameFlow
+                onNextGame: { closeGameFlow(then: onNextGame) },
+                onHome: { closeGameFlow(then: onHome) },
+                onClose: { closeGameFlow() }
             )
         case .whackAMole:
             WhackAMoleGameView(
-                configuration: configuration,
+                configuration: configurationWithSoundSetting,
                 gazeController: gazeController,
+                onNextGame: { closeGameFlow(then: onNextGame) },
+                onHome: { closeGameFlow(then: onHome) },
                 // The player's character swings the hammer.
                 helper: HelperCharacter(rawValue: characterID) ?? .fox,
-                onClose: closeGameFlow
+                onClose: { closeGameFlow() }
             )
         case .veggieKeeper:
             FixationGameView(
                 gaze: gazeController,
                 character: FixationCharacter(rawValue: characterID) ?? .fox,
-                onExit: closeGameFlow,
-                onHome: { leaveGame(through: onHome) },
-                onNextGame: { leaveGame(through: onNextGame) }
+                onExit: { closeGameFlow() },
+                onHome: { closeGameFlow(then: onHome) },
+                onNextGame: { closeGameFlow(then: onNextGame) }
             )
         }
     }
@@ -118,14 +123,20 @@ struct SelectedGameView: View {
         }
     }
 
-    private func closeGameFlow() {
-        leaveGame(through: onExit)
+    /// Whack a Mole's hit sounds are short system sounds, which have no volume of their own:
+    /// they are switched off when the "Sound effect" slider is all the way down.
+    private var configurationWithSoundSetting: GameConfiguration {
+        var adjusted = configuration
+        if soundEffectsVolume <= 0 { adjusted.soundEnabled = false }
+        return adjusted
     }
 
-    private func leaveGame(through destination: () -> Void) {
+    /// Stops the camera, closes the game and hands over to `destination` (by default the usual
+    /// exit).
+    private func closeGameFlow(then destination: (() -> Void)? = nil) {
         gazeController.stop()
         presentedScreen = nil
-        destination()
+        (destination ?? onExit)()
     }
 }
 #else
