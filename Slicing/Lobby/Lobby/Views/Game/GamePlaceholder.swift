@@ -1,6 +1,7 @@
 //
 //  GamePlaceholder.swift
-//  Routes each lobby selection to its playable mini-game.
+//  Routes each lobby selection to its playable mini-game, with the character the
+//  player chose on character select: the same character in every game.
 //  Whack a Mole launches through the shared calibration flow; Veggie Dash and
 //  Veggie Keeper own their start and calibration screens.
 //
@@ -19,7 +20,13 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Finish and pause screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
+    /// The character chosen on character select.
+    @AppStorage(GameCharacter.storageKey) private var characterID = GameCharacter.fox.id
     @State private var configuration = ConfigurationStore.standard.load()
     @State private var gazeController = GazeInputController()
     @State private var presentedScreen: PresentedScreen?
@@ -47,6 +54,8 @@ struct SelectedGameView: View {
                     WhackAMoleGameView(
                         configuration: configuration,
                         gazeController: gazeController,
+                        // The player's character swings the hammer.
+                        helper: HelperCharacter(rawValue: characterID) ?? .fox,
                         onClose: { closeGameFlow() }
                     )
                 }
@@ -61,15 +70,20 @@ struct SelectedGameView: View {
     private var selectedGame: some View {
         switch game {
         case .veggieDash:
-            FoxPathHomeView(onExit: onExit)
+            // The player's character is the one to follow.
+            FoxPathHomeView(player: PathCharacter(rawValue: characterID) ?? .fox, onExit: onExit)
         case .whackAMole:
             whackAMoleLauncher
         case .veggieKeeper:
+            // The player's character keeps the stall.
             GameStartView(
+                character: FixationCharacter(rawValue: characterID) ?? .fox,
                 onExit: onExit,
                 onGameplayStarted: {
                     BackgroundMusicPlayer.shared.play(.veggieKeeper)
-                }
+                },
+                onHome: onHome,
+                onNextGame: onNextGame
             )
         }
     }
@@ -104,6 +118,10 @@ struct SelectedGameView: View {
     let game: MiniGame
     /// Leaves the game. ContentView decides where to go (the start screen or the Game Map).
     let onExit: () -> Void
+    /// Finish and pause screen "Home": back to the start screen.
+    var onHome: () -> Void = {}
+    /// Finish screen "Next": on to another game, picked by ContentView.
+    var onNextGame: () -> Void = {}
 
 
     var body: some View {

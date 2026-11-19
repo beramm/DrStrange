@@ -1,6 +1,6 @@
 //
 //  DriftingCloudsView.swift
-//  A few clouds slowly drifting across the sky, some left, some right.
+//  Two clouds slowly drifting across the sky, one left, one right.
 //  Only two cloud pictures exist, so some are flipped to look like different clouds.
 //
 
@@ -25,9 +25,7 @@ struct DriftingCloudsView: View {
 
     private let clouds = [
         Cloud(imageName: "Cloud1", flipped: false, y: 0.10, width: 0.26, speed: 0.012, start: 0.15),
-        Cloud(imageName: "Cloud2", flipped: true, y: 0.22, width: 0.20, speed: -0.009, start: 0.70),
-        Cloud(imageName: "Cloud2", flipped: false, y: 0.38, width: 0.24, speed: 0.008, start: 0.85),
-        Cloud(imageName: "Cloud1", flipped: true, y: 0.50, width: 0.18, speed: -0.011, start: 0.35),
+        Cloud(imageName: "Cloud2", flipped: true, y: 0.40, width: 0.22, speed: -0.009, start: 0.80),
     ]
 
     var body: some View {

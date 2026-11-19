@@ -69,13 +69,15 @@ final class WhackAMoleGameViewModel {
     }()
     #endif
 
+    /// - Parameter helper: the player's character, who swings the hammer. Nil picks one at random.
     init(
         configuration: GameConfiguration,
+        helper: HelperCharacter? = nil,
         sessionStore: SessionStore = .standard,
         highScoreStore: HighScoreStore = .standard
     ) {
         self.configuration = configuration
-        self.engine = WhackAMoleEngine(configuration: configuration)
+        self.engine = WhackAMoleEngine(configuration: configuration, helper: helper)
         self.settings = configuration.board
         self.remainingSeconds = Int(GameConfiguration.sessionDuration.rounded(.up))
         self.soundEnabled = configuration.soundEnabled

@@ -2,7 +2,16 @@ import DrStrangeGazeTracker
 import SwiftUI
 import UIKit
 
-/// Pre-game calibration using whichever prescribed eye remains uncovered.
+/// Pre-game calibration using whichever prescribed eye remains uncovered. Shared by every game.
+///
+/// Three steps, from the design:
+/// 1. "Stare at the dots": what to do (sit still, follow the dots with your eye). NEXT.
+/// 2. "Keep your head in the circle": the camera, with the face oval. When the face is in place
+///    and still, calibration starts by itself.
+/// 3. The dots (unchanged).
+/// Recalibration during a game skips step 1.
+///
+/// Positions come from the 1366 × 1024 design frame and are scaled to the screen.
 struct GazeCalibrationView: View {
     let controller: GazeInputController
     let isRecalibration: Bool
@@ -10,7 +19,12 @@ struct GazeCalibrationView: View {
     let onCancel: () -> Void
 
     @State private var didComplete = false
+    /// False on step 1 ("Stare at the dots"), true once NEXT is tapped.
+    @State private var showsCamera: Bool
     @Environment(\.scenePhase) private var scenePhase
+
+    /// Seconds the face must stay ready before the dots start by themselves.
+    private static let readyHoldSeconds = 1.0
 
     init(
         controller: GazeInputController,
@@ -22,14 +36,19 @@ struct GazeCalibrationView: View {
         self.isRecalibration = isRecalibration
         self.onCalibrated = onCalibrated
         self.onCancel = onCancel
+        _showsCamera = State(initialValue: isRecalibration)
     }
 
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                Color.white.ignoresSafeArea()
+            let sx = geometry.size.width / CalibrationCardScreen.design.width
+            let sy = geometry.size.height / CalibrationCardScreen.design.height
+            let s = min(sx, sy)
 
+            ZStack {
                 if let target = controller.activeCalibrationTarget {
+                    // Step 3: the dots.
+                    Color.white.ignoresSafeArea()
                     CalibrationFixationTarget()
                         .position(
                             x: target.x * geometry.size.width,
@@ -50,10 +69,15 @@ struct GazeCalibrationView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 32)
                     }
-                } else if controller.isPreparingCalibration {
-                    calibrationInstructions
                 } else {
-                    setupPanel
+                    CalibrationCardScreen.background.ignoresSafeArea()
+                    if showsCamera {
+                        cameraStep(sx: sx, sy: sy, s: s)
+                    } else {
+                        instructionsStep
+                    }
+                    closeButton(s: s)
+                        .position(x: 70 * sx, y: 70 * sy)
                 }
             }
         }
@@ -69,46 +93,51 @@ struct GazeCalibrationView: View {
             if phase == .active { controller.resumeForActiveScene() }
             else { controller.pauseForInactiveScene() }
         }
-    }
-
-    private var calibrationInstructions: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "scope")
-                .font(.system(size: 88, weight: .bold))
-                .foregroundStyle(.orange)
-                .accessibilityHidden(true)
-            Text("Get ready for the first dot")
-                .font(.system(size: 42, weight: .heavy, design: .rounded))
-            Text("Focus on the centre of each dot with your eye. Keep your head and the iPad still.")
-                .font(.system(.title2, design: .rounded).weight(.semibold))
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 680)
-            Text("\(controller.calibrationCountdown)")
-                .font(.system(size: 88, weight: .heavy, design: .rounded))
-                .foregroundStyle(.orange)
-                .contentTransition(.numericText(countsDown: true))
-                .animation(.snappy, value: controller.calibrationCountdown)
-                .accessibilityLabel("First dot in \(controller.calibrationCountdown) seconds")
-            Spacer()
+        // Step 2: once the face is in place and still for a moment, start the dots by themselves.
+        .task(id: ReadyState(showsCamera: showsCamera, isReady: controller.isReadyToCalibrate)) {
+            guard showsCamera, controller.isReadyToCalibrate, !controller.isPreparingCalibration,
+                  controller.activeCalibrationTarget == nil else { return }
+            try? await Task.sleep(for: .seconds(Self.readyHoldSeconds))
+            guard !Task.isCancelled, controller.isReadyToCalibrate,
+                  !controller.isPreparingCalibration else { return }
+            controller.startCalibration(preparationSeconds: isRecalibration ? 3 : 6)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(40)
-        .foregroundStyle(.black)
-        .accessibilityElement(children: .contain)
     }
 
-    private var setupPanel: some View {
-        VStack(spacing: 18) {
-            Spacer(minLength: 36)
-            Text("Get ready to play")
-                .font(.system(size: 42, weight: .heavy, design: .rounded))
-            HStack(spacing: 30) {
-                SetupStep(number: 1, text: "Face in oval")
-                SetupStep(number: 2, text: "Follow arrow")
-                SetupStep(number: 3, text: "Hold still")
-            }
+    private struct ReadyState: Equatable {
+        let showsCamera: Bool
+        let isReady: Bool
+    }
 
+    // MARK: - Step 1: Stare at the dots
+
+    private var instructionsStep: some View {
+        CalibrationCardScreen(
+            title: "Stare at the dots",
+            firstLine: "Sit still and don't move your head",
+            secondLine: "Follow the dots with only your eye"
+        ) {
+            withAnimation(.easeInOut(duration: 0.25)) { showsCamera = true }
+        }
+    }
+
+    // MARK: - Step 2: Keep your head in the circle
+
+    private func cameraStep(sx: CGFloat, sy: CGFloat, s: CGFloat) -> some View {
+        ZStack {
+            Text("Keep Your Head in The Circle")
+                .font(.custom("DoodleChalkDemoRegular", size: 76 * s))
+                .tracking(76 * s * 0.025)
+                .foregroundStyle(CalibrationCardScreen.titleBrown)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .frame(width: 1060 * sx)
+                .position(x: 683 * sx, y: 100 * sy)
+                .accessibilityAddTraits(.isHeader)
+
+            CalibrationCardScreen.card(sx: sx, sy: sy)
+
+            // The camera, inside the card.
             ZStack {
                 VolatileGazeCameraPreview(view: controller.cameraPreview)
                 if !controller.cameraStarted { Color.black }
@@ -118,50 +147,62 @@ struct GazeCalibrationView: View {
                     isCheckingPatch: controller.oneEyeEnforcerEnabled &&
                         controller.patchWearState == .checking
                 )
-            }
-            .frame(width: 520, height: 390)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(alignment: .bottom) {
-                guidanceBanner
-                    .padding(16)
-            }
-
-            HStack(spacing: 12) {
-                ReadinessBadge(
-                    title: "Face",
-                    isReady: controller.sample.setupState == .ready
-                )
-                if controller.oneEyeEnforcerEnabled {
-                    ReadinessBadge(
-                        title: "Eye patch",
-                        isReady: controller.isPatchVerified
-                    )
+                .scaleEffect(1.25 * s)
+                if controller.isPreparingCalibration {
+                    countdown(s: s)
                 }
-                ReadinessBadge(
-                    title: "Light",
-                    isReady: !controller.isSceneTooDark
-                )
             }
+            .frame(width: 844 * sx, height: 583 * sy)
+            .clipped()
+            .overlay(alignment: .bottom) {
+                if !controller.isPreparingCalibration {
+                    guidanceBanner
+                        .frame(maxWidth: 620 * s)
+                        .padding(16 * s)
+                }
+            }
+            .position(x: 683 * sx, y: 511.5 * sy)
 
-            Button(controller.isPreparingCalibration ? "Get ready…" : "Let's start!") {
-                controller.startCalibration(preparationSeconds: isRecalibration ? 3 : 6)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(controller.isReadyToCalibrate ? .green : .gray)
-            .disabled(!controller.isReadyToCalibrate || controller.isPreparingCalibration)
-
-            Button("Cancel") {
-                controller.stop()
-                onCancel()
-            }
-            .buttonStyle(.bordered)
-            Spacer()
+            CalibrationCardScreen.houses(carrot: CGRect(x: 128, y: 607, width: 154, height: 268),
+                   onion: CGRect(x: 1048, y: 670, width: 180, height: 202),
+                   sx: sx, sy: sy)
         }
-        .frame(maxWidth: .infinity)
-        .padding(32)
-        .foregroundStyle(.black)
+    }
+
+    /// "First dot in 3, 2, 1" over the camera, once the face is ready.
+    private func countdown(s: CGFloat) -> some View {
+        VStack(spacing: 8 * s) {
+            Text("Get ready for the first dot")
+                .font(.custom("DaysOne-Regular", size: 34 * s))
+            Text("\(controller.calibrationCountdown)")
+                .font(.custom("DaysOne-Regular", size: 110 * s))
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.snappy, value: controller.calibrationCountdown)
+        }
+        .foregroundStyle(.white)
+        .shadow(color: .black.opacity(0.5), radius: 6)
+        .padding(28 * s)
+        .background(.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 28 * s))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("First dot in \(controller.calibrationCountdown) seconds")
+    }
+
+    // MARK: - Shared pieces
+
+    /// Leaves calibration (and the game) before the dots start.
+    private func closeButton(s: CGFloat) -> some View {
+        Button {
+            controller.stop()
+            onCancel()
+        } label: {
+            Image("FinishScreen/ButtonClose")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 80 * s, height: 80 * s)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
     }
 
     private var guidance: CalibrationGuidance {
@@ -301,7 +342,7 @@ struct GazeCalibrationView: View {
         return .init(
             id: "ready",
             title: "Ready!",
-            message: "Tap the green Let's start button.",
+            message: "Keep still, the dots start soon.",
             systemImage: "checkmark.circle.fill",
             tone: .success
         )
@@ -338,42 +379,6 @@ struct GazeCalibrationView: View {
         .transition(.opacity.combined(with: .scale(scale: 0.98)))
         .animation(.smooth(duration: 0.3), value: guidance.id)
         .accessibilityElement(children: .combine)
-    }
-}
-
-private struct SetupStep: View {
-    let number: Int
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Text("\(number)")
-                .font(.headline.weight(.heavy))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(.blue, in: Circle())
-            Text(text)
-                .font(.headline)
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct ReadinessBadge: View {
-    let title: String
-    let isReady: Bool
-
-    var body: some View {
-        Label(
-            title,
-            systemImage: isReady ? "checkmark.circle.fill" : "circle.dashed"
-        )
-        .font(.headline)
-        .foregroundStyle(isReady ? .green : .orange)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.thinMaterial, in: Capsule())
-        .accessibilityLabel("\(title): \(isReady ? "ready" : "not ready")")
     }
 }
 

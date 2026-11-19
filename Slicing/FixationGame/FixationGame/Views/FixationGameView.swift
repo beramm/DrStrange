@@ -1,8 +1,10 @@
 //
 //  FixationGameView.swift
 //  Veggie Keeper (fixation game): guard the vegetable stall.
-//  The picture comes from MarketSceneView; the top bar, pause and end screens
-//  are styled like the Whack-a-Mole game.
+//  The picture comes from MarketSceneView. The top bar matches Veggie Dash's
+//  (painted carrots, time bar, painted pause button); inside the DrStrange app
+//  the pause pop-up, the patch reminder and the finish screen are the ones
+//  shared by all the games.
 //
 //  "Watching the stall" comes from one of two inputs:
 //  - Eye control: the gaze tracker's point is on the stall (after calibration).
@@ -20,6 +22,10 @@ struct FixationGameView: View {
     let character: FixationCharacter
     /// Back to the start screen.
     let onExit: () -> Void
+    /// Pause and finish screen "Home": back to the start of the app. Nil falls back to `onExit`.
+    var onHome: (() -> Void)? = nil
+    /// Finish screen "Next": on to another game. Nil hides the button.
+    var onNextGame: (() -> Void)? = nil
 
     private enum Phase: Equatable {
         case waiting                          // before the child first watches the stall
@@ -60,6 +66,12 @@ struct FixationGameView: View {
     @State private var veggiesLeft = 3
     @State private var guardedSeconds: Double = 0
     @State private var thiefIsHere = false
+    /// True while the game is paused because the camera sees both eyes (the patch came off).
+    @State private var isPausedForMissingPatch = false
+    /// Where to go back to once the patch is on again: waiting or playing.
+    @State private var phaseBeforePatchPause = Phase.waiting
+    /// Where the game was when calibration was lost, to carry on from there afterwards.
+    @State private var phaseBeforeRecalibration = Phase.waiting
     @Environment(\.scenePhase) private var scenePhase
 
     private var usesGaze: Bool { gaze != nil }
@@ -82,14 +94,8 @@ struct FixationGameView: View {
     var body: some View {
         ZStack {
             if case let .finished(stoppedEarly) = phase {
-                FixationGameResultView(
-                    veggiesSaved: veggiesLeft,
-                    totalVeggies: totalVeggies,
-                    stoppedEarly: stoppedEarly,
-                    onPlayAgain: restart,
-                    onDone: onExit
-                )
-                .transition(.opacity)
+                finishScreen(stoppedEarly: stoppedEarly)
+                    .transition(.opacity)
             } else {
                 gameplay
             }
@@ -114,6 +120,64 @@ struct FixationGameView: View {
                 if phase == .playing { phase = .paused }
             }
         }
+        #if !VEGGIE_KEEPER_STANDALONE
+        .onChange(of: gaze?.patchWearState, initial: true) { _, state in
+            respondToPatchState(state)
+        }
+        // Calibration lost: pause, show "Time to check again", calibrate, then carry on.
+        .recalibratesWhenNeeded(
+            controller: gaze,
+            isActive: !isFinished,
+            pause: pauseForRecalibration,
+            resume: { phase = phaseBeforeRecalibration }
+        )
+        #endif
+    }
+
+    private var isFinished: Bool {
+        if case .finished = phase { return true }
+        return false
+    }
+
+    private func pauseForRecalibration() {
+        if phase != .paused { phaseBeforeRecalibration = phase }
+        phase = .paused
+    }
+
+    @ViewBuilder
+    private func finishScreen(stoppedEarly: Bool) -> some View {
+        #if VEGGIE_KEEPER_STANDALONE
+        // The standalone Veggie Keeper project has no shared finish screen or its pictures.
+        FixationGameResultView(
+            character: character,
+            veggiesSaved: veggiesLeft,
+            totalVeggies: totalVeggies,
+            stoppedEarly: stoppedEarly,
+            onPlayAgain: restart,
+            onDone: onExit
+        )
+        #else
+        // The shared finish screen, with the veggies still safe shown as carrots.
+        GameFinishScreen(onRestart: restart, onNext: onNextGame, onHome: { (onHome ?? onExit)() }) { scale in
+            VStack(spacing: 22 * scale) {
+                Text("Life Remaining")
+                    .font(.custom("DaysOne-Regular", size: 38 * scale))
+                    .foregroundStyle(Color(red: 0.24, green: 0.13, blue: 0.06))
+                carrots
+                    .frame(width: 327 * scale)
+            }
+        }
+        #endif
+    }
+
+    /// The painted carrots: one orange carrot per veggie still safe, grey for the ones taken.
+    private var carrots: some View {
+        Image("VeggieKeeperCarrots\(min(max(veggiesLeft, 0), totalVeggies))")
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .accessibilityLabel("Veggies safe")
+            .accessibilityValue("\(veggiesLeft) of \(totalVeggies)")
     }
 
     // MARK: - Gameplay screen
@@ -154,30 +218,57 @@ struct FixationGameView: View {
             }
 
             if phase == .paused {
+                #if VEGGIE_KEEPER_STANDALONE
+                // The standalone Veggie Keeper project has no shared pop-up or its pictures.
                 FixationPauseOverlay(
                     onResume: { phase = .playing },
                     onRest: { phase = .finished(stoppedEarly: true) }
                 )
+                #else
+                if isPausedForMissingPatch {
+                    // The patch came off: the shared reminder, until the one-eye check passes.
+                    PatchReminderScreen()
+                        .transition(.opacity)
+                } else {
+                    // Inside the DrStrange app: the shared pause pop-up (Home, Restart, Play).
+                    GamePausePopup(
+                        onResume: { phase = .playing },
+                        onRestart: restart,
+                        onHome: { (onHome ?? onExit)() }
+                    )
+                }
+                #endif
             }
         }
     }
 
-    /// Exit, veggies left, time bar and pause, like Whack-a-Mole's top bar.
+    /// Height of the pause button; the carrots and the time bar are sized to match it.
+    private static let controlSize: CGFloat = 64
+
+    /// Veggies left, time bar and pause, like Veggie Dash's top bar. Stopping early is offered
+    /// from the pause screen.
     private var topBar: some View {
         HStack(spacing: 20) {
-            FixationHUDButton(systemImage: "xmark", label: "Stop the game") {
-                phase = .finished(stoppedEarly: true)
-            }
-
-            VeggiesLeftView(left: veggiesLeft, total: totalVeggies)
+            carrots
+                .frame(height: Self.controlSize)
+                .animation(.snappy, value: veggiesLeft)
 
             GuardProgressView(progress: guardedSeconds / guardSeconds, secondsLeft: secondsLeft)
                 .frame(maxWidth: .infinity)
 
-            FixationHUDButton(systemImage: "pause.fill", label: "Pause") {
+            Button {
                 phase = .paused
+            } label: {
+                Image("VeggieKeeperPauseButton")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: Self.controlSize, height: Self.controlSize)
+                    .contentShape(Circle())
             }
+            .buttonStyle(.plain)
             .disabled(phase != .playing)
+            .accessibilityLabel("Pause")
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 12)
@@ -282,7 +373,7 @@ struct FixationGameView: View {
                     thiefIsHere = true
                     try await Task.sleep(for: .seconds(thiefSeconds))
                     veggiesLeft -= 1
-                    // The thief walks back with the veggies, then comes up under the next crate.
+                    // The mole shows the veggies and goes back down, then comes up at the next basket.
                     thiefIsHere = false
                     try await Task.sleep(for: .seconds(1.6))
                 }
@@ -297,8 +388,40 @@ struct FixationGameView: View {
         veggiesLeft = totalVeggies
         guardedSeconds = 0
         thiefIsHere = false
+        isPausedForMissingPatch = false
         phase = .waiting
+        #if !VEGGIE_KEEPER_STANDALONE
+        respondToPatchState(gaze?.patchWearState)
+        #endif
     }
+
+    #if !VEGGIE_KEEPER_STANDALONE
+    /// Pauses behind the patch reminder while the camera sees both eyes, and carries on by itself
+    /// once the one-eye check passes again.
+    private func respondToPatchState(_ state: PatchWearState?) {
+        guard let gaze else { return }
+        if !gaze.oneEyeEnforcerEnabled {
+            if isPausedForMissingPatch {
+                isPausedForMissingPatch = false
+                phase = phaseBeforePatchPause
+            }
+            return
+        }
+        switch state {
+        case .missing:
+            guard phase == .waiting || phase == .playing else { return }
+            phaseBeforePatchPause = phase
+            isPausedForMissingPatch = true
+            phase = .paused
+        case .verified:
+            guard isPausedForMissingPatch else { return }
+            isPausedForMissingPatch = false
+            phase = phaseBeforePatchPause
+        default:
+            break
+        }
+    }
+    #endif
 }
 
 #Preview("Fixation game (finger)", traits: .landscapeLeft) {

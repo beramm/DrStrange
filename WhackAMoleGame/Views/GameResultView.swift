@@ -2,6 +2,8 @@ import SwiftUI
 
 /// End-of-session summary. A big friendly result for the child, details for the adult below.
 struct GameResultView: View {
+    /// Whose picture is shown: the game's helper (the player's character).
+    var helper = HelperCharacter.fox
     let session: GameSessionRecord
     let score: Int
     /// Best score on this device before this game.
@@ -30,7 +32,7 @@ struct GameResultView: View {
 
     private var celebration: some View {
         HStack(spacing: 24) {
-            Image(FoxCharacterView.assetName(1))
+            Image(FoxCharacterView.assetName(1, helper: helper))
                 .resizable()
                 .scaledToFit()
                 .frame(width: 180, height: 180)

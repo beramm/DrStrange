@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var showsSettings = false
     /// Setting "Random game": the Game Map picks the game by itself.
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
+    @AppStorage(MiniGame.lastGameStorageKey) private var lastGameID = ""
     @AppStorage(AppSettings.backgroundVolumeKey)
     private var backgroundMusicVolume = AppSettings.migratedBackgroundVolume()
     @AppStorage(AppSettings.soundEffectsVolumeKey) private var soundEffectsVolume = 1.0
@@ -38,7 +39,12 @@ struct ContentView: View {
                 case .randomizer:
                     RandomizerView(onChosen: { game in path.append(.game(game)) })
                 case .game(let game):
-                    SelectedGameView(game: game, onExit: leaveGame)
+                    SelectedGameView(
+                        game: game,
+                        onExit: leaveGame,
+                        onHome: goHome,
+                        onNextGame: { goToNextGame(after: game) }
+                    )
                 }
             }
         }
@@ -78,6 +84,23 @@ struct ContentView: View {
             path.removeAll()
         } else {
             path.removeLast()
+        }
+    }
+
+    /// Finish screen "Home": back to the start screen, as when the app opens.
+    private func goHome() {
+        path.removeAll()
+    }
+
+    /// Finish screen "Next": one of the other games at random, opened in place of the game
+    /// just played. Picked on the tap, not when the finish screen appears.
+    private func goToNextGame(after finished: MiniGame) {
+        let next = MiniGame.randomNext(after: finished)
+        lastGameID = next.rawValue
+        if path.isEmpty {
+            path.append(.game(next))
+        } else {
+            path[path.count - 1] = .game(next)
         }
     }
 
