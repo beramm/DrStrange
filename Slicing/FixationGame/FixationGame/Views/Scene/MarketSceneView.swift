@@ -94,8 +94,9 @@ struct MarketSceneView: View {
             // The game checks the gaze point against this area.
             Color.clear
                 .frame(width: w * 0.541 * stallScale, height: h * 0.601 * stallScale)
-                .position(x: w * gazeArea.x, y: h * gazeArea.y)
+                // Measured before `.position`, which would make it as big as the whole screen.
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { onStallFrameChange($0) }
+                .position(x: w * gazeArea.x, y: h * gazeArea.y)
 
             MoleThiefView(
                 isHere: thiefIsHere,

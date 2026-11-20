@@ -431,7 +431,7 @@ struct FixationGameView: View {
                     veggiesLeft -= 1
                     // The mole shows the veggies and goes back down, then comes up at the next basket.
                     thiefIsHere = false
-                    try await Task.sleep(for: .seconds(1.6))
+                    try await Task.sleep(for: .seconds(1.1))
                 }
                 phase = .finished(stoppedEarly: false)
             }
