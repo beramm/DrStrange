@@ -16,6 +16,7 @@ final class GazeInputController {
     private(set) var cameraStatus = "paddy-gazeTrack loading…"
     private(set) var cameraStarted = false
     private(set) var isPreparingCalibration = false
+    private(set) var isResumingCalibration = false
     private(set) var calibrationCountdown = 0
     private(set) var patchWearState: PatchWearState = .checking
     private(set) var oneEyeEnforcerEnabled = true
@@ -43,6 +44,7 @@ final class GazeInputController {
     @ObservationIgnored private var lastValidSampleAt: TimeInterval?
     @ObservationIgnored private var captureFrameCount = 0
     @ObservationIgnored private var captureRejections: [String: Int] = [:]
+    @ObservationIgnored private var isPreviewEnabled = false
 
     private let minimumSamplesPerTarget = PaddyCalibrationCapture.minimumSamples
     private let maximumCaptureWindow: TimeInterval = 2.0
@@ -76,7 +78,11 @@ final class GazeInputController {
     }
 
     var calibrationNeedsGuidance: Bool {
-        activeCalibrationTarget != nil && !isReadyToCalibrate
+        activeCalibrationTarget != nil && !isReadyForPreparationCountdown
+    }
+
+    var isCountdownPositionReady: Bool {
+        (isPreparingCalibration || isResumingCalibration) && isReadyForPreparationCountdown
     }
 
     var isCalibrated: Bool {
@@ -103,7 +109,7 @@ final class GazeInputController {
     }
 
     func startCamera() {
-        runtime.setPreviewEnabled(true)
+        setPreviewEnabled(true)
         guard !cameraStarted else { return }
         Task {
             do {
@@ -138,12 +144,31 @@ final class GazeInputController {
 
         calibrationTask = Task { [weak self] in
             guard let self else { return }
-            for remaining in countdownValues {
-                guard !Task.isCancelled else { return }
-                calibrationCountdown = remaining
-                try? await Task.sleep(for: .seconds(1))
+            preparation: while !Task.isCancelled {
+                while !isReadyForPreparationCountdown {
+                    calibrationCountdown = countdownValues[0]
+                    status = "Countdown reset — return your face to the oval"
+                    do { try await Task.sleep(for: .milliseconds(100)) }
+                    catch { return }
+                }
+                for remaining in countdownValues {
+                    calibrationCountdown = remaining
+                    status = "Stay still — calibration begins after the countdown"
+                    let secondEndsAt = ProcessInfo.processInfo.systemUptime + 1
+                    while ProcessInfo.processInfo.systemUptime < secondEndsAt {
+                        guard !Task.isCancelled else { return }
+                        guard isReadyForPreparationCountdown else {
+                            calibrationCountdown = countdownValues[0]
+                            status = "Countdown reset — return your face to the oval"
+                            continue preparation
+                        }
+                        do { try await Task.sleep(for: .milliseconds(100)) }
+                        catch { return }
+                    }
+                }
+                break
             }
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, isReadyForPreparationCountdown else { return }
             isPreparingCalibration = false
             calibrationCountdown = 0
             await runCalibration()
@@ -153,10 +178,11 @@ final class GazeInputController {
     func stop() {
         calibrationTask?.cancel()
         calibrationTask = nil
-        runtime.setPreviewEnabled(false)
+        setPreviewEnabled(false)
         runtime.stop()
         cameraStarted = false
         isPreparingCalibration = false
+        isResumingCalibration = false
         calibrationCountdown = 0
         activeCalibrationTarget = nil
         calibration = nil
@@ -220,8 +246,7 @@ final class GazeInputController {
             let isFirstTarget = activeCalibrationTarget == nil
             activeCalibrationTarget = target
             if isFirstTarget {
-                runtime.setPreviewEnabled(false)
-                runtime.previewView.clear()
+                setPreviewEnabled(false)
             }
             calibrationState = .collecting
             isCollectingSamples = false
@@ -241,12 +266,22 @@ final class GazeInputController {
                 }
                 try await Task.sleep(for: .milliseconds(500))
                 guard !Task.isCancelled else { return nil }
+                guard await restoreCalibrationPositionIfNeeded(label: label) else { return nil }
                 isCollectingSamples = true
-                let started = ProcessInfo.processInfo.systemUptime
-                let maximumEnd = started + maximumCaptureWindow
+                var started = ProcessInfo.processInfo.systemUptime
+                var maximumEnd = started + maximumCaptureWindow
                 repeat {
                     try await Task.sleep(for: .milliseconds(100))
                     guard !Task.isCancelled else { return nil }
+                    if !isReadyForPreparationCountdown {
+                        isCollectingSamples = false
+                        clearCaptureStability()
+                        guard await restoreCalibrationPositionIfNeeded(label: label) else { return nil }
+                        isCollectingSamples = true
+                        started = ProcessInfo.processInfo.systemUptime
+                        maximumEnd = started + maximumCaptureWindow
+                        continue
+                    }
                     let now = ProcessInfo.processInfo.systemUptime
                     let stableDuration = stableWindowStartedAt.map { now - $0 } ?? 0
                     status = "\(label) · attempt \(attempt) · \(rawSamples.count)/\(minimumSamplesPerTarget) stable samples"
@@ -284,6 +319,8 @@ final class GazeInputController {
     func finishCalibration(_ samples: [GazeCalibrationSample]) {
         defer {
             activeCalibrationTarget = nil
+            isResumingCalibration = false
+            calibrationCountdown = 0
             isCollectingSamples = false
             rawSamples = []
             stableWindowStartedAt = nil
@@ -293,7 +330,7 @@ final class GazeInputController {
         guard samples.count == PaddyCalibrationCapture.targets.count else {
             calibrationState = .failed
             status = "Calibration was incomplete. No partial calibration was saved."
-            runtime.setPreviewEnabled(true)
+            setPreviewEnabled(true)
             publishWithoutPrediction(trackingState: .limited)
             return
         }
@@ -307,7 +344,7 @@ final class GazeInputController {
             calibration = nil
             calibrationState = .failed
             status = "Calibration could not fit a stable mapping. Try again."
-            runtime.setPreviewEnabled(true)
+            setPreviewEnabled(true)
             publishWithoutPrediction(trackingState: .limited)
         }
     }
@@ -320,15 +357,17 @@ final class GazeInputController {
             invalidateCalibrationForOrientationChange()
         }
         lastImageOrientation = analysis.imageOrientation
-        if cameraStarted, activeCalibrationTarget == nil,
-           let previewImage = analysis.previewImage {
-            runtime.previewView.display(previewImage)
-        }
         cameraStatus = analysis.modelStatus
         isSceneTooDark = analysis.isSceneTooDark
         isFrameCaptureReady = analysis.captureRejectionReason == nil
         updateStableSetupState(with: analysis.setupCandidate)
         updatePatchState(with: analysis)
+        let needsSetupPreview = !isCalibrated &&
+            (activeCalibrationTarget == nil || calibrationNeedsGuidance)
+        setPreviewEnabled(needsSetupPreview)
+        if cameraStarted, isPreviewEnabled, let previewImage = analysis.previewImage {
+            runtime.previewView.display(previewImage)
+        }
         if isCollectingSamples { recordCalibrationFrame(analysis) }
 
         let timestampNanoseconds = UInt64(max(analysis.hostUptime, 0) * 1_000_000_000)
@@ -399,6 +438,7 @@ final class GazeInputController {
         calibrationState = .invalid
         activeCalibrationTarget = nil
         isPreparingCalibration = false
+        isResumingCalibration = false
         calibrationCountdown = 0
         isCollectingSamples = false
         clearCaptureStability()
@@ -406,8 +446,78 @@ final class GazeInputController {
         stableSetupState = .unknown
         pendingSetupState = nil
         pendingSetupFrameCount = 0
-        runtime.setPreviewEnabled(true)
+        setPreviewEnabled(true)
         status = "The iPad orientation changed — recalibrate before playing"
+    }
+
+    private func setPreviewEnabled(_ enabled: Bool) {
+        guard isPreviewEnabled != enabled else { return }
+        isPreviewEnabled = enabled
+        runtime.setPreviewEnabled(enabled)
+        if !enabled { runtime.previewView.clear() }
+    }
+
+    private var isReadyForPreparationCountdown: Bool {
+        cameraStarted &&
+            sample.setupState == .ready &&
+            isPatchVerified &&
+            !isSceneTooDark &&
+            cameraStatus.contains("active")
+    }
+
+    private func restoreCalibrationPositionIfNeeded(
+        label: String,
+        preparationSeconds: Int = 4
+    ) async -> Bool {
+        guard !isReadyForPreparationCountdown else { return true }
+
+        let countdownValues = Self.countdownValues(preparationSeconds: preparationSeconds)
+        isCollectingSamples = false
+        clearCaptureStability()
+        isResumingCalibration = true
+        calibrationCountdown = countdownValues[0]
+        setPreviewEnabled(true)
+        var didRestorePosition = false
+
+        defer {
+            isResumingCalibration = false
+            calibrationCountdown = 0
+            if didRestorePosition { setPreviewEnabled(false) }
+        }
+
+        recovery: while !Task.isCancelled {
+            while !isReadyForPreparationCountdown {
+                setPreviewEnabled(true)
+                calibrationCountdown = countdownValues[0]
+                status = "\(label) paused — return your face to the oval"
+                do { try await Task.sleep(for: .milliseconds(100)) }
+                catch { return false }
+            }
+
+            setPreviewEnabled(false)
+            for remaining in countdownValues {
+                calibrationCountdown = remaining
+                status = "\(label) — stay still while the countdown finishes"
+                let secondEndsAt = ProcessInfo.processInfo.systemUptime + 1
+                while ProcessInfo.processInfo.systemUptime < secondEndsAt {
+                    guard !Task.isCancelled else { return false }
+                    guard isReadyForPreparationCountdown else {
+                        setPreviewEnabled(true)
+                        calibrationCountdown = countdownValues[0]
+                        status = "\(label) paused — return your face to the oval"
+                        continue recovery
+                    }
+                    do { try await Task.sleep(for: .milliseconds(100)) }
+                    catch { return false }
+                }
+            }
+            break
+        }
+
+        guard !Task.isCancelled, isReadyForPreparationCountdown else { return false }
+        didRestorePosition = true
+        status = "\(label) — continue looking at the dot"
+        return true
     }
 
     private func updatePatchState(with analysis: PaddyFrameAnalysis) {

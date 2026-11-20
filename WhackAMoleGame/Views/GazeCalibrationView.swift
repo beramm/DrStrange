@@ -47,7 +47,16 @@ struct GazeCalibrationView: View {
             let s = min(sx, sy)
 
             ZStack {
-                if let target = controller.activeCalibrationTarget {
+                if controller.isResumingCalibration,
+                   controller.isCountdownPositionReady {
+                    // After the user returns to position, count down on the same
+                    // white calibration page used by the fixation targets.
+                    Self.calibrationBackground.ignoresSafeArea()
+                    countdown(s: s)
+                    calibrationCancelButton
+                } else if let target = controller.activeCalibrationTarget,
+                   !controller.calibrationNeedsGuidance,
+                   !controller.isResumingCalibration {
                     // Step 3: the dots.
                     Self.calibrationBackground.ignoresSafeArea()
                     CalibrationFixationTarget()
@@ -59,30 +68,9 @@ struct GazeCalibrationView: View {
                             .easeInOut(duration: PaddyCalibrationCapture.targetTransitionSeconds),
                             value: target
                         )
-                    if controller.calibrationNeedsGuidance {
-                        VStack {
-                            if target.y > 0.5 {
-                                guidanceBanner
-                                    .frame(maxWidth: 620)
-                                Spacer()
-                            } else {
-                                Spacer()
-                                guidanceBanner
-                                    .frame(maxWidth: 620)
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 32)
-                    }
                     VStack {
                         if target.y <= 0.10 { Spacer() }
                         HStack(spacing: 12) {
-                            if !controller.calibrationNeedsGuidance {
-                                Text(controller.status)
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(.black)
-                                    .lineLimit(2)
-                            }
                             Spacer()
                             Button("Cancel") {
                                 controller.stop()
@@ -157,9 +145,7 @@ struct GazeCalibrationView: View {
 
     private func cameraStep(sx: CGFloat, sy: CGFloat, s: CGFloat) -> some View {
         ZStack {
-            Text(controller.isPreparingCalibration
-                 ? "Get Ready for the First Dot"
-                 : "Keep Your Head in The Circle")
+            Text(cameraStepTitle)
                 .font(.custom("DoodleChalkDemoRegular", size: 76 * s))
                 .tracking(76 * s * 0.025)
                 .foregroundStyle(CalibrationCardScreen.titleBrown)
@@ -175,23 +161,21 @@ struct GazeCalibrationView: View {
             ZStack {
                 VolatileGazeCameraPreview(view: controller.cameraPreview)
                 if !controller.cameraStarted { Color.black }
-                if !controller.isPreparingCalibration {
-                    FacePositionGuide(
-                        state: controller.sample.setupState,
-                        isReady: controller.isReadyToCalibrate,
-                        isCheckingPatch: controller.oneEyeEnforcerEnabled &&
-                            controller.patchWearState == .checking
-                    )
-                    .scaleEffect(1.25 * s)
-                }
-                if controller.isPreparingCalibration {
+                FacePositionGuide(
+                    state: controller.sample.setupState,
+                    isReady: controller.isReadyToCalibrate,
+                    isCheckingPatch: controller.oneEyeEnforcerEnabled &&
+                        controller.patchWearState == .checking
+                )
+                .scaleEffect(1.25 * s)
+                if controller.isCountdownPositionReady {
                     countdown(s: s)
                 }
             }
             .frame(width: 844 * sx, height: 583 * sy)
             .clipped()
             .overlay(alignment: .bottom) {
-                if !controller.isPreparingCalibration {
+                if !controller.isPreparingCalibration || !controller.isCountdownPositionReady {
                     guidanceBanner
                         .frame(maxWidth: 620 * s)
                         .padding(16 * s)
@@ -205,7 +189,35 @@ struct GazeCalibrationView: View {
         }
     }
 
-    /// The four-second countdown shows 3, 2, 1, 0 over the live camera.
+    private var cameraStepTitle: String {
+        if (controller.isPreparingCalibration || controller.isResumingCalibration),
+           !controller.isCountdownPositionReady {
+            return "Put Your Face Back in The Oval"
+        }
+        if controller.isPreparingCalibration { return "Get Ready for the First Dot" }
+        if controller.isResumingCalibration { return "Get Ready to Continue" }
+        if controller.activeCalibrationTarget != nil { return "Put Your Face Back in The Oval" }
+        return "Keep Your Head in The Circle"
+    }
+
+    private var calibrationCancelButton: some View {
+        VStack {
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    controller.stop()
+                    onCancel()
+                }
+                .buttonStyle(.bordered)
+                .tint(.black)
+            }
+            Spacer()
+        }
+        .padding(24)
+    }
+
+    /// The four-second countdown shows 3, 2, 1, 0. Initial preparation overlays
+    /// the live camera; recovery after position loss uses the white calibration page.
     private func countdown(s: CGFloat) -> some View {
         VStack(spacing: 8 * s) {
             Text("Stay still")
@@ -215,12 +227,15 @@ struct GazeCalibrationView: View {
                 .contentTransition(.numericText(countsDown: true))
                 .animation(.snappy, value: controller.calibrationCountdown)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(controller.isResumingCalibration ? .black : .white)
         .shadow(color: .black.opacity(0.5), radius: 6)
         .padding(28 * s)
-        .background(.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 28 * s))
+        .background(
+            controller.isResumingCalibration ? .orange.opacity(0.16) : .black.opacity(0.35),
+            in: RoundedRectangle(cornerRadius: 28 * s)
+        )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("First dot in \(controller.calibrationCountdown) seconds")
+        .accessibilityLabel("Calibration continues in \(controller.calibrationCountdown) seconds")
     }
 
     // MARK: - Shared pieces
@@ -481,6 +496,12 @@ private struct FacePositionGuide: View {
                         .background(color.opacity(0.92), in: Capsule())
                         .offset(y: -18)
                 }
+
+            Circle()
+                .fill(color)
+                .frame(width: 14, height: 14)
+                .overlay { Circle().stroke(.white, lineWidth: 3) }
+                .shadow(color: .black.opacity(0.45), radius: 3)
 
             if let directionIcon {
                 Image(systemName: directionIcon)
