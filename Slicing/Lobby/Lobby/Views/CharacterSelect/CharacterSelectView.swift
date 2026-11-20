@@ -59,14 +59,14 @@ struct CharacterSelectView: View {
                 Image("Podium")
                     .resizable()
                     .frame(width: 440 * s, height: 190 * s)
-                    .position(x: 356 * sx, y: 662 * sy)
+                    .position(x: 356 * sx, y: 700 * sy)
 
                 // The character walks on the spot, and turns around when the arrows
                 // change it. The pictures have empty space around the drawing, so this
                 // frame is bigger than the character itself.
                 TurningCharacterView(character: selected, turnsRight: turnsRight)
                     .frame(width: 574 * s, height: 574 * s)
-                    .position(x: 343 * sx, y: 426 * sy)
+                    .position(x: 358 * sx, y: 490 * sy)
 
                 ArrowButton(direction: .previous, size: 76 * s) {
                     turnsRight = false
