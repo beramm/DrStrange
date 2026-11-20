@@ -162,18 +162,42 @@ struct FixationGameView: View {
             onDone: onExit
         )
         #else
-        // The shared finish screen, with the veggies still safe shown as carrots.
-        GameFinishScreen(onRestart: restart, onNext: onNextGame, onHome: { (onHome ?? onExit)() }) { scale in
-            VStack(spacing: 22 * scale) {
-                Text("Life Remaining")
-                    .font(.custom("DaysOne-Regular", size: 38 * scale))
-                    .foregroundStyle(Color(red: 0.24, green: 0.13, blue: 0.06))
-                carrots
-                    .frame(width: 327 * scale)
+        if veggiesLeft > 0 {
+            // At least one basket kept safe: "Game Completed".
+            GameFinishScreen(
+                header: .banner(title: "Game Completed", ribbon: "FinishScreen/Ribbon"),
+                onRestart: restart,
+                onNext: onNextGame,
+                onHome: { (onHome ?? onExit)() }
+            ) { scale in
+                finishMessage("Great job protecting\nthe vegetables!", scale: scale)
+            }
+        } else {
+            // The mole took every basket: "Game Over", play again or go home.
+            GameFinishScreen(
+                header: .banner(title: "GAME OVER", ribbon: "FinishScreen/RibbonRed"),
+                buttonWidth: 124,
+                onRestart: restart,
+                onNext: nil,
+                onHome: { (onHome ?? onExit)() }
+            ) { scale in
+                finishMessage("Let's Try Again!", scale: scale)
             }
         }
         #endif
     }
+
+    #if !VEGGIE_KEEPER_STANDALONE
+    /// The line in the middle of the finish screen.
+    private func finishMessage(_ text: LocalizedStringKey, scale: CGFloat) -> some View {
+        Text(text)
+            .font(.custom("DaysOne-Regular", size: 52 * scale))
+            .foregroundStyle(Color(red: 0.24, green: 0.13, blue: 0.06))
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .minimumScaleFactor(0.6)
+    }
+    #endif
 
     /// The painted carrots: one orange carrot per veggie still safe, grey for the ones taken.
     private var carrots: some View {
@@ -407,7 +431,7 @@ struct FixationGameView: View {
                     veggiesLeft -= 1
                     // The mole shows the veggies and goes back down, then comes up at the next basket.
                     thiefIsHere = false
-                    try await Task.sleep(for: .seconds(1.6))
+                    try await Task.sleep(for: .seconds(1.1))
                 }
                 phase = .finished(stoppedEarly: false)
             }

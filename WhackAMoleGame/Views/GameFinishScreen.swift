@@ -13,6 +13,34 @@ struct GameFinishScreen<Content: View>: View {
     /// screen points). It fills the space between the ribbon and the buttons.
     @ViewBuilder let content: (_ scale: CGFloat) -> Content
 
+    /// The look of the top of the sign.
+    enum Header {
+        /// Three stars on the top edge and a small "Great job" ribbon below them.
+        case starsAndRibbon
+        /// A wide ribbon across the top edge with its own title, and no stars
+        /// ("Game Completed" in green, "Game Over" in red).
+        case banner(title: LocalizedStringKey, ribbon: String)
+    }
+    var header: Header = .starsAndRibbon
+    /// Width of the side buttons (restart, home), in design points. The middle Next button is bigger.
+    var buttonWidth: CGFloat = 86
+
+    init(
+        header: Header = .starsAndRibbon,
+        buttonWidth: CGFloat = 86,
+        onRestart: @escaping () -> Void,
+        onNext: (() -> Void)?,
+        onHome: @escaping () -> Void,
+        @ViewBuilder content: @escaping (_ scale: CGFloat) -> Content
+    ) {
+        self.header = header
+        self.buttonWidth = buttonWidth
+        self.onRestart = onRestart
+        self.onNext = onNext
+        self.onHome = onHome
+        self.content = content
+    }
+
     /// Set by the first button tap, so repeated taps cannot start two navigations.
     @State private var hasChosen = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -53,12 +81,18 @@ struct GameFinishScreen<Content: View>: View {
                     .position(c)
                     .accessibilityHidden(true)
 
-                star(width: 150 * s).position(at(-197, -311))
-                star(width: 150 * s).position(at(197, -311))
-                star(width: 200 * s).position(at(0, -337))
+                switch header {
+                case .starsAndRibbon:
+                    star(width: 150 * s).position(at(-197, -311))
+                    star(width: 150 * s).position(at(197, -311))
+                    star(width: 200 * s).position(at(0, -337))
 
-                ribbon(scale: s)
-                    .position(at(0, -137))
+                    ribbon(scale: s)
+                        .position(at(0, -137))
+                case let .banner(title, ribbon):
+                    banner(title: title, ribbon: ribbon, scale: s)
+                        .position(at(0, -300))
+                }
                 content(s)
                     .frame(width: panel.width * 0.8, height: 220 * s)
                     .position(at(0, 10))
@@ -140,15 +174,38 @@ struct GameFinishScreen<Content: View>: View {
             .accessibilityAddTraits(.isHeader)
     }
 
+    /// The wide ribbon across the top of the sign, with the title in Doodle.
+    private func banner(title: LocalizedStringKey, ribbon: String, scale s: CGFloat) -> some View {
+        let width = 950 * s
+        return Image(ribbon)
+            .resizable()
+            .scaledToFit()
+            .frame(width: width)
+            .overlay {
+                Text(title)
+                    .font(.custom("DoodleChalkDemoRegular", size: 72 * s))
+                    .tracking(72 * s * 0.025)
+                    .foregroundStyle(Self.ribbonText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .frame(width: width * 0.66)
+                    // The flat middle of the band sits a little above the picture's centre.
+                    .offset(y: -width * 0.03)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(title))
+            .accessibilityAddTraits(.isHeader)
+    }
+
     // MARK: - Buttons
 
     private func buttons(scale s: CGFloat) -> some View {
-        HStack(alignment: .bottom, spacing: 18 * s) {
-            roundButton("FinishScreen/ButtonRestart", label: "Restart", width: 86 * s, action: onRestart)
+        HStack(alignment: .bottom, spacing: (onNext == nil ? 80 : 18) * s) {
+            roundButton("FinishScreen/ButtonRestart", label: "Restart", width: buttonWidth * s, action: onRestart)
             if let onNext {
                 roundButton("FinishScreen/ButtonNext", label: "Next game", width: 124 * s, action: onNext)
             }
-            roundButton("FinishScreen/ButtonHome", label: "Home", width: 86 * s, action: onHome)
+            roundButton("FinishScreen/ButtonHome", label: "Home", width: buttonWidth * s, action: onHome)
         }
     }
 

@@ -26,11 +26,11 @@ struct MoleThiefView: View {
     /// Width of the mole pictures, as a fraction of the stage width. The distraction
     /// moles are 0.13; the thief is bigger.
     private let width: CGFloat = 0.17
-    /// Same speed as the distraction moles (24 pictures each way).
-    private let framesPerSecond = 40.0
+    /// Faster than the distraction moles (24 pictures each way, 0.4 s).
+    private let framesPerSecond = 60.0
     private let frameCount = 24
     /// How long the mole shows the stolen carrot before going down.
-    private let showCarrotSeconds = 0.8
+    private let showCarrotSeconds = 0.5
 
     private enum Pose: Equatable {
         case hidden
