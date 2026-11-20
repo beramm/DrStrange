@@ -1,0 +1,45 @@
+//
+//  PauseOverlay.swift
+//  Pause screen of the standalone Veggie Keeper project: resume, or stop and
+//  rest when the child's eyes are tired or uncomfortable. Inside the DrStrange
+//  app the game uses the shared GamePausePopup instead.
+//
+
+import SwiftUI
+
+struct FixationPauseOverlay: View {
+    let onResume: () -> Void
+    let onRest: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.25).ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Image(systemName: "pause.circle.fill")
+                    .font(.system(size: 72))
+                    .foregroundStyle(FixationPalette.accent)
+                    .accessibilityHidden(true)
+                Text("Paused")
+                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
+                    .foregroundStyle(FixationPalette.ink)
+                HStack(spacing: 20) {
+                    Button(action: onRest) {
+                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
+                            .frame(minWidth: 200, minHeight: 56)
+                    }
+                    .buttonStyle(.bordered)
+                    Button(action: onResume) {
+                        Label("Play", systemImage: "play.fill")
+                            .frame(minWidth: 180, minHeight: 56)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(FixationPalette.accent)
+                }
+                .font(.title2.weight(.bold))
+            }
+            .padding(48)
+            .background(RoundedRectangle(cornerRadius: 36).fill(FixationPalette.cream))
+        }
+    }
+}

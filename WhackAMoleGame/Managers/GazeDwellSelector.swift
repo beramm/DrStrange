@@ -40,7 +40,7 @@ struct GazeDwellUpdate: Equatable {
 /// Converts continuous gaze near one character into one deliberate, proximity-scored activation.
 /// Distance samples are held only for the current dwell and are discarded immediately afterwards.
 struct GazeDwellSelector {
-    static let defaultDwellNanoseconds: UInt64 = 1_000_000_000
+    static let defaultDwellNanoseconds: UInt64 = 500_000_000
     static let defaultScoringWindowNanoseconds: UInt64 = 400_000_000
 
     private let dwellNanoseconds: UInt64

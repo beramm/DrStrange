@@ -101,6 +101,13 @@ public enum TrackingState: String, Equatable, Sendable {
 
 public enum SetupState: String, Equatable, Sendable {
     case tooClose
+    case misaligned
+    case lookUp
+    case lookDown
+    case turnLeft
+    case turnRight
+    case movingTooMuch
+    case stabilizing
     case ready
     case tooFar
     case unknown

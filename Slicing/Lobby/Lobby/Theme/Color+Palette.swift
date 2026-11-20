@@ -29,8 +29,14 @@ extension Color {
     /// Circle behind the character on the card.
     static let portraitBlue   = Color(red: 0.55, green: 0.76, blue: 0.94)
 
+    // MARK: Pop-ups (Setting, pause)
+
+    /// Faded brown layer behind a pop-up card.
+    static let popupShade   = Color(red: 0.36, green: 0.22, blue: 0.12).opacity(0.55)
+    /// Chosen option on the Setting card, and the outline / text of the options.
+    static let pillYellow   = Color(red: 0.96, green: 0.83, blue: 0.49)
+    static let pillOutline  = Color(red: 0.20, green: 0.11, blue: 0.03)
+
     // MARK: Game Map (randomizer)
 
-    /// Stand-in for a game's cover picture until the real covers are ready.
-    static let coverPlaceholder = Color(red: 0.64, green: 0.78, blue: 0.88)
 }

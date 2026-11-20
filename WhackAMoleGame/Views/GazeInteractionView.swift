@@ -5,7 +5,16 @@ enum GazeTargetGeometry {
     static let radiusScale: CGFloat = 1.2
 }
 
-/// Smooths the custom-tracker point for interaction and converts a continuous one-second dwell
+enum GazeCursorGeometry {
+    static let diameter: CGFloat = 250
+    static let radius: CGFloat = diameter / 2
+
+    static func contains(target: CGPoint, around cursor: CGPoint) -> Bool {
+        hypot(target.x - cursor.x, target.y - cursor.y) <= radius
+    }
+}
+
+/// Smooths the custom-tracker point for interaction and converts a continuous half-second dwell
 /// near an active character into a proximity-scored game action.
 struct GazeInteractionView: View {
     let controller: GazeInputController
@@ -15,41 +24,37 @@ struct GazeInteractionView: View {
     @State private var selector = GazeDwellSelector()
     @State private var smoother = GazePointSmoother()
     @State private var smoothedNormalizedPoint: CGPoint?
+    @State private var visibleNormalizedPoint: CGPoint?
+    @State private var cursorHideTask: Task<Void, Never>?
     @State private var dwellProgress: Double = 0
     @State private var proximityTier: GazeProximityTier?
+    @State private var trailSamples: [GazeTrailSample] = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
-            let point = cursorPoint(for: smoothedNormalizedPoint, in: proxy.size)
+            let point = cursorPoint(for: visibleNormalizedPoint, in: proxy.size)
 
             ZStack {
-                if let point, controller.hasUsableGaze {
+                if !reduceMotion, controller.hasUsableGaze {
+                    TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                        GazeTrailCanvas(samples: trailSamples, now: timeline.date)
+                    }
+                }
+
+                if let point, mayDisplayCursor {
                     ZStack {
-                        Circle()
-                            .strokeBorder(.white, lineWidth: 3)
-                            .background(Circle().fill(tierColor.opacity(0.72)))
-                            .frame(width: 30, height: 30)
+                        GazeCursorBubble()
 
                         if dwellProgress > 0 {
                             Circle()
                                 .trim(from: 0, to: dwellProgress)
                                 .stroke(tierColor, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                                 .rotationEffect(.degrees(-90))
-                                .frame(width: 46, height: 46)
+                                .frame(width: 62, height: 62)
                         }
                     }
                     .position(point)
-                    .shadow(radius: 3)
-                }
-
-                if !controller.isCalibrated {
-                    Text("Eye control needs recalibration")
-                        .font(.headline)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(.black.opacity(0.75), in: Capsule())
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                        .padding(.bottom, 18)
                 }
             }
             .onChange(of: controller.sample.timestamp) { _, _ in
@@ -58,6 +63,7 @@ struct GazeInteractionView: View {
             .onChange(of: viewModel.phase) { _, phase in
                 if phase != .playing { resetDwell() }
             }
+            .onDisappear { cursorHideTask?.cancel() }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -65,7 +71,10 @@ struct GazeInteractionView: View {
 
     private func cursorPoint(for normalizedPoint: CGPoint?, in size: CGSize) -> CGPoint? {
         guard let normalizedPoint else { return nil }
-        return CGPoint(x: normalizedPoint.x * size.width, y: normalizedPoint.y * size.height)
+        return CGPoint(
+            x: min(max(normalizedPoint.x, 0), 1) * size.width,
+            y: min(max(normalizedPoint.y, 0), 1) * size.height
+        )
     }
 
     private func consumeSample(in proxy: GeometryProxy) {
@@ -75,6 +84,8 @@ struct GazeInteractionView: View {
             timestampNanoseconds: controller.sample.timestamp.uptimeNanoseconds,
             isUsable: controller.hasUsableGaze
         )
+        updateVisibleCursor()
+        recordTrailSample(smoothedNormalizedPoint)
         let point = cursorPoint(for: smoothedNormalizedPoint, in: proxy.size)
         let candidate = point.flatMap { point in
             viewModel.targets.compactMap { target -> GazeFocusCandidate? in
@@ -94,15 +105,16 @@ struct GazeInteractionView: View {
                     y: holeRect.minY + localCharacterRect.midY
                 )
                 let distance = hypot(point.x - characterCenter.x, point.y - characterCenter.y)
-                // Use a circular area at least as large as the visible character, while retaining
-                // the forgiving target size of the existing hole-cell interaction.
+                guard GazeCursorGeometry.contains(target: characterCenter, around: point) else {
+                    return nil
+                }
+                // Keep the existing character-relative distance for scoring tiers.
                 let baseOuterRadius = max(
                     localCharacterRect.width / 2,
                     min(holeRect.width, holeRect.height) / 2
                 )
                 let outerRadius = baseOuterRadius * GazeTargetGeometry.radiusScale
                 let normalizedDistance = distance / max(outerRadius, 1)
-                guard normalizedDistance <= 1 else { return nil }
                 return GazeFocusCandidate(
                     targetID: target.id,
                     holeIndex: target.holeIndex,
@@ -132,10 +144,64 @@ struct GazeInteractionView: View {
         }
     }
 
+    private var mayDisplayCursor: Bool {
+        controller.hasUsableGaze || (
+            controller.sample.trackingState == .lost &&
+            controller.isCalibrated &&
+            controller.isPatchVerified &&
+            !controller.isSceneTooDark
+        )
+    }
+
+    private func updateVisibleCursor() {
+        if let smoothedNormalizedPoint {
+            cursorHideTask?.cancel()
+            cursorHideTask = nil
+            visibleNormalizedPoint = smoothedNormalizedPoint
+        } else if mayDisplayCursor, visibleNormalizedPoint != nil {
+            guard cursorHideTask == nil else { return }
+            cursorHideTask = Task { @MainActor in
+                do {
+                    try await Task.sleep(for: .seconds(GazeCursorVisuals.briefTrackingGapHold))
+                } catch { return }
+                guard !Task.isCancelled else { return }
+                visibleNormalizedPoint = nil
+                cursorHideTask = nil
+            }
+        } else {
+            cursorHideTask?.cancel()
+            cursorHideTask = nil
+            visibleNormalizedPoint = nil
+        }
+    }
+
+    private func recordTrailSample(_ point: CGPoint?) {
+        guard let point, controller.hasUsableGaze else {
+            trailSamples.removeAll()
+            return
+        }
+        let now = Date()
+        trailSamples.removeAll {
+            now.timeIntervalSince($0.timestamp) >= GazeCursorVisuals.trailLifetime
+        }
+        if let previous = trailSamples.last,
+           hypot(point.x - previous.point.x, point.y - previous.point.y) < GazeCursorVisuals.trailMinimumMovement {
+            return
+        }
+        trailSamples.append(GazeTrailSample(point: point, timestamp: now))
+        if trailSamples.count > GazeCursorVisuals.trailMaximumSamples {
+            trailSamples.removeFirst(trailSamples.count - GazeCursorVisuals.trailMaximumSamples)
+        }
+    }
+
     private func resetDwell() {
         selector.reset()
         smoother.reset()
         smoothedNormalizedPoint = nil
+        cursorHideTask?.cancel()
+        cursorHideTask = nil
+        visibleNormalizedPoint = nil
+        trailSamples.removeAll()
         dwellProgress = 0
         proximityTier = nil
     }
