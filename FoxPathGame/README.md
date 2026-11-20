@@ -62,7 +62,8 @@ Debug builds accept these launch arguments (Product ▸ Scheme ▸ Edit Scheme �
    - the edges of the screen dim to a soft red and a clear spotlight stays on the friend
    - a dashed ring breathes around the friend, a "!" bubble bobs above it, and a hint tells the
      child to look at it again
-   - the ring fills while the child looks at the friend, and it walks on when the ring is full
+   - as soon as the child looks back at the friend, the ring and "!" turn sky blue (the red edges
+     stay); the ring fills while the child keeps looking, and the friend walks on when it is full
 6. **Next path.** When the friend reaches the veggie stall, a new random path appears, the friend
    to follow is drawn again, and the walk goes on until the time is up.
 7. **End.** The game ends when the 2 minutes are up or when the last heart is gone.
@@ -91,9 +92,9 @@ and missing gaze readings never bring one. Exactly:
 
 | State | What happens |
 |---|---|
-| `openingHole` | A hole (`Holes/Hole1`, the supplied mole hole) opens on the ground right under the basket on the friend's back (0.35 s). |
-| `emerging` | The mole comes up out of the hole (0.6 s). Its feet stay in the hole. |
-| `reaching` | It stays upright and stretches up to the basket (0.9 s). At the end it has a carrot: the heart is lost now, once. |
+| `openingHole` | A hole (`Holes/Hole1`, the supplied mole hole) opens on the ground right under the basket on the friend's back (0.15 s). |
+| `emerging` | The mole comes up out of the hole (0.25 s). Its feet stay in the hole. |
+| `reaching` | It stays upright and stretches up to the basket (0.4 s). From the hole opening to the carrot taken: 0.8 s. At the end it has a carrot: the heart is lost now, once. |
 | `sinking` | It goes back down the same hole, holding the carrot over its head (0.6 s). |
 | `closingHole` | The hole closes (0.35 s) and nothing is left on the map. |
 

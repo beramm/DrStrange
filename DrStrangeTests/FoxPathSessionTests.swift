@@ -379,6 +379,13 @@ final class FoxPathSessionTests: XCTestCase {
         XCTAssertEqual(settings.cooldown, 4)
     }
 
+    func testMoleStealsFasterThanBefore() {
+        let settings = ThiefSettings()
+        let toSteal = settings.holeOpenDuration + settings.emergeDuration + settings.reachDuration
+        XCTAssertEqual(toSteal, 0.8, accuracy: 1e-9, "0.8 s from the hole opening to the carrot taken")
+        XCTAssertGreaterThanOrEqual(settings.reachDuration, 0.4, "still time to look back and send it away")
+    }
+
     func testWalkIsFasterThanBefore() {
         XCTAssertGreaterThan(FoxPathSettings.standard.foxSpeed, 68, "faster than the earlier 68 units/s")
         XCTAssertLessThanOrEqual(FoxPathSettings.standard.foxSpeed, 120, "still easy to follow")

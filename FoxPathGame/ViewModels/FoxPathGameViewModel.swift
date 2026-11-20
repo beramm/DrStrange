@@ -362,7 +362,7 @@ final class FoxPathGameViewModel {
     /// Windows of script time (seconds) in which the pretend pointer wanders off. The long ones
     /// let the mole take a carrot; the short ones bring a mole that is then sent away.
     private static let scriptedLookAways: [ClosedRange<TimeInterval>] = [
-        6...13, 30...31.6, 40...42.3, 58...65, 85...86.5, 100...102.3,
+        6...13, 30...31.2, 40...41.2, 58...65, 85...86.2, 100...101.2,
     ]
 
     private func moveScriptedPointer(by delta: TimeInterval) {
