@@ -4,6 +4,11 @@ import XCTest
 @testable import DrStrange
 
 final class PaddyGazeIntegrationTests: XCTestCase {
+    @MainActor
+    func testPreparationCountdownDisplaysThreeThroughZero() {
+        XCTAssertEqual(GazeInputController.countdownValues(preparationSeconds: 4), [3, 2, 1, 0])
+    }
+
     func testCalibrationTargetsHaveExactOrderAndBottomRow() {
         let expected: [(Double, Double)] = [
             (0.08, 0.08), (0.29, 0.08), (0.50, 0.08), (0.71, 0.08), (0.92, 0.08),
@@ -147,6 +152,39 @@ final class PaddyGazeIntegrationTests: XCTestCase {
         XCTAssertNil(controller.sample.pointNormalized)
     }
 
+    @MainActor
+    func testOlderAnalysisCannotMoveCursorBackToStalePrediction() {
+        let controller = GazeInputController()
+        controller.setOneEyeEnforcerEnabled(false)
+        controller.finishCalibration(PaddyCalibrationCapture.targets.map { target in
+            GazeCalibrationSample(raw: GazeCoordinate(x: target.x, y: target.y), target: target)
+        })
+
+        func analysis(at uptime: TimeInterval, x: Double) -> PaddyFrameAnalysis {
+            PaddyFrameAnalysis(
+                hostUptime: uptime,
+                imageOrientation: .up,
+                prediction: EyeStripPrediction(
+                    xScreenCentered: x,
+                    yScreenCentered: 0.5,
+                    inferenceDurationMS: 5
+                ),
+                setupCandidate: .ready,
+                eyeAvailability: .both,
+                isSceneTooDark: false,
+                captureRejectionReason: nil,
+                modelStatus: "paddy-gazeTrack active · on-device",
+                previewImage: nil
+            )
+        }
+
+        controller.consume(analysis(at: 2, x: 0.5))
+        let latest = controller.sample
+        controller.consume(analysis(at: 1, x: 0.9))
+        XCTAssertEqual(controller.sample.timestamp, latest.timestamp)
+        XCTAssertEqual(controller.sample.pointNormalized, latest.pointNormalized)
+    }
+
     func testEyeStripGeometryMatchesDocumentedFrameConvention() throws {
         let geometry = try XCTUnwrap(
             EyeStripInputGeometry.cropGeometry(
@@ -214,7 +252,7 @@ final class PaddyGazeIntegrationTests: XCTestCase {
         XCTAssertEqual(jittered, initial)
     }
 
-    func testTrackingLossResetsCursorFilter() {
+    func testBriefTrackingLossDoesNotResetCursorFilter() {
         var smoother = GazePointSmoother()
         _ = smoother.consume(
             point: CGPoint(x: 0.20, y: 0.20),
@@ -230,13 +268,11 @@ final class PaddyGazeIntegrationTests: XCTestCase {
         )
 
         let reacquired = CGPoint(x: 0.80, y: 0.75)
-        XCTAssertEqual(
-            smoother.consume(
-                point: reacquired,
-                timestampNanoseconds: 1_033_333_334,
-                isUsable: true
-            ),
-            reacquired
+        let filtered = smoother.consume(
+            point: reacquired,
+            timestampNanoseconds: 1_033_333_334,
+            isUsable: true
         )
+        XCTAssertLessThan(filtered?.x ?? 1, reacquired.x)
     }
 }

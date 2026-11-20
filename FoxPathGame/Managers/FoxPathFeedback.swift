@@ -35,12 +35,12 @@ final class FoxPathFeedback {
         if hapticsEnabled { notification.notificationOccurred(.success) }
     }
 
-    /// A thief comes into view. A soft cue, no alarm.
+    /// The mole's hole opens. A soft cue, no alarm.
     func thiefAppeared() {
         play(1105)
     }
 
-    /// A thief took vegetables and a heart is gone.
+    /// The mole took a carrot and a heart is gone.
     func lifeLost() {
         play(1073)
         if hapticsEnabled { notification.notificationOccurred(.warning) }

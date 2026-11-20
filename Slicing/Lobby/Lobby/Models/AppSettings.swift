@@ -24,6 +24,11 @@ nonisolated enum AppSettings {
     /// with both eyes open (for example a child without amblyopia). The games then
     /// skip the "one eye only" patch check.
     static let wearsEyePatchKey = "wearsEyePatch"
+
+    /// The global choice wins over older per-game settings, including an explicit "No".
+    static func wearsEyePatch(defaults: UserDefaults = .standard, fallback: Bool = true) -> Bool {
+        (defaults.object(forKey: wearsEyePatchKey) as? Bool) ?? fallback
+    }
     /// Testing option: when on, only Whack a Mole can be played. The other games
     /// show a lock on the Game Map and are never picked.
     // Use a fresh key now that all three games are playable. Older installs saved

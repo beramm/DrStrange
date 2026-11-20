@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// One hole, open only while its mole is around. The hole opens, the mole climbs out (frame by
-/// frame), reacts when hit and goes back down, then the hole closes.
+/// One hole, open only while its mole is around. The hole opens, the mole slides up out of it,
+/// turns sad when hit and slides back down, then the hole closes.
 /// Gameplay activation is gaze-only; the cell deliberately ignores direct touch input.
 struct MoleHoleView: View {
     let hole: HoleVisual
     let target: ActiveTarget?
     let visual: MoleVisual?
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
@@ -14,9 +16,7 @@ struct MoleHoleView: View {
             let height = proxy.size.height
             let art = HoleArt.all[hole.artIndex % HoleArt.all.count]
             let image = art.imageRect(fittingMouth: Self.mouthRect(in: proxy.size))
-            let moleFrame = visual?.hitFrame == nil
-                ? Self.moleImageRect(artIndex: hole.artIndex, in: proxy.size)
-                : Self.moleHitImageRect(artIndex: hole.artIndex, in: proxy.size)
+            let opening = art.openingRect(in: image)
 
             ZStack(alignment: .topLeading) {
                 Image(art.assetName)
@@ -27,11 +27,20 @@ struct MoleHoleView: View {
                     .opacity(min(hole.openness * 1.6, 1))
                     .position(x: image.midX, y: image.midY)
 
-                // Each frame already ends at the hole's front edge, so the mole only needs placing.
+                // The mole slides up from inside the hole; anything below the hole's front edge is
+                // hidden, so it looks like it climbs out. With Reduce Motion it fades instead.
                 if let target, let visual {
+                    let moleFrame = Self.moleImageRect(
+                        artIndex: hole.artIndex,
+                        isHit: visual.isHit,
+                        rise: reduceMotion ? 1 : Self.smooth(visual.rise),
+                        in: proxy.size
+                    )
                     CharacterView(target: target, visual: visual)
                         .frame(width: moleFrame.width, height: moleFrame.height)
                         .position(x: moleFrame.midX, y: moleFrame.midY)
+                        .opacity(reduceMotion ? visual.rise : 1)
+                        .mask(HoleMouthMask(opening: opening))
                         .id(target.id)
                 }
 
@@ -81,14 +90,18 @@ struct MoleHoleView: View {
         )
     }
 
-    /// Frame for the mole images in a hole cell of `size`.
-    static func moleImageRect(artIndex: Int, in size: CGSize) -> CGRect {
-        rectFromLip(MoleArt.imageRect, artIndex: artIndex, in: size)
+    /// Gentle start and finish for the slide in and out of the hole.
+    static func smooth(_ t: Double) -> Double {
+        let t = min(max(t, 0), 1)
+        return t * t * (3 - 2 * t)
     }
 
-    /// Frame for the hit images in a hole cell of `size`.
-    static func moleHitImageRect(artIndex: Int, in size: CGSize) -> CGRect {
-        rectFromLip(MoleArt.hitImageRect, artIndex: artIndex, in: size)
+    /// Frame for the mole picture in a hole cell of `size`, `rise` of the way out of the hole
+    /// (0 = helmet just below the front edge, 1 = fully out).
+    static func moleImageRect(artIndex: Int, isHit: Bool, rise: Double, in size: CGSize) -> CGRect {
+        let full = rectFromLip(MoleArt.picture(isHit: isHit).imageRect, artIndex: artIndex, in: size)
+        let drop = rectFromLip(MoleArt.fullMoleRect, artIndex: artIndex, in: size).height
+        return full.offsetBy(dx: 0, dy: drop * CGFloat(1 - rise))
     }
 
     /// The fully risen mole inside a hole cell of `size`. Shared with the fox's attack so the
@@ -103,23 +116,71 @@ struct MoleHoleView: View {
     }
 }
 
-/// Where the mole frames sit relative to the hole they were painted in, measured from the art and
-/// given in opening widths from the middle of the opening's front edge.
-enum MoleArt {
-    private static let openingWidth: CGFloat = 290
-    private static let lip = CGPoint(x: 333, y: 598)
-    private static let hitLip = CGPoint(x: 285, y: 370)
+/// Shows only what is above the hole's front edge: everything above the middle of the dark
+/// opening, plus the opening itself, so the cut follows the opening's curved front rim.
+private struct HoleMouthMask: Shape {
+    let opening: CGRect
 
-    private static func relative(_ rect: CGRect, lip: CGPoint = lip) -> CGRect {
-        CGRect(x: (rect.minX - lip.x) / openingWidth, y: (rect.minY - lip.y) / openingWidth, width: rect.width / openingWidth, height: rect.height / openingWidth)
+    func path(in rect: CGRect) -> Path {
+        var path = Path(CGRect(x: rect.minX - rect.width, y: rect.minY - rect.height * 2, width: rect.width * 3, height: opening.midY - rect.minY + rect.height * 2))
+        path.addEllipse(in: opening)
+        return path
+    }
+}
+
+/// The two provided mole pictures and where the mole stands in its hole, given in hole-opening
+/// widths from the middle of the opening's front edge. Both pictures are lined up on the helmet, so
+/// swapping to the sad mole keeps it in place.
+enum MoleArt {
+    struct Picture: Equatable {
+        let assetName: String
+        /// Image size in pixels.
+        let pixelSize: CGSize
+        /// The yellow helmet in the image, in pixels, measured from the art.
+        let helmet: CGRect
+
+        /// Where the whole image goes when the mole is fully out.
+        var imageRect: CGRect {
+            let unit = helmet.width / MoleArt.helmetWidth
+            return CGRect(
+                x: -helmet.midX / unit,
+                y: -MoleArt.standingHeight - helmet.minY / unit,
+                width: pixelSize.width / unit,
+                height: pixelSize.height / unit
+            )
+        }
     }
 
-    /// The cropped frame images.
-    static let imageRect = relative(CGRect(x: 209, y: 278, width: 265, height: 330))
-    /// The mole when fully out of the hole (last frame).
-    static let fullMoleRect = relative(CGRect(x: 212, y: 281, width: 259, height: 324))
-    /// The cropped hit frame images.
-    static let hitImageRect = relative(CGRect(x: 162, y: 48, width: 265, height: 332), lip: hitLip)
+    /// Helmet width in opening widths: the same size the moles had before.
+    static let helmetWidth: CGFloat = 0.66
+    /// From the top of the helmet down to the hole's front edge when fully out, in opening widths:
+    /// the head and the top of the striped shirt show; the legs stay in the hole.
+    static let standingHeight: CGFloat = 1.09
+
+    static let appear = Picture(
+        assetName: "Mole/Appear",
+        pixelSize: CGSize(width: 1119, height: 1434),
+        helmet: CGRect(x: 293, y: 124, width: 476, height: 238)
+    )
+    static let disappear = Picture(
+        assetName: "Mole/Disappear",
+        pixelSize: CGSize(width: 674, height: 643),
+        helmet: CGRect(x: 223, y: 51, width: 197, height: 101)
+    )
+
+    static func picture(isHit: Bool) -> Picture { isHit ? disappear : appear }
+
+    /// The mole's body (helmet to the hole's front edge) when fully out, from the appear picture's
+    /// outline (pixels 202...874 across).
+    static let fullMoleRect: CGRect = {
+        let unit = appear.helmet.width / helmetWidth
+        return CGRect(
+            x: (202 - appear.helmet.midX) / unit,
+            y: -standingHeight,
+            width: (874 - 202) / unit,
+            height: standingHeight
+        )
+    }()
 }
 
 /// The provided hole artwork (`Holes/Hole1…3`), with where the dark opening sits in each image,

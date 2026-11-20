@@ -36,6 +36,21 @@ final class AppSettingsMigrationTests: XCTestCase {
         XCTAssertEqual(defaults.double(forKey: AppSettings.backgroundVolumeKey), 0.35, accuracy: 0.001)
     }
 
+    func testGlobalEyePatchChoiceOverridesOldGameSetting() throws {
+        let (defaults, suite) = try makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(false, forKey: AppSettings.wearsEyePatchKey)
+
+        XCTAssertFalse(AppSettings.wearsEyePatch(defaults: defaults, fallback: true))
+    }
+
+    func testOldGameEyePatchChoiceIsUsedUntilGlobalChoiceIsSaved() throws {
+        let (defaults, suite) = try makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        XCTAssertFalse(AppSettings.wearsEyePatch(defaults: defaults, fallback: false))
+    }
+
     private func makeDefaults() throws -> (UserDefaults, String) {
         let suite = "AppSettingsMigrationTests.\(UUID().uuidString)"
         return (try XCTUnwrap(UserDefaults(suiteName: suite)), suite)

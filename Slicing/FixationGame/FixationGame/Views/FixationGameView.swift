@@ -55,12 +55,17 @@ struct FixationGameView: View {
     @GestureState private var fingerIsDown = false
     /// Eye-control mode: true while the gaze point is on the stall.
     @State private var gazeIsOnStall = false
-    /// Steadies the gaze point; the dot and the stall check both use its point.
+    /// Steadies the gaze point; the cursor and stall check use the same point.
+    #if VEGGIE_KEEPER_STANDALONE
     @State private var smoother = GazeSmoother()
+    #else
+    @State private var smoother = GazePointSmoother()
+    @State private var smoothedNormalizedPoint: CGPoint?
+    #endif
     /// The stall's position on screen, used to check the gaze point.
     @State private var stallFrame: CGRect = .zero
-    /// The full screen size, used to turn the 0–1 gaze point into screen points.
-    @State private var screenSize: CGSize = .zero
+    /// The game scene's position in global coordinates, matching the stall frame.
+    @State private var screenFrame: CGRect = .zero
 
     @State private var phase = Phase.waiting
     @State private var veggiesLeft = 3
@@ -216,8 +221,7 @@ struct FixationGameView: View {
                 molesCanAppear: phase == .playing,
                 onStallFrameChange: { stallFrame = $0 }
             )
-            // The full screen, to place the gaze point.
-            .onGeometryChange(for: CGSize.self) { $0.size } action: { screenSize = $0 }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { screenFrame = $0 }
 
             // Finger mode only: an invisible layer that fills the screen and feels the finger.
             if !usesGaze {
@@ -321,9 +325,10 @@ struct FixationGameView: View {
         }
     }
 
-    /// The gaze dot (while testing) and a warning when eye control is lost.
+    /// The shared gaze bubble and a warning when eye control is lost.
     private func gazeOverlay(_ gaze: GazeInputController) -> some View {
         ZStack {
+            #if VEGGIE_KEEPER_STANDALONE
             if showsGazeDot, gaze.hasUsableGaze, let point = smoother.point {
                 Circle()
                     .strokeBorder(.white, lineWidth: 3)
@@ -332,6 +337,18 @@ struct FixationGameView: View {
                     .position(point)
                     .shadow(radius: 3)
             }
+            #else
+            if showsGazeDot {
+                PaddyGazeCursorVisual(
+                    pointNormalized: smoothedNormalizedPoint,
+                    isTracking: gaze.hasUsableGaze,
+                    mayHoldBriefLoss: gaze.sample.trackingState == .lost &&
+                        gaze.isCalibrated &&
+                        gaze.isPatchVerified &&
+                        !gaze.isSceneTooDark
+                )
+            }
+            #endif
 
             if !gaze.isCalibrated {
                 Text("Eye control needs recalibration")
@@ -351,16 +368,17 @@ struct FixationGameView: View {
 
     // MARK: - Gaze
 
-    /// The gaze point in screen points. The tracker gives 0–1 values across the area
-    /// the calibration circles covered (see GazeScreenArea): (0, 0) is its top-left
-    /// circle and (1, 1) its bottom-right circle.
+    #if VEGGIE_KEEPER_STANDALONE
     private func gazePoint(_ gaze: GazeInputController) -> CGPoint? {
         guard let point = gaze.sample.pointNormalized else { return nil }
-        return GazeScreenArea.screenPoint(x: point.x, y: point.y, in: screenSize)
+        let local = GazeScreenArea.screenPoint(x: point.x, y: point.y, in: screenFrame.size)
+        return CGPoint(x: screenFrame.minX + local.x, y: screenFrame.minY + local.y)
     }
+    #endif
 
     /// Is the eye looking at the stall right now? Lost tracking counts as looking away.
     private func updateGazeOnStall() {
+        #if VEGGIE_KEEPER_STANDALONE
         guard let gaze, gaze.hasUsableGaze, let rawPoint = gazePoint(gaze) else {
             smoother.reset()
             gazeIsOnStall = false
@@ -369,6 +387,20 @@ struct FixationGameView: View {
         smoother.add(rawPoint)
         guard let point = smoother.point else { return }
         gazeIsOnStall = stallFrame.insetBy(dx: -gazeMargin, dy: -gazeMargin).contains(point)
+        #else
+        let raw = gaze?.sample.pointNormalized.map { CGPoint(x: $0.x, y: $0.y) }
+        smoothedNormalizedPoint = smoother.consume(
+            point: raw,
+            timestampNanoseconds: gaze?.sample.timestamp.uptimeNanoseconds ?? 0,
+            isUsable: gaze?.hasUsableGaze == true
+        )
+        guard let point = smoothedNormalizedPoint else {
+            gazeIsOnStall = false
+            return
+        }
+        let screenPoint = PaddyGazeScreenGeometry.point(point, in: screenFrame)
+        gazeIsOnStall = stallFrame.insetBy(dx: -gazeMargin, dy: -gazeMargin).contains(screenPoint)
+        #endif
     }
 
     // MARK: - Game logic
@@ -409,6 +441,11 @@ struct FixationGameView: View {
     }
 
     private func restart() {
+        smoother.reset()
+        #if !VEGGIE_KEEPER_STANDALONE
+        smoothedNormalizedPoint = nil
+        #endif
+        gazeIsOnStall = false
         veggiesLeft = totalVeggies
         guardedSeconds = 0
         thiefIsHere = false

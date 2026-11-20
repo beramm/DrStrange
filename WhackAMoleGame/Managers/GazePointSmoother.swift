@@ -10,6 +10,7 @@ struct GazePointSmoother {
     static let resetGapNanoseconds: UInt64 = 500_000_000
 
     private var filter = OneEuroGazeFilter()
+    private var lastUsableTimestampNanoseconds: UInt64?
 
     mutating func consume(
         point rawPoint: CGPoint?,
@@ -20,9 +21,20 @@ struct GazePointSmoother {
               let rawPoint,
               rawPoint.x.isFinite,
               rawPoint.y.isFinite else {
-            reset()
+            if let lastUsableTimestampNanoseconds,
+               timestampNanoseconds > lastUsableTimestampNanoseconds,
+               timestampNanoseconds - lastUsableTimestampNanoseconds > Self.resetGapNanoseconds {
+                reset()
+            }
             return nil
         }
+        if let lastUsableTimestampNanoseconds {
+            guard timestampNanoseconds > lastUsableTimestampNanoseconds else { return nil }
+            if timestampNanoseconds - lastUsableTimestampNanoseconds > Self.resetGapNanoseconds {
+                reset()
+            }
+        }
+        lastUsableTimestampNanoseconds = timestampNanoseconds
         let filtered = filter.filter(
             GazeCoordinate(x: rawPoint.x, y: rawPoint.y),
             timestamp: TimeInterval(timestampNanoseconds) / 1_000_000_000
@@ -32,5 +44,6 @@ struct GazePointSmoother {
 
     mutating func reset() {
         filter.reset()
+        lastUsableTimestampNanoseconds = nil
     }
 }

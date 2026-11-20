@@ -12,9 +12,8 @@ enum FoxPathInput {
         return false
     }
 }
-
-/// Full-screen gameplay. Shows the result screen in place when the game ends: time is up, the
-/// last heart is gone, or the game was stopped early.
+/// Full-screen gameplay. Shows the result screen in place when the game ends: the finish screen
+/// when time is up or the game was stopped early, the Game Over screen when the last carrot is gone.
 struct FoxPathGameView: View {
     /// Seconds without a gaze sample before the pointer counts as lost.
     private static let gazeTimeout: TimeInterval = 0.5
@@ -24,17 +23,29 @@ struct FoxPathGameView: View {
     /// The player's character, always the one followed. Nil draws it at random (standalone app).
     let player: PathCharacter?
     let onClose: () -> Void
+    /// Finish screen "Next": goes on to another game. Nil hides the button (standalone app).
+    let onNextGame: (() -> Void)?
+    /// Finish and pause screen "Home": back to the start of the app. Nil falls back to `onClose`.
+    let onHome: (() -> Void)?
 
     @State private var viewModel: FoxPathGameViewModel
-    @State private var isConfirmingStop = false
     @State private var isPausedForMissingPatch = false
     @State private var zoomAtPinchStart: CGFloat?
     @Environment(\.scenePhase) private var scenePhase
 
-    init(configuration: FoxPathConfiguration, input: FoxPathInput, player: PathCharacter? = nil, onClose: @escaping () -> Void) {
+    init(
+        configuration: FoxPathConfiguration,
+        input: FoxPathInput,
+        player: PathCharacter? = nil,
+        onNextGame: (() -> Void)? = nil,
+        onHome: (() -> Void)? = nil,
+        onClose: @escaping () -> Void
+    ) {
         self.configuration = configuration
         self.input = input
         self.player = player
+        self.onNextGame = onNextGame
+        self.onHome = onHome
         self.onClose = onClose
         _viewModel = State(initialValue: Self.makeViewModel(configuration: configuration, input: input, player: player))
     }
@@ -45,12 +56,15 @@ struct FoxPathGameView: View {
 
     var body: some View {
         ZStack {
-            if let result = viewModel.result {
+            if let result = viewModel.result, result.endReason == .noLivesLeft {
+                // All three carrots are gone: the session already ended the game.
+                FoxPathGameOverView(onRestart: restart, onHome: goHome)
+                    .transition(.opacity)
+            } else if viewModel.result != nil {
                 FoxPathResultView(
-                    result: result,
-                    character: viewModel.roles.primary,
-                    onPlayAgain: restart,
-                    onDone: onClose
+                    onRestart: restart,
+                    onNext: onNextGame,
+                    onHome: goHome
                 )
                 .transition(.opacity)
             } else {
@@ -86,38 +100,44 @@ struct FoxPathGameView: View {
 
     private var gameplay: some View {
         ZStack {
+            playfield
+
+            if viewModel.phase == .paused {
+                if isPausedForMissingPatch, gazeController != nil {
+                    PatchReminderScreen()
+                        .transition(.opacity)
+                } else {
+                    GamePausePopup(onResume: viewModel.resume, onRestart: restart, onHome: goHome)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: isPausedForMissingPatch)
+    }
+
+    /// The map, the guidance, the pointer and the top bar.
+    @ViewBuilder
+    private var playfield: some View {
+        ZStack {
             FoxPathMapView(viewModel: viewModel)
                 .gesture(input.usesGaze ? nil : fingerGesture)
                 .simultaneousGesture(pinchGesture)
 
             FoxFocusOverlay(viewModel: viewModel, usesGaze: input.usesGaze)
 
-            if configuration.showsGazeMarker, let point = viewModel.pointer {
+            if !input.usesGaze, configuration.showsGazeMarker, let point = viewModel.pointer {
                 FoxPointerMarker(point: point)
             }
 
             if case let .gaze(controller) = input {
-                GazePointerFeed(controller: controller, viewModel: viewModel)
+                GazePointerFeed(
+                    controller: controller,
+                    viewModel: viewModel,
+                    showsCursor: configuration.showsGazeMarker
+                )
             }
 
-            FoxPathHUDView(viewModel: viewModel, onExit: requestStop)
+            FoxPathHUDView(viewModel: viewModel)
                 .frame(maxHeight: .infinity, alignment: .top)
-
-            if viewModel.phase == .paused, !isConfirmingStop {
-                if isPausedForMissingPatch, let gazeController {
-                    FoxPathMissingPatchPauseOverlay(
-                        isPatchVerified: gazeController.isPatchVerified,
-                        onResume: resumeAfterPatchCheck,
-                        onRest: viewModel.finishEarly
-                    )
-                } else {
-                    PauseOverlay(onResume: viewModel.resume, onRest: viewModel.finishEarly)
-                }
-            }
-        }
-        .confirmationDialog("Stop the game?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
-            Button("Stop the game") { viewModel.finishEarly() }
-            Button("Keep playing", role: .cancel) { resumeAfterStopDialog() }
         }
     }
 
@@ -138,9 +158,10 @@ struct FoxPathGameView: View {
             .onEnded { _ in zoomAtPinchStart = nil }
     }
 
-    private func requestStop() {
-        viewModel.pause()
-        isConfirmingStop = true
+    /// Leaves the game for the start of the app (or the Fox Path home in the standalone app).
+    private func goHome() {
+        viewModel.stop()
+        (onHome ?? onClose)()
     }
 
     /// Every new game draws new maps and new roles.
@@ -166,35 +187,46 @@ struct FoxPathGameView: View {
             }
             return
         }
-        guard state == .missing, viewModel.phase != .finished else { return }
-        isPausedForMissingPatch = true
-        viewModel.pause()
-    }
-
-    private func resumeAfterPatchCheck() {
-        guard gazeController?.isPatchVerified == true else { return }
-        isPausedForMissingPatch = false
-        viewModel.resume()
-    }
-
-    private func resumeAfterStopDialog() {
-        if isPausedForMissingPatch {
-            guard gazeController?.isPatchVerified == true else { return }
+        switch state {
+        case .missing:
+            guard viewModel.phase != .finished else { return }
+            isPausedForMissingPatch = true
+            viewModel.pause()
+        case .verified:
+            // The patch is back on: hide the reminder and carry on without a tap.
+            guard isPausedForMissingPatch else { return }
             isPausedForMissingPatch = false
+            viewModel.resume()
+        default:
+            break
         }
-        viewModel.resume()
     }
 }
 
-/// Passes each gaze sample to the game as a screen point. Samples are used for the current
-/// frame only and are never stored.
+/// Passes filtered gaze to the game and draws the shared cursor. Its short
+/// smoothing and trail history stays in memory and is never saved.
 private struct GazePointerFeed: View {
     let controller: GazeInputController
     let viewModel: FoxPathGameViewModel
+    let showsCursor: Bool
+
+    @State private var smoother = GazePointSmoother()
+    @State private var smoothedNormalizedPoint: CGPoint?
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
+                if showsCursor {
+                    PaddyGazeCursorVisual(
+                        pointNormalized: smoothedNormalizedPoint,
+                        isTracking: controller.hasUsableGaze,
+                        mayHoldBriefLoss: controller.sample.trackingState == .lost &&
+                            controller.isCalibrated &&
+                            controller.isPatchVerified &&
+                            !controller.isSceneTooDark
+                    )
+                }
+
                 if !controller.isCalibrated {
                     Text("Eye control needs recalibration")
                         .font(.headline)
@@ -211,112 +243,27 @@ private struct GazePointerFeed: View {
                 consumeSample(in: proxy.frame(in: .global))
             }
         }
+        .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    /// The tracker reports gaze as a fraction of the safe-area rectangle it was calibrated on.
+    /// The shared tracker reports a full-screen normalized point. The same
+    /// filtered point drives both the game and the visible bubble.
     private func consumeSample(in frame: CGRect) {
-        guard controller.hasUsableGaze, let gaze = controller.sample.pointNormalized else {
+        let raw = controller.sample.pointNormalized.map { CGPoint(x: $0.x, y: $0.y) }
+        smoothedNormalizedPoint = smoother.consume(
+            point: raw,
+            timestampNanoseconds: controller.sample.timestamp.uptimeNanoseconds,
+            isUsable: controller.hasUsableGaze
+        )
+        guard let gaze = smoothedNormalizedPoint else {
             viewModel.pointerLost()
             return
         }
-        viewModel.pointerMoved(to: CGPoint(
-            x: frame.minX + gaze.x * frame.width,
-            y: frame.minY + gaze.y * frame.height
-        ))
-    }
-}
-
-/// Pause screen. Besides resuming, it offers a clear way to stop and rest when the child's eyes
-/// are tired or uncomfortable.
-private struct PauseOverlay: View {
-    let onResume: () -> Void
-    let onRest: () -> Void
-
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.25).ignoresSafeArea()
-            VStack(spacing: 24) {
-                Image(systemName: "pause.circle.fill")
-                    .font(.system(size: 72))
-                    .foregroundStyle(FoxPathPalette.accent)
-                    .accessibilityHidden(true)
-                Text("Paused")
-                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                    .foregroundStyle(FoxPathPalette.ink)
-                HStack(spacing: 20) {
-                    Button(action: onRest) {
-                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
-                            .frame(minWidth: 200, minHeight: 56)
-                    }
-                    .buttonStyle(.bordered)
-                    Button(action: onResume) {
-                        Label("Play", systemImage: "play.fill")
-                            .frame(minWidth: 180, minHeight: 56)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(FoxPathPalette.accent)
-                }
-                .font(.title2.weight(.bold))
-                Text("Grown-ups: if your child has sore or tired eyes, a headache, or the patch feels uncomfortable, choose Rest my eyes.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 460)
-            }
-            .padding(48)
-            .background(RoundedRectangle(cornerRadius: 36).fill(FoxPathPalette.cream))
-        }
-    }
-}
-
-private struct FoxPathMissingPatchPauseOverlay: View {
-    let isPatchVerified: Bool
-    let onResume: () -> Void
-    let onRest: () -> Void
-
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.32).ignoresSafeArea()
-            VStack(spacing: 20) {
-                Image(systemName: "eye.slash.fill")
-                    .font(.system(size: 68))
-                    .foregroundStyle(.orange)
-                    .accessibilityHidden(true)
-                Text("Patch check paused the game")
-                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                    .foregroundStyle(FoxPathPalette.ink)
-                Text(isPatchVerified
-                     ? "The one-eye check passed again. You can keep playing."
-                     : "Grown-ups: put the prescribed patch back on, then keep the child's face centred while the camera checks it.")
-                    .font(.title3)
-                    .foregroundStyle(FoxPathPalette.ink)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 560)
-                HStack(spacing: 20) {
-                    Button(action: onRest) {
-                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
-                            .frame(minWidth: 200, minHeight: 56)
-                    }
-                    .buttonStyle(.bordered)
-                    Button(action: onResume) {
-                        Label(isPatchVerified ? "Play" : "Checking…", systemImage: "play.fill")
-                            .frame(minWidth: 180, minHeight: 56)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(FoxPathPalette.accent)
-                    .disabled(!isPatchVerified)
-                }
-                .font(.title2.weight(.bold))
-                Text("The camera only checks whether one eye stays visible; it cannot confirm that the correct prescribed eye is patched.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 520)
-            }
-            .padding(48)
-            .background(RoundedRectangle(cornerRadius: 36).fill(FoxPathPalette.cream))
-        }
+        viewModel.pointerMoved(
+            to: PaddyGazeScreenGeometry.point(gaze, in: frame),
+            alreadySmoothed: true
+        )
     }
 }

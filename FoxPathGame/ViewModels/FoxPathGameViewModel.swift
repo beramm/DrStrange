@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import QuartzCore
 
-/// Drives one game in real time: reads the pointer, moves the followed character and the thief,
+/// Drives one game in real time: reads the pointer, moves the followed character and the mole,
 /// runs the 2-minute clock and the camera, and exposes only what the views need. Pointer
 /// positions live in memory for the current frame only; nothing about where the player looked
 /// is stored.
@@ -35,11 +35,10 @@ final class FoxPathGameViewModel {
     private(set) var roles: CharacterRoles
     /// The character the child follows.
     private(set) var foxPose: FoxWalkPose
-    /// The thief, while one is on the map.
-    private(set) var thiefPose: FoxWalkPose?
-    private(set) var thiefState: ThiefState = .inactive
-    /// 0...1 while the thief fades in or out.
-    private(set) var thiefVisibility: Double = 0
+    /// The mole and its hole, while one is on the map.
+    private(set) var mole: MoleThiefVisual?
+    /// A decoy mole popping up on the grass to tempt the eyes away; it never takes anything.
+    private(set) var decoy: MoleThiefVisual?
     private(set) var trackingState: FoxTrackingState = .waiting
     private(set) var attention: PlayerAttentionState = .following
     private(set) var refocusProgress: Double = 0
@@ -59,6 +58,7 @@ final class FoxPathGameViewModel {
 
     @ObservationIgnored private var session: FoxPathSession
     @ObservationIgnored private var engine: FoxPathEngine
+    @ObservationIgnored private var decoys: DecoyMoleSpawner
     @ObservationIgnored private var displayLink: CADisplayLink?
     @ObservationIgnored private let linkTarget = DisplayLinkTarget()
     @ObservationIgnored private var lastTick: CFTimeInterval?
@@ -67,13 +67,12 @@ final class FoxPathGameViewModel {
     @ObservationIgnored private var tangent = CGVector(dx: 1, dy: 0)
     @ObservationIgnored private var nextWalkCountdown: TimeInterval?
     @ObservationIgnored private var endCountdown: TimeInterval?
-    @ObservationIgnored private var thiefDistance: CGFloat = 0
     @ObservationIgnored private let feedback: FoxPathFeedback
 
     #if DEBUG
     /// QA hook for simulator recordings: `-FoxPathSimulatedGaze YES` moves a pretend pointer
-    /// that follows the character and looks away a few times, some of them long enough for a
-    /// thief to reach the character. It is a recording aid, not gaze tracking.
+    /// that follows the character and looks away a few times, some of them long enough for the
+    /// mole to take a carrot. It is a recording aid, not gaze tracking.
     @ObservationIgnored private let usesScriptedPointer = UserDefaults.standard.bool(forKey: "FoxPathSimulatedGaze")
     @ObservationIgnored private var scriptClock: TimeInterval = 0
     #endif
@@ -88,6 +87,8 @@ final class FoxPathGameViewModel {
         self.settings = settings
         self.pointerTimeout = pointerTimeout
         self.session = session
+        // Its own generator, drawn from the game seed, so decoys never change the maps.
+        decoys = DecoyMoleSpawner(seed: seed ^ 0x6D6F_6C65)
         map = walk.map
         engine = walk.engine
         roles = session.roles
@@ -167,9 +168,9 @@ final class FoxPathGameViewModel {
     // MARK: - Pointer
 
     /// A new gaze or finger position, in the coordinates of the full-screen game view.
-    func pointerMoved(to point: CGPoint) {
+    func pointerMoved(to point: CGPoint, alreadySmoothed: Bool = false) {
         let now = CACurrentMediaTime()
-        if let previous = pointer, pointerIsDown, let last = lastPointerTime {
+        if !alreadySmoothed, let previous = pointer, pointerIsDown, let last = lastPointerTime {
             let blend = 1 - exp(-(now - last) / Self.pointerSmoothing)
             pointer = CGPoint(
                 x: previous.x + (point.x - previous.x) * blend,
@@ -200,7 +201,7 @@ final class FoxPathGameViewModel {
         return hypot(pointer.x - fox.x, pointer.y - fox.y) <= followRadius ? .onFox : .away
     }
 
-    /// What the thief reacts to. Only the walk's own off-track state, which already waited for
+    /// What the mole reacts to. Only the walk's own off-track state, which already waited for
     /// the look-away grace, counts as not following; a missing reading never does.
     private func attention(for reading: FoxPointerReading) -> PlayerAttentionState {
         if reading == .unavailable { return .trackingUnavailable }
@@ -229,20 +230,31 @@ final class FoxPathGameViewModel {
                 countdown -= delta
                 nextWalkCountdown = countdown
                 applySession(session.advance(by: delta, attention: .following, walk: nil))
-                // A thief still running off finishes before the next path appears.
+                // A mole still going back down finishes before the next path appears.
                 if countdown <= 0, session.thief == nil, endCountdown == nil { startNextWalk() }
             } else {
                 applyWalk(engine.advance(by: delta, reading: reading))
                 let current = attention(for: reading)
                 if current != attention { attention = current }
+                syncFromEngine()
                 let walk = engine.state == .finished ? nil : WalkProgress(
                     distanceLeft: engine.distanceLeft,
-                    feet: map.route.sample(at: CGFloat(engine.distance)).point
+                    bagHole: foxPose.bagHolePoint
                 )
                 applySession(session.advance(by: delta, attention: current, walk: walk))
             }
             syncFromEngine()
-            syncThief()
+            syncMole()
+            // Decoys pop up only while the child follows the walking character and no thief is around.
+            decoys.advance(
+                by: delta,
+                canSpawn: nextWalkCountdown == nil && engine.state == .following
+                    && attention == .following && session.thief == nil,
+                feet: foxPose.feet,
+                map: map
+            )
+            let decoyVisual = decoys.decoy.map(MoleThiefVisual.init(decoy:))
+            if decoyVisual != decoy { decoy = decoyVisual }
         }
 
         var nextCamera = camera
@@ -299,6 +311,8 @@ final class FoxPathGameViewModel {
         let walk = Self.makeWalk(session: &session, settings: settings)
         map = walk.map
         engine = walk.engine
+        decoys.reset()
+        decoy = nil
         roles = session.roles
         foxPose = .standing(roles.primary, at: walk.map.route.sample(at: 0).point)
         tangent = CGVector(dx: 1, dy: 0)
@@ -309,18 +323,15 @@ final class FoxPathGameViewModel {
         let sample = map.route.sample(at: CGFloat(engine.distance))
         tangent = sample.tangent
 
-        var pose = foxPose
-        pose.character = roles.primary
-        pose.feet = sample.point
-        switch engine.state {
-        case .following:
-            // While it holds still for a lost reading the character keeps its last walking picture.
-            pose.facing = FoxFacing.walking(along: sample.tangent)
-            pose.assetName = FoxWalkAnimation.assetName(for: roles.primary, facing: pose.facing, distance: CGFloat(engine.distance))
-        case .waiting, .offTrack, .finished:
-            pose.facing = .front
-            pose.assetName = roles.primary.standingAsset
-        }
+        // While it holds still for a lost reading the character keeps its last walking picture; when
+        // it stops because the child looked away it keeps facing the way it was going.
+        let pose = FoxWalkPose.onPath(
+            roles.primary,
+            state: engine.state,
+            feet: sample.point,
+            tangent: sample.tangent,
+            distance: CGFloat(engine.distance)
+        )
         if pose != foxPose { foxPose = pose }
 
         if engine.state != trackingState { trackingState = engine.state }
@@ -329,37 +340,13 @@ final class FoxPathGameViewModel {
         if engine.needsPointer != needsPointer { needsPointer = engine.needsPointer }
     }
 
-    private func syncThief() {
+    private func syncMole() {
         guard let thief = session.thief else {
-            if thiefPose != nil { thiefPose = nil }
-            if thiefState != .inactive { thiefState = .inactive }
-            if thiefVisibility != 0 { thiefVisibility = 0 }
-            thiefDistance = 0
+            if mole != nil { mole = nil }
             return
         }
-        let position = thief.position(around: foxPose.feet)
-        var pose = thiefPose ?? FoxWalkPose.standing(thief.character, at: position)
-        let step = CGVector(dx: position.x - pose.feet.x, dy: position.y - pose.feet.y)
-        let moved = hypot(step.dx, step.dy)
-        pose.character = thief.character
-        if moved > 0.01 {
-            thiefDistance += moved
-            pose.facing = FoxFacing.walking(along: step)
-            pose.isMirrored = pose.facing == .side && step.dx < 0
-            pose.assetName = FoxWalkAnimation.assetName(for: thief.character, facing: pose.facing, distance: thiefDistance)
-        } else if pose.facing == .side {
-            // Standing still side on: feet together.
-            pose.assetName = thief.character.sideAsset(frame: thief.character.sideSequence[0])
-        } else {
-            pose.facing = .front
-            pose.isMirrored = false
-            pose.assetName = thief.character.standingAsset
-        }
-        pose.feet = position
-        if pose != thiefPose { thiefPose = pose }
-        if thief.state != thiefState { thiefState = thief.state }
-        let visibility = (thief.visibility * 20).rounded() / 20
-        if visibility != thiefVisibility { thiefVisibility = visibility }
+        let visual = MoleThiefVisual(thief: thief)
+        if visual != mole { mole = visual }
     }
 
     private func finish() {
@@ -373,7 +360,7 @@ final class FoxPathGameViewModel {
 
     #if DEBUG
     /// Windows of script time (seconds) in which the pretend pointer wanders off. The long ones
-    /// let a thief reach the character; the short ones bring a thief that is then chased off.
+    /// let the mole take a carrot; the short ones bring a mole that is then sent away.
     private static let scriptedLookAways: [ClosedRange<TimeInterval>] = [
         6...13, 30...31.6, 40...42.3, 58...65, 85...86.5, 100...102.3,
     ]

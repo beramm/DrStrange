@@ -327,63 +327,48 @@ final class FoxAttackTests: XCTestCase {
 
     // MARK: - Mole animation
 
-    func testMoleClimbsOutFrameByFrame() throws {
+    func testMoleClimbsOutSmoothly() throws {
         var engine = makeEngine()
         let target = try XCTUnwrap(advanceToSpawn(&engine))
-        var last = engine.moleVisual(for: engine.targets[0]).frame
-        XCTAssertLessThanOrEqual(last, 2, "starts with just the helmet tip")
+        var last = engine.moleVisual(for: engine.targets[0]).rise
+        XCTAssertLessThanOrEqual(last, 0.05, "starts hidden in the hole")
         for _ in 0..<60 {
             engine.advance(by: 0.01)
-            let frame = engine.moleVisual(for: engine.targets.first { $0.id == target.id }!).frame
-            XCTAssertGreaterThanOrEqual(frame, last)
-            last = frame
+            let visual = engine.moleVisual(for: engine.targets.first { $0.id == target.id }!)
+            XCTAssertGreaterThanOrEqual(visual.rise, last)
+            XCTAssertFalse(visual.isHit, "the happy mole picture while climbing out")
+            last = visual.rise
         }
-        XCTAssertEqual(last, MoleVisual.frameCount)
+        XCTAssertEqual(last, 1)
     }
 
-    func testPunchedMolePlaysHitFramesBackDownTheHole() throws {
+    func testPunchedMoleTurnsSadThenSinksBackDown() throws {
         var engine = makeEngine()
         let target = try XCTUnwrap(advanceToSpawn(&engine))
         _ = run(&engine, for: 0.7)
         engine.tapHole(target.holeIndex)
         func visual() -> MoleVisual? { engine.targets.first { $0.id == target.id }.map { engine.moleVisual(for: $0) } }
 
-        // Waiting for the hammer: fully up, no hit frames yet.
+        // Waiting for the hammer: fully up and still happy.
         _ = run(&engine, for: timing.impactOffset - 0.05)
-        XCTAssertEqual(visual()?.frame, MoleVisual.frameCount)
-        XCTAssertNil(visual()?.hitFrame)
+        XCTAssertEqual(visual()?.rise, 1)
+        XCTAssertEqual(visual()?.isHit, false)
 
-        // The hammer lands on the first hit frame.
+        // The hammer lands: the sad picture, still fully up while it reacts.
         _ = run(&engine, for: 0.06)
-        var last = try XCTUnwrap(visual()?.hitFrame)
-        XCTAssertLessThanOrEqual(last, 4)
+        XCTAssertEqual(visual()?.isHit, true)
+        _ = run(&engine, for: timing.hitReaction * 0.8)
+        XCTAssertEqual(visual()?.rise, 1)
 
-        // The hit frames then play forwards once until the mole has gone.
-        var shown = Set<Int>()
+        // Then it slides back down into the hole and is gone.
+        var last = 1.0
         while let current = visual() {
-            let frame = try XCTUnwrap(current.hitFrame)
-            XCTAssertGreaterThanOrEqual(frame, last)
-            last = frame
-            shown.insert(frame)
+            XCTAssertTrue(current.isHit)
+            XCTAssertLessThanOrEqual(current.rise, last)
+            last = current.rise
             engine.advance(by: 0.01)
         }
-        XCTAssertGreaterThanOrEqual(last, MoleVisual.frameCount - 1, "back down to the helmet tip before disappearing")
-        XCTAssertGreaterThan(shown.count, 20)
-    }
-
-    func testHitAnimationBlendsContinuouslyBetweenAdjacentFrames() throws {
-        let start = try XCTUnwrap(MoleVisual(frame: MoleVisual.frameCount, hitProgress: 0).hitFrameBlend)
-        XCTAssertEqual(start, MoleVisual.FrameBlend(current: 1, next: 2, fraction: 0))
-
-        let halfwayBetweenFrames = try XCTUnwrap(
-            MoleVisual(frame: MoleVisual.frameCount, hitProgress: 5.5 / 23).hitFrameBlend
-        )
-        XCTAssertEqual(halfwayBetweenFrames.current, 6)
-        XCTAssertEqual(halfwayBetweenFrames.next, 7)
-        XCTAssertEqual(halfwayBetweenFrames.fraction, 0.5, accuracy: 0.0001)
-
-        let end = try XCTUnwrap(MoleVisual(frame: MoleVisual.frameCount, hitProgress: 1).hitFrameBlend)
-        XCTAssertEqual(end, MoleVisual.FrameBlend(current: 24, next: 24, fraction: 0))
+        XCTAssertLessThan(last, 0.05, "back inside the hole before disappearing")
     }
 
     func testUntappedMoleAlsoGoesBackDown() throws {
@@ -391,10 +376,35 @@ final class FoxAttackTests: XCTestCase {
         let target = try XCTUnwrap(advanceToSpawn(&engine))
         while engine.targets.first(where: { $0.id == target.id })?.phase.isUp == true { engine.advance(by: 0.01) }
         let start = try XCTUnwrap(engine.targets.first { $0.id == target.id })
-        XCTAssertEqual(engine.moleVisual(for: start).frame, MoleVisual.frameCount)
+        XCTAssertEqual(engine.moleVisual(for: start).rise, 1)
         engine.advance(by: engine.configuration.spawnRules.exitAnimationDuration * 0.9)
         let later = try XCTUnwrap(engine.targets.first { $0.id == target.id })
-        XCTAssertLessThan(engine.moleVisual(for: later).frame, 6)
+        XCTAssertLessThan(engine.moleVisual(for: later).rise, 0.2)
+        XCTAssertFalse(engine.moleVisual(for: later).isHit, "only a hit mole looks sad")
+    }
+
+    func testMolePicturesLineUpOnTheHelmet() {
+        let size = CGSize(width: 300, height: 255)
+        let happy = MoleHoleView.moleImageRect(artIndex: 0, isHit: false, rise: 1, in: size)
+        let sad = MoleHoleView.moleImageRect(artIndex: 0, isHit: true, rise: 1, in: size)
+        func helmet(_ picture: MoleArt.Picture, in frame: CGRect) -> CGRect {
+            let sx = frame.width / picture.pixelSize.width, sy = frame.height / picture.pixelSize.height
+            return CGRect(x: frame.minX + picture.helmet.minX * sx, y: frame.minY + picture.helmet.minY * sy,
+                          width: picture.helmet.width * sx, height: picture.helmet.height * sy)
+        }
+        let a = helmet(MoleArt.appear, in: happy), b = helmet(MoleArt.disappear, in: sad)
+        XCTAssertEqual(a.midX, b.midX, accuracy: 0.5)
+        XCTAssertEqual(a.minY, b.minY, accuracy: 0.5)
+        XCTAssertEqual(a.width, b.width, accuracy: 0.5)
+
+        // The hammer's target (top of the helmet) is on the helmet.
+        let body = MoleHoleView.characterRect(artIndex: 0, in: size)
+        let strike = CGPoint(x: body.minX + body.width * CharacterView.strikePoint.x, y: body.minY + body.height * CharacterView.strikePoint.y)
+        XCTAssertTrue(a.insetBy(dx: 0, dy: -2).contains(strike))
+
+        // Fully down, the helmet is below the hole's front edge.
+        let hidden = MoleHoleView.moleImageRect(artIndex: 0, isHit: false, rise: 0, in: size)
+        XCTAssertGreaterThanOrEqual(helmet(MoleArt.appear, in: hidden).minY, body.maxY - 0.5)
     }
 
     // MARK: - Random holes
@@ -493,6 +503,27 @@ final class FoxAttackTests: XCTestCase {
                     XCTAssertGreaterThanOrEqual(frontEdge - cell.width * 0.42, ground.lowerBound - 0.5, "\(screen) \(scale) \(y)")
                     XCTAssertLessThanOrEqual(frontEdge + cell.width * 0.12, ground.upperBound + 0.5, "\(screen) \(scale) \(y)")
                 }
+            }
+        }
+    }
+
+    func testCloudsDriftSlowlyThroughTheSky() {
+        for screen in [CGSize(width: 1210, height: 834), CGSize(width: 1133, height: 744), CGSize(width: 1376, height: 1032)] {
+            let sky = GameBackgroundView.grassBand(screen: screen).lowerBound
+            for cloud in DriftingCloud.all {
+                let start = cloud.frame(at: 1000, screen: screen)
+                let later = cloud.frame(at: 1001, screen: screen)
+                XCTAssertLessThanOrEqual(start.maxY, sky, "\(cloud.assetName) stays above the grass")
+                // Allow for the moment the cloud wraps back to the left edge.
+                var step = later.minX - start.minX
+                if step < 0 { step += screen.width + start.width }
+                XCTAssertGreaterThan(step, 0, "drifts to the right")
+                XCTAssertLessThan(step, 30, "slowly")
+                // It comes back in from the left after leaving on the right.
+                var x: [CGFloat] = []
+                for t in stride(from: 0.0, through: 400, by: 1) { x.append(cloud.frame(at: t, screen: screen).minX) }
+                XCTAssertLessThanOrEqual(x.min()!, -start.width + 30)
+                XCTAssertGreaterThanOrEqual(x.max()!, screen.width - 30)
             }
         }
     }
