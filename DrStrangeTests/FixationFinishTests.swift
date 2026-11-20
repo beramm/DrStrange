@@ -18,7 +18,7 @@ final class FixationFinishTests: XCTestCase {
     }
 
     func testTopBarAndFinishArtworkIsInTheAssetCatalog() {
-        var names = ["VeggieKeeperPauseButton", "FinishScreen/Star", "FinishScreen/Ribbon",
+        var names = ["VeggieKeeperPauseButton", "FinishScreen/Star", "FinishScreen/Ribbon", "FinishScreen/RibbonRed",
                      "FinishScreen/ButtonRestart", "FinishScreen/ButtonNext", "FinishScreen/ButtonHome",
                      "SettingsCard", "LobbyRope"]
         names += (0...3).map { "VeggieKeeperCarrots\($0)" }
