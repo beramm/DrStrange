@@ -4,7 +4,9 @@ import SwiftUI
 /// while the character waits, and the off-track warning when the pointer has left it.
 ///
 /// The warning is a slow fade and a gentle breathing motion. Nothing flashes, and with
-/// Reduce Motion the cues hold still.
+/// Reduce Motion the cues hold still. The ring and the "!" are red while the eyes are away and
+/// turn sky blue as soon as they are back on the character, while the ring fills. The red tint
+/// at the edges stays red until the character walks on.
 struct FoxFocusOverlay: View {
     let viewModel: FoxPathGameViewModel
     let usesGaze: Bool
@@ -14,20 +16,23 @@ struct FoxFocusOverlay: View {
         let fox = viewModel.foxScreenPoint
         let height = viewModel.foxScreenHeight
         let bubbleSize = min(max(height * 0.36, 56), 96)
+        // Off track, but the eyes are back on the character and the ring is filling.
+        let isLookingBack = state == .offTrack && viewModel.refocusProgress > 0
+        let warning = isLookingBack ? FoxPathPalette.lookingBack : FoxPathPalette.danger
 
         ZStack {
             if state == .offTrack {
-                DangerTint(center: fox, clearRadius: height * 0.8)
+                DangerTint(center: fox, clearRadius: height * 0.8, color: FoxPathPalette.danger)
                     .transition(.opacity)
             }
             if state == .offTrack || state == .waiting {
-                FocusRing(progress: viewModel.refocusProgress, isWarning: state == .offTrack)
+                FocusRing(progress: viewModel.refocusProgress, color: state == .offTrack ? warning : FoxPathPalette.guide)
                     .frame(width: height * 1.25, height: height * 1.25)
                     .position(fox)
                     .transition(.opacity)
             }
             if state == .offTrack {
-                AlertBubble()
+                AlertBubble(color: warning)
                     .frame(width: bubbleSize, height: bubbleSize)
                     .position(x: fox.x, y: max(fox.y - height * 0.5 - bubbleSize * 0.6, bubbleSize * 0.5 + 8))
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
@@ -53,6 +58,7 @@ struct FoxFocusOverlay: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: state)
+        .animation(.easeInOut(duration: 0.25), value: isLookingBack)
         .animation(.easeInOut(duration: 0.3), value: viewModel.needsPointer)
         .ignoresSafeArea()
         .allowsHitTesting(false)
@@ -111,10 +117,11 @@ private struct RoleIntroCard: View {
     }
 }
 
-/// Warm tint that closes in around the fox, leaving the fox itself clear.
+/// Tint that closes in around the fox, leaving the fox itself clear.
 private struct DangerTint: View {
     let center: CGPoint
     let clearRadius: CGFloat
+    let color: Color
 
     @State private var isBreathing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -125,7 +132,7 @@ private struct DangerTint: View {
             Rectangle()
                 .fill(
                     RadialGradient(
-                        colors: [.clear, FoxPathPalette.danger.opacity(0.22), FoxPathPalette.danger.opacity(0.5)],
+                        colors: [.clear, color.opacity(0.22), color.opacity(0.5)],
                         center: UnitPoint(x: center.x / max(size.width, 1), y: center.y / max(size.height, 1)),
                         startRadius: clearRadius,
                         endRadius: clearRadius * 3.4
@@ -142,7 +149,7 @@ private struct DangerTint: View {
 /// Ring around the fox that fills while the pointer rests on it.
 private struct FocusRing: View {
     let progress: Double
-    let isWarning: Bool
+    let color: Color
 
     @State private var isPulsing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -153,7 +160,7 @@ private struct FocusRing: View {
                 .stroke(.white.opacity(0.75), style: StrokeStyle(lineWidth: 6, lineCap: .round, dash: [2, 16]))
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(isWarning ? FoxPathPalette.danger : FoxPathPalette.guide, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.08), value: progress)
         }
@@ -165,6 +172,7 @@ private struct FocusRing: View {
 
 /// "!" above the fox's head while it waits for the player.
 private struct AlertBubble: View {
+    let color: Color
     @State private var isBobbing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -173,10 +181,10 @@ private struct AlertBubble: View {
             let side = min(proxy.size.width, proxy.size.height)
             ZStack {
                 Circle().fill(.white)
-                Circle().strokeBorder(FoxPathPalette.danger, lineWidth: side * 0.08)
+                Circle().strokeBorder(color, lineWidth: side * 0.08)
                 Image(systemName: "exclamationmark")
                     .font(.system(size: side * 0.58, weight: .black, design: .rounded))
-                    .foregroundStyle(FoxPathPalette.danger)
+                    .foregroundStyle(color)
             }
         }
         .shadow(color: .black.opacity(0.2), radius: 4, y: 2)

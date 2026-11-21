@@ -44,12 +44,12 @@ struct ThiefSettings: Codable, Equatable {
     /// (map units), because the walk is about to end.
     var minimumWalkLeft: Double = 100
     /// Seconds the hole under the basket takes to open.
-    var holeOpenDuration: Double = 0.35
+    var holeOpenDuration: Double = 0.15
     /// Seconds the mole takes to come up out of the hole.
-    var emergeDuration: Double = 0.6
+    var emergeDuration: Double = 0.25
     /// Seconds the mole reaches up to the basket before it has the carrot. Looking back at the
     /// character before then sends the mole away with nothing.
-    var reachDuration: Double = 0.9
+    var reachDuration: Double = 0.4
     /// Seconds the mole takes to go back down the hole from all the way up.
     var sinkDuration: Double = 0.6
     /// Seconds the hole takes to close.
