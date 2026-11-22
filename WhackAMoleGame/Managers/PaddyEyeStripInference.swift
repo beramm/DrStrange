@@ -91,15 +91,15 @@ final class EyeStripInferenceEngine {
 
     static func loadBundled() -> (engine: EyeStripInferenceEngine?, status: String) {
         guard let url = Bundle.main.url(
-            forResource: "paddy-gazeTrack",
+            forResource: "paddy-gazeTrackV2",
             withExtension: "mlmodelc"
         ) else {
-            return (nil, "paddy-gazeTrack not bundled")
+            return (nil, "paddy-gazeTrackV2 not bundled")
         }
         do {
-            return (try EyeStripInferenceEngine(modelURL: url), "paddy-gazeTrack ready")
+            return (try EyeStripInferenceEngine(modelURL: url), "paddy-gazeTrackV2 ready")
         } catch {
-            return (nil, "paddy-gazeTrack failed to load")
+            return (nil, "paddy-gazeTrackV2 failed to load")
         }
     }
 

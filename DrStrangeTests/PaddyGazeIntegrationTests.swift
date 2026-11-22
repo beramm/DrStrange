@@ -126,7 +126,7 @@ final class PaddyGazeIntegrationTests: XCTestCase {
                 eyeAvailability: .both,
                 isSceneTooDark: false,
                 captureRejectionReason: "the face was not aligned with the screen",
-                modelStatus: "paddy-gazeTrack active · on-device",
+                modelStatus: "paddy-gazeTrackV2 active · on-device",
                 previewImage: nil
             ))
         }
@@ -144,7 +144,7 @@ final class PaddyGazeIntegrationTests: XCTestCase {
             eyeAvailability: .none,
             isSceneTooDark: false,
             captureRejectionReason: "the model lost one or both eye regions",
-            modelStatus: "paddy-gazeTrack waiting for eye regions",
+            modelStatus: "paddy-gazeTrackV2 waiting for eye regions",
             previewImage: nil
         ))
         XCTAssertEqual(controller.sample.trackingState, .lost)
@@ -173,7 +173,7 @@ final class PaddyGazeIntegrationTests: XCTestCase {
                 eyeAvailability: .both,
                 isSceneTooDark: false,
                 captureRejectionReason: nil,
-                modelStatus: "paddy-gazeTrack active · on-device",
+                modelStatus: "paddy-gazeTrackV2 active · on-device",
                 previewImage: nil
             )
         }
