@@ -2,6 +2,28 @@ import XCTest
 @testable import DrStrange
 
 final class AppSettingsMigrationTests: XCTestCase {
+    func testLanguagesMapToBundledLocalizationIdentifiers() {
+        XCTAssertEqual(AppLanguage.english.localeIdentifier, "en")
+        XCTAssertEqual(AppLanguage.bahasa.localeIdentifier, "id")
+    }
+
+    func testIndonesianSettingsTranslationIsBundled() throws {
+        let localizationPath = try XCTUnwrap(
+            Bundle.main.path(
+                forResource: AppLanguage.bahasa.localeIdentifier,
+                ofType: "lproj"
+            )
+        )
+        let localizationBundle = try XCTUnwrap(Bundle(path: localizationPath))
+        let translation = localizationBundle.localizedString(
+            forKey: "Settings",
+            value: nil,
+            table: "Localizable"
+        )
+
+        XCTAssertEqual(translation, "Pengaturan")
+    }
+
     func testLegacyBackgroundSoundOffMigratesToMutedVolume() throws {
         let (defaults, suite) = try makeDefaults()
         defer { defaults.removePersistentDomain(forName: suite) }
