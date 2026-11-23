@@ -25,19 +25,26 @@ struct FoxPathHomeView: View {
     let onHome: (() -> Void)?
     /// Finish screen "Next": on to another game in the host app. Nil hides the button.
     let onNextGame: (() -> Void)?
+    /// Optional host hooks for switching between gameplay and result music.
+    let onResultShown: (() -> Void)?
+    let onGameplayRestarted: (() -> Void)?
 
     init(
         player: PathCharacter? = nil,
         oneEyeEnforcerEnabled: Bool = true,
         onExit: (() -> Void)? = nil,
         onHome: (() -> Void)? = nil,
-        onNextGame: (() -> Void)? = nil
+        onNextGame: (() -> Void)? = nil,
+        onResultShown: (() -> Void)? = nil,
+        onGameplayRestarted: (() -> Void)? = nil
     ) {
         self.player = player
         self.oneEyeEnforcerEnabled = oneEyeEnforcerEnabled
         self.onExit = onExit
         self.onHome = onHome
         self.onNextGame = onNextGame
+        self.onResultShown = onResultShown
+        self.onGameplayRestarted = onGameplayRestarted
     }
 
     var body: some View {
@@ -80,7 +87,9 @@ struct FoxPathHomeView: View {
                         input: .gaze(gazeController),
                         player: player,
                         onNextGame: onNextGame.map { next in { closeGame(then: next) } },
-                        onHome: onHome.map { home in { closeGame(then: home) } }
+                        onHome: onHome.map { home in { closeGame(then: home) } },
+                        onResultShown: onResultShown,
+                        onGameplayRestarted: onGameplayRestarted
                     ) {
                         closeGame()
                     }
@@ -90,7 +99,9 @@ struct FoxPathHomeView: View {
                         input: .touch,
                         player: player,
                         onNextGame: onNextGame.map { next in { closeGame(then: next) } },
-                        onHome: onHome.map { home in { closeGame(then: home) } }
+                        onHome: onHome.map { home in { closeGame(then: home) } },
+                        onResultShown: onResultShown,
+                        onGameplayRestarted: onGameplayRestarted
                     ) {
                         closeGame()
                     }

@@ -12,8 +12,11 @@ final class BackgroundMusicPlayer {
         case gameSelected = "BGM_game_selected"
         case veggieKeeper = "BGM_veggie_keeper"
         case whackAMole = "BGM_whack_a_mole"
+        case results = "BGM_results_screen"
 
-        fileprivate var fileExtension: String { "mp3" }
+        fileprivate var fileExtension: String {
+            self == .results ? "m4a" : "mp3"
+        }
     }
 
     static let shared = BackgroundMusicPlayer()
