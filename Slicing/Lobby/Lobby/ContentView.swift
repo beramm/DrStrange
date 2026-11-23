@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var path: [LobbyRoute] = []
     /// True while the Settings pop-up is open (it can open over any screen).
     @State private var showsSettings = false
+    @AppStorage(AppSettings.languageKey) private var language = AppLanguage.english
     /// Setting "Random game": the Game Map picks the game by itself.
     @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var randomSpinEnabled = true
     @AppStorage(MiniGame.lastGameStorageKey) private var lastGameID = ""
@@ -49,6 +50,7 @@ struct ContentView: View {
                 }
             }
         }
+        .environment(\.locale, Locale(identifier: language.localeIdentifier))
         // The Settings pop-up sits on top of whichever screen is showing.
         .overlay {
             if showsSettings {

@@ -9,6 +9,14 @@ import Foundation
 nonisolated enum AppLanguage: String, CaseIterable {
     case english
     case bahasa
+
+    /// Locale used by SwiftUI when this language is selected in Settings.
+    var localeIdentifier: String {
+        switch self {
+        case .english: "en"
+        case .bahasa: "id"
+        }
+    }
 }
 
 nonisolated enum AppSettings {

@@ -13,7 +13,7 @@ final class GazeInputController {
     private(set) var sample: GazeSample
     private(set) var activeCalibrationTarget: NormalizedGazePoint?
     private(set) var status = "Starting the front camera…"
-    private(set) var cameraStatus = "paddy-gazeTrack loading…"
+    private(set) var cameraStatus = "paddy-gazeTrackV2 loading…"
     private(set) var cameraStarted = false
     private(set) var isPreparingCalibration = false
     private(set) var isResumingCalibration = false
@@ -120,7 +120,7 @@ final class GazeInputController {
                     : "Centre your face 45–60 cm away and keep both eyes visible"
             } catch {
                 status = "Camera start failed: \(error)"
-                cameraStatus = "paddy-gazeTrack camera unavailable"
+                cameraStatus = "paddy-gazeTrackV2 camera unavailable"
             }
         }
     }
@@ -199,7 +199,7 @@ final class GazeInputController {
         isSceneTooDark = false
         isFrameCaptureReady = false
         status = "Stopped; volatile gaze and calibration data discarded"
-        cameraStatus = "paddy-gazeTrack stopped"
+        cameraStatus = "paddy-gazeTrackV2 stopped"
         publishWithoutPrediction(trackingState: .paused)
     }
 
@@ -337,7 +337,7 @@ final class GazeInputController {
         do {
             calibration = try PaddyCalibrationCapture.fitComplete(samples)
             calibrationState = .calibrated
-            status = "Calibration complete — paddy-gazeTrack is ready to play"
+            status = "Calibration complete — paddy-gazeTrackV2 is ready to play"
             publishWithoutPrediction(trackingState: .limited)
             completedCalibrationCount += 1
         } catch {
@@ -653,9 +653,9 @@ final class GazeInputController {
         case .turnLeft: "Turn left a little"
         case .turnRight: "Turn right a little"
         case .movingTooMuch: "Too much movement — hold still"
-        case .stabilizing: "Hold still while paddy-gazeTrack finds both eye regions"
+        case .stabilizing: "Hold still while paddy-gazeTrackV2 finds both eye regions"
         case .ready where !isPatchVerified: "Keep still while the eye patch is checked"
-        case .ready: "Ready to calibrate with paddy-gazeTrack"
+        case .ready: "Ready to calibrate with paddy-gazeTrackV2"
         case .unknown: "Centre your face 45–60 cm from the landscape camera"
         }
     }
@@ -677,7 +677,7 @@ final class GazeInputController {
     private func handleRuntimeFailure(_ error: Error) {
         unclampedCalibratedPoint = nil
         status = "Camera tracking failed: \(error)"
-        cameraStatus = "paddy-gazeTrack camera failed"
+        cameraStatus = "paddy-gazeTrackV2 camera failed"
         publishWithoutPrediction(trackingState: .lost)
     }
 }

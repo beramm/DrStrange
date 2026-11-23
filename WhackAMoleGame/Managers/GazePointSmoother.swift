@@ -1,7 +1,7 @@
 import Foundation
 
 /// Interaction-only One Euro smoothing. Calibration always consumes the raw
-/// `paddy-gazeTrack` output before this filter is applied.
+/// `paddy-gazeTrackV2` output before this filter is applied.
 struct GazePointSmoother {
     static let minimumCutoff = 0.6
     static let speedCoefficient = 0.02

@@ -19,16 +19,12 @@ struct SettingsPopup: View {
     @AppStorage(AppSettings.backgroundVolumeKey) private var savedBackgroundVolume = 1.0
     @AppStorage(AppSettings.soundEffectsVolumeKey) private var savedSoundEffectsVolume = 1.0
     @AppStorage(AppSettings.wearsEyePatchKey) private var savedWearsEyePatch = true
-    @AppStorage(MiniGame.randomSpinEnabledStorageKey) private var savedRandomSpin = true
-    @AppStorage(AppSettings.gamesLockedKey) private var savedGamesLocked = false
 
     // The choices on the card, before they are saved.
     @State private var language = AppLanguage.english
     @State private var backgroundVolume = 1.0
     @State private var soundEffectsVolume = 1.0
     @State private var wearsEyePatch = true
-    @State private var randomSpin = true
-    @State private var gamesLocked = false
 
     /// Width ÷ height of the card picture.
     private let cardAspect: CGFloat = 1933 / 1405
@@ -80,7 +76,7 @@ struct SettingsPopup: View {
             .accessibilityLabel("Close")
             .position(x: w * 0.9, y: h * 0.11)
 
-            row("Language", y: 0.245, width: w, height: h) {
+            row("Language", y: 0.25, width: w, height: h) {
                 ChoicePill(title: "English", isChosen: language == .english, width: w * 0.19, height: pillHeight) {
                     language = .english
                 }
@@ -89,7 +85,7 @@ struct SettingsPopup: View {
                 }
             }
 
-            row("Background sound", y: 0.345, width: w, height: h) {
+            row("Background sound", y: 0.39, width: w, height: h) {
                 VolumeSlider(value: $backgroundVolume, width: w * 0.34, height: pillHeight)
                     // Hear the music change while sliding.
                     .onChange(of: backgroundVolume) { _, volume in
@@ -97,7 +93,7 @@ struct SettingsPopup: View {
                     }
             }
 
-            row("Sound effect", y: 0.445, width: w, height: h) {
+            row("Sound effect", y: 0.53, width: w, height: h) {
                 VolumeSlider(value: $soundEffectsVolume, width: w * 0.34, height: pillHeight) {
                     // A sample sound at the new volume when the finger lets go.
                     SoundEffectPlayer.shared.play(.button)
@@ -108,22 +104,13 @@ struct SettingsPopup: View {
             }
 
             // Testing option: NO lets someone play with both eyes open.
-            row("Wearing eye patch", y: 0.545, width: w, height: h) {
+            row("Wearing eye patch", y: 0.67, width: w, height: h) {
                 ChoicePill(title: "Yes", isChosen: wearsEyePatch, width: w * 0.115, height: pillHeight) {
                     wearsEyePatch = true
                 }
                 ChoicePill(title: "No", isChosen: !wearsEyePatch, width: w * 0.115, height: pillHeight) {
                     wearsEyePatch = false
                 }
-            }
-
-            row("Random game", y: 0.645, width: w, height: h) {
-                onOffPills(isOn: $randomSpin, pillHeight: pillHeight, width: w)
-            }
-
-            // Testing option: ON leaves only Whack a Mole playable.
-            row("Lock games", y: 0.745, width: w, height: h) {
-                onOffPills(isOn: $gamesLocked, pillHeight: pillHeight, width: w)
             }
 
             Button(action: save) {
@@ -141,7 +128,7 @@ struct SettingsPopup: View {
                     .frame(width: w * 0.25)
             }
             .buttonStyle(PressableButtonStyle())
-            .position(x: w * 0.5, y: h * 0.87)
+            .position(x: w * 0.5, y: h * 0.84)
         }
     }
 
@@ -168,25 +155,12 @@ struct SettingsPopup: View {
         .position(x: w * 0.5, y: h * y)
     }
 
-    private func onOffPills(isOn: Binding<Bool>, pillHeight: CGFloat, width w: CGFloat) -> some View {
-        HStack(spacing: w * 0.015) {
-            ChoicePill(title: "On", isChosen: isOn.wrappedValue, width: w * 0.115, height: pillHeight) {
-                isOn.wrappedValue = true
-            }
-            ChoicePill(title: "Off", isChosen: !isOn.wrappedValue, width: w * 0.115, height: pillHeight) {
-                isOn.wrappedValue = false
-            }
-        }
-    }
-
     /// Shows the saved settings on the card.
     private func loadSaved() {
         language = savedLanguage
         backgroundVolume = savedBackgroundVolume
         soundEffectsVolume = savedSoundEffectsVolume
         wearsEyePatch = savedWearsEyePatch
-        randomSpin = savedRandomSpin
-        gamesLocked = savedGamesLocked
         #if canImport(DrStrangeGazeTracker)
         // Keep the old Whack-a-Mole preference only until a global choice is saved.
         wearsEyePatch = AppSettings.wearsEyePatch(
@@ -208,8 +182,6 @@ struct SettingsPopup: View {
         savedBackgroundVolume = backgroundVolume
         savedSoundEffectsVolume = soundEffectsVolume
         savedWearsEyePatch = wearsEyePatch
-        savedRandomSpin = randomSpin
-        savedGamesLocked = gamesLocked
         #if canImport(DrStrangeGazeTracker)
         // Whack-a-Mole's patch check ("one-eye enforcer") follows the eye patch choice.
         var configuration = ConfigurationStore.standard.load()

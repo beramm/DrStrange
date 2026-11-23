@@ -60,7 +60,7 @@ actor PaddyVisionFrameAnalyzer {
     private let previewContext = CIContext(options: [.cacheIntermediates: false])
     private var previewEnabled = false
     private var inferenceEngine: EyeStripInferenceEngine?
-    private var modelStatus = "paddy-gazeTrack not loaded"
+    private var modelStatus = "paddy-gazeTrackV2 not loaded"
     private var didAttemptModelLoad = false
 
     func setPreviewEnabled(_ enabled: Bool) {
@@ -108,13 +108,13 @@ actor PaddyVisionFrameAnalyzer {
             do {
                 prediction = try inferenceEngine.predict(orientedImage: upright, face: face)
                 if prediction != nil {
-                    modelStatus = "paddy-gazeTrack active · on-device"
+                    modelStatus = "paddy-gazeTrackV2 active · on-device"
                 } else {
-                    modelStatus = "paddy-gazeTrack waiting for both eye regions"
+                    modelStatus = "paddy-gazeTrackV2 waiting for both eye regions"
                 }
             } catch {
                 prediction = nil
-                modelStatus = "paddy-gazeTrack inference failed"
+                modelStatus = "paddy-gazeTrackV2 inference failed"
             }
         } else {
             prediction = nil
