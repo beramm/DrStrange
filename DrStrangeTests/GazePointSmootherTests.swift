@@ -12,7 +12,7 @@ final class GazePointSmootherTests: XCTestCase {
         )
     }
 
-    func testSmallJitterIsStronglyDamped() {
+    func testSmallJitterStaysInsideSoftDeadZone() {
         var smoother = GazePointSmoother()
         _ = smoother.consume(
             point: CGPoint(x: 0.5, y: 0.5),
@@ -26,9 +26,7 @@ final class GazePointSmootherTests: XCTestCase {
             isUsable: true
         )
 
-        XCTAssertNotNil(filtered)
-        XCTAssertGreaterThan(filtered?.x ?? 0, 0.5)
-        XCTAssertLessThan(filtered?.x ?? 1, 0.505)
+        XCTAssertEqual(filtered, CGPoint(x: 0.5, y: 0.5))
     }
 
     func testLargeIntentionalMoveRespondsQuickly() {
@@ -45,24 +43,52 @@ final class GazePointSmootherTests: XCTestCase {
             isUsable: true
         )
 
-        XCTAssertGreaterThan(filtered?.x ?? 0, 0.48)
+        XCTAssertGreaterThan(filtered?.x ?? 0, 0.2)
         XCTAssertLessThan(filtered?.x ?? 1, 0.8)
     }
 
-    func testInvalidTrackingResetsSmoothing() {
+    func testBriefTrackingLossKeepsSmoothing() {
         var smoother = GazePointSmoother()
         _ = smoother.consume(
             point: CGPoint(x: 0.2, y: 0.2),
-            timestampNanoseconds: 1_000,
+            timestampNanoseconds: 1_000_000_000,
             isUsable: true
         )
-        XCTAssertNil(smoother.consume(point: nil, timestampNanoseconds: 2_000, isUsable: false))
+        XCTAssertNil(smoother.consume(
+            point: nil,
+            timestampNanoseconds: 1_033_000_000,
+            isUsable: false
+        ))
 
         let reacquired = CGPoint(x: 0.8, y: 0.8)
-        XCTAssertEqual(
-            smoother.consume(point: reacquired, timestampNanoseconds: 3_000, isUsable: true),
-            reacquired
+        let filtered = smoother.consume(
+            point: reacquired,
+            timestampNanoseconds: 1_066_000_000,
+            isUsable: true
         )
+        XCTAssertGreaterThan(filtered?.x ?? 0, 0.2)
+        XCTAssertLessThan(filtered?.x ?? 1, reacquired.x)
+    }
+
+    func testLongTrackingLossResetsSmoothing() {
+        var smoother = GazePointSmoother()
+        _ = smoother.consume(
+            point: CGPoint(x: 0.2, y: 0.2),
+            timestampNanoseconds: 1_000_000_000,
+            isUsable: true
+        )
+        XCTAssertNil(smoother.consume(
+            point: nil,
+            timestampNanoseconds: 1_500_000_001,
+            isUsable: false
+        ))
+
+        let reacquired = CGPoint(x: 0.8, y: 0.8)
+        XCTAssertEqual(smoother.consume(
+            point: reacquired,
+            timestampNanoseconds: 1_600_000_000,
+            isUsable: true
+        ), reacquired)
     }
 
     func testLongSampleGapSnapsToCurrentPoint() {
@@ -77,7 +103,7 @@ final class GazePointSmootherTests: XCTestCase {
         XCTAssertEqual(
             smoother.consume(
                 point: current,
-                timestampNanoseconds: 1_300_000_001,
+                timestampNanoseconds: 1_500_000_001,
                 isUsable: true
             ),
             current

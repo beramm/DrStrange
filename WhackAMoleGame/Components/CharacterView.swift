@@ -1,9 +1,10 @@
 import SwiftUI
 import UIKit
 
-/// One mole, drawn from the provided 24-frame rise animation (`Characters/MoleRise/Frame01…24`).
-/// The frames play forwards as it climbs out and backwards as it goes down. Sleeping moles (decoys)
-/// are drawn in grey with a "z z" bubble.
+/// One mole, drawn from the two provided pictures: `Mole/Appear` while it climbs out of its hole and
+/// waits, and `Mole/Disappear` (the sad mole) once the hammer has landed. The hole view slides the
+/// picture up and down and hides whatever is below the hole's front edge, so no frame sequence is
+/// needed. Sleeping moles (decoys) are drawn in grey with a "z z" bubble.
 struct CharacterView: View {
     let target: ActiveTarget
     let visual: MoleVisual
@@ -13,38 +14,30 @@ struct CharacterView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    static func assetName(_ frame: Int) -> String {
-        String(format: "MoleRise/Frame%02d", min(max(frame, 1), MoleVisual.frameCount))
-    }
-
     private var isAsleep: Bool { target.role == .decoy }
 
-    /// Squash on impact, then a head wobble that dies away.
-    private var reaction: (squash: Double, wobble: Double) {
-        guard let progress = visual.hitProgress, !reduceMotion else { return (0, 0) }
-        let squash = sin(min(progress / 0.3, 1) * .pi)
-        let wobble = sin(progress * .pi * 4) * (1 - progress)
-        return (squash, wobble)
+    /// A small squash right after the hammer lands; none with Reduce Motion.
+    private var squash: CGFloat {
+        guard !reduceMotion, let progress = visual.hitProgress else { return 1 }
+        return 1 - 0.07 * CGFloat(sin(.pi * min(progress / 0.12, 1)))
     }
 
     var body: some View {
         GeometryReader { proxy in
-            // With Reduce Motion the mole fades in and out instead of climbing.
-            Image(Self.assetName(reduceMotion ? MoleVisual.frameCount : visual.frame))
+            Image(MoleArt.picture(isHit: visual.isHit).assetName)
                 .resizable()
                 .interpolation(.high)
                 .frame(width: proxy.size.width, height: proxy.size.height)
+                .scaleEffect(x: 1, y: squash, anchor: .bottom)
                 .grayscale(isAsleep ? 1 : 0)
-                .opacity(reduceMotion ? Double(visual.frame) / Double(MoleVisual.frameCount) : 1)
                 .overlay(alignment: .topTrailing) {
-                    if isAsleep && visual.frame >= MoleVisual.frameCount - 2 {
+                    if isAsleep && visual.rise >= 0.9 {
                         SleepBubble()
-                            .frame(width: proxy.size.width * 0.38, height: proxy.size.width * 0.26)
+                            .frame(width: proxy.size.width * 0.3, height: proxy.size.width * 0.2)
+                            .offset(x: -proxy.size.width * 0.03, y: proxy.size.height * 0.03)
                     }
                 }
         }
-        .scaleEffect(x: 1 + 0.12 * reaction.squash, y: 1 - 0.16 * reaction.squash, anchor: .bottom)
-        .rotationEffect(.degrees(9 * reaction.wobble), anchor: .bottom)
         .accessibilityHidden(true)
     }
 }
@@ -59,24 +52,5 @@ private struct SleepBubble: View {
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .background(Capsule().fill(WhackAMolePalette.cream.opacity(0.9)))
         }
-    }
-}
-
-struct StarShape: Shape {
-    var points = 5
-
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let outer = min(rect.width, rect.height) / 2
-        let inner = outer * 0.45
-        var path = Path()
-        for index in 0..<(points * 2) {
-            let radius = index.isMultiple(of: 2) ? outer : inner
-            let angle = Double(index) * .pi / Double(points) - .pi / 2
-            let point = CGPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
-            index == 0 ? path.move(to: point) : path.addLine(to: point)
-        }
-        path.closeSubpath()
-        return path
     }
 }

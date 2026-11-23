@@ -18,6 +18,8 @@ struct CharacterSelectView: View {
     /// The chosen character, saved on the device so it survives app restarts.
     @AppStorage(GameCharacter.storageKey) private var selectedID = GameCharacter.fox.id
     @Environment(\.dismiss) private var dismiss
+    /// Which way the character on the podium spins: right for next, left for previous.
+    @State private var turnsRight = true
 
     private var selected: GameCharacter { GameCharacter.with(id: selectedID) }
 
@@ -41,7 +43,7 @@ struct CharacterSelectView: View {
 
                 Text("Choose your character")
                     .textCase(.uppercase)
-                    .font(.doodle(80 * s))
+                    .doodleText(size: 80 * s)
                     .foregroundStyle(Color.titleBrown)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -52,27 +54,28 @@ struct CharacterSelectView: View {
                 RoundIconButton(systemImage: "gearshape.fill", label: "Settings", size: 62 * s, action: onSettings)
                     .position(x: 1128 * sx, y: 83 * sy)
 
-                // The chosen character standing on the podium.
+                // The chosen character standing on the podium (a tree stump). The
+                // character's feet are on the middle of the stump's flat top.
                 Image("Podium")
                     .resizable()
-                    .frame(width: 374 * s, height: 161 * s)
-                    .position(x: 339 * sx, y: 643 * sy)
+                    .frame(width: 440 * s, height: 190 * s)
+                    .position(x: 356 * sx, y: 700 * sy)
 
-                // The character image has empty space around the drawing, so this frame
-                // is bigger than the character itself.
-                Image(selected.imageName)
-                    .resizable()
-                    .scaledToFit()
+                // The character walks on the spot, and turns around when the arrows
+                // change it. The pictures have empty space around the drawing, so this
+                // frame is bigger than the character itself.
+                TurningCharacterView(character: selected, turnsRight: turnsRight)
                     .frame(width: 574 * s, height: 574 * s)
-                    .position(x: 343 * sx, y: 426 * sy)
-                    .accessibilityLabel(selected.name)
+                    .position(x: 358 * sx, y: 490 * sy)
 
                 ArrowButton(direction: .previous, size: 76 * s) {
+                    turnsRight = false
                     selectedID = selected.neighbour(-1).id
                 }
                 .position(x: 97 * sx, y: 450 * sy)
 
                 ArrowButton(direction: .next, size: 76 * s) {
+                    turnsRight = true
                     selectedID = selected.neighbour(1).id
                 }
                 .position(x: 576 * sx, y: 450 * sy)

@@ -10,7 +10,7 @@ nonisolated enum Buddy {
     static let defaultName = "Kiko"
 
     /// Asset-catalog image name of the character.
-    static let imageName = "Image"
+    static let imageName = "CharacterFox"
 
     /// Key used to save the child's chosen name on the device.
     static let nameStorageKey = "buddyName"

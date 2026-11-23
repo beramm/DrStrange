@@ -1,57 +1,114 @@
 //
 //  MiniGameCard.swift
-//  One game card on the Game Map: cover picture, title (Days One) and tagline (Belanosima)
-//  on the same "Card" image as the character card.
+//  One game card on the Game Map.
 //
-//  Sizes come from the 421 × 570 "Card" image and are multiplied by `scale`.
-//  The card is drawn at full size; the Game Map shrinks the cards that aren't chosen.
+//  While the game is being chosen, the card shows only the game's name. Once the
+//  game is picked (by the randomizer or by a tap), the card flips over to show the
+//  full card from the design: cover, title and tagline (all drawn in the picture).
+//  VoiceOver always reads the title and tagline.
+//
+//  A locked game (testing setting "Lock games") is darkened and shows a lock.
+//
+//  The card is 421 × 570 at design size, multiplied by `scale`.
+//  The Game Map shrinks the cards that aren't chosen.
 //
 
 import SwiftUI
 
 struct MiniGameCard: View {
     let game: MiniGame
+    var isLocked = false
+    /// False: only the name. True: flipped over to the full card.
+    var isRevealed = false
     /// 1 = design size. Pass the screen's scale so the card grows with the iPad.
     let scale: CGFloat
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        let s = scale
-
-        ZStack {
-            Image("Card")
-                .resizable()
-
-            // Cover picture. TODO: replace with the game's real cover image when it's ready.
-            RoundedRectangle(cornerRadius: 8 * s, style: .continuous)
-                .fill(Color.coverPlaceholder)
-                .frame(width: 324 * s, height: 280 * s)
-                .position(x: 210 * s, y: 186 * s)
-
-            // Title: one Text per line, pulled closer together than normal line spacing allows.
-            VStack(spacing: -10 * s) {
-                ForEach(game.cardTitle.components(separatedBy: "\n"), id: \.self) { line in
-                    Text(line)
+        FlipCard(
+            angle: isRevealed ? 180 : 0,
+            usesRotation: !reduceMotion,
+            front: { nameSide },
+            back: { fullCard }
+        )
+        .animation(.easeInOut(duration: 0.6), value: isRevealed)
+        .frame(width: 421 * scale, height: 570 * scale)
+        .overlay {
+            if isLocked {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18 * scale, style: .continuous)
+                        .fill(.black.opacity(0.35))
+                        .padding(6 * scale)
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 64 * scale, weight: .bold))
+                        .foregroundStyle(Color.signText)
+                        .frame(width: 130 * scale, height: 130 * scale)
+                        .background(Circle().fill(Color.roundButton))
                 }
             }
-            .textCase(.uppercase)
-            .font(.daysOne(40 * s))
-            .foregroundStyle(Color.ink)
-            .position(x: 210 * s, y: 393 * s)
-
-            Text(game.tagline)
-                .font(.belanosima(20 * s))
-                .foregroundStyle(Color.ink)
-                .multilineTextAlignment(.center)
-                .frame(width: 320 * s)
-                .position(x: 210 * s, y: 486 * s)
         }
-        .frame(width: 421 * s, height: 570 * s)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement()
+        .accessibilityLabel(isLocked ? "\(game.title), locked" : "\(game.title). \(game.tagline)")
+    }
+
+    /// The plain card with just the game's name.
+    private var nameSide: some View {
+        Image("Card")
+            .resizable()
+            .overlay {
+                Text(game.title)
+                    .textCase(.uppercase)
+                    .doodleText(size: 76 * scale)
+                    .foregroundStyle(Color.titleBrown)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+                    .frame(width: 330 * scale)
+            }
+    }
+
+    /// The full card from the design.
+    private var fullCard: some View {
+        Image(game.cardImageName)
+            .resizable()
+            .scaledToFit()
+    }
+}
+
+/// Shows `front` while turned less than halfway (`angle` below 90°) and `back` after that,
+/// turning around the vertical axis like a real card.
+private struct FlipCard<Front: View, Back: View>: View, Animatable {
+    var angle: Double
+    /// False (Reduce Motion): no turning, the sides just swap.
+    let usesRotation: Bool
+    @ViewBuilder let front: () -> Front
+    @ViewBuilder let back: () -> Back
+
+    var animatableData: Double {
+        get { angle }
+        set { angle = newValue }
+    }
+
+    var body: some View {
+        ZStack {
+            if angle < 90 {
+                front()
+            } else {
+                // Turned the other way round, so it reads correctly after the flip.
+                back()
+                    .rotation3DEffect(.degrees(usesRotation ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+            }
+        }
+        .rotation3DEffect(.degrees(usesRotation ? angle : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.4)
     }
 }
 
 #Preview(traits: .landscapeLeft) {
-    MiniGameCard(game: .whackAMole, scale: 1)
-        .padding()
-        .background(Color.sky)
+    HStack {
+        MiniGameCard(game: .whackAMole, scale: 0.8)
+        MiniGameCard(game: .veggieKeeper, isRevealed: true, scale: 0.8)
+    }
+    .padding()
+    .background(Color.sky)
 }

@@ -28,7 +28,7 @@ final class FeedbackPlayer {
         play(1103)
     }
 
-    func levelChanged() {
+    func newHighScore() {
         play(1057)
         if hapticsEnabled { notification.notificationOccurred(.success) }
     }

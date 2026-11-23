@@ -3,36 +3,54 @@ import SwiftUI
 /// Full-screen gameplay. Shows the result screen in place when the session ends,
 /// whether time ran out or it was stopped early.
 struct WhackAMoleGameView: View {
-    private static let foxSize: CGFloat = 130
+    private static let idleHelperSize: CGFloat = 250
 
     let configuration: GameConfiguration
     let gazeController: GazeInputController?
+    /// The player's character, who swings the hammer. Nil picks one at random (standalone app).
+    let helper: HelperCharacter?
     let onClose: () -> Void
+    /// Finish screen "Next": goes on to another game. Nil hides the button (standalone app).
+    let onNextGame: (() -> Void)?
+    /// Finish screen "Home": back to the start of the app. Nil falls back to `onClose`.
+    let onHome: (() -> Void)?
 
     @State private var viewModel: WhackAMoleGameViewModel
-    @State private var isConfirmingStop = false
     @State private var isPausedForMissingPatch = false
+    /// Set when Home is chosen on the pause screen, so the finish screen does not flash up while
+    /// the game closes.
+    @State private var isLeavingForHome = false
+    @State private var isPausedForRecalibration = false
+    @State private var isPresentingRecalibration = false
     @Environment(\.scenePhase) private var scenePhase
 
     init(
         configuration: GameConfiguration,
         gazeController: GazeInputController? = nil,
+        onNextGame: (() -> Void)? = nil,
+        onHome: (() -> Void)? = nil,
+        helper: HelperCharacter? = nil,
         onClose: @escaping () -> Void
     ) {
         self.configuration = configuration
         self.gazeController = gazeController
+        self.onNextGame = onNextGame
+        self.onHome = onHome
+        self.helper = helper
         self.onClose = onClose
-        _viewModel = State(initialValue: WhackAMoleGameViewModel(configuration: configuration))
+        _viewModel = State(initialValue: WhackAMoleGameViewModel(configuration: configuration, helper: helper))
     }
 
     var body: some View {
         ZStack {
-            if let session = viewModel.finishedSession {
+            if viewModel.finishedSession != nil, !isLeavingForHome {
                 GameResultView(
-                    session: session,
                     score: viewModel.score,
-                    onPlayAgain: restart,
-                    onDone: onClose
+                    previousHighScore: viewModel.highScore,
+                    isNewHighScore: viewModel.isNewHighScore,
+                    onRestart: restart,
+                    onNext: onNextGame,
+                    onHome: onHome ?? onClose
                 )
                 .transition(.opacity)
             } else {
@@ -55,6 +73,19 @@ struct WhackAMoleGameView: View {
         .onChange(of: gazeController?.patchWearState, initial: true) { _, state in
             respondToPatchState(state)
         }
+        .onChange(of: gazeController?.isCalibrated, initial: true) { _, isCalibrated in
+            respondToCalibrationState(isCalibrated)
+        }
+        .fullScreenCover(isPresented: $isPresentingRecalibration) {
+            if let gazeController {
+                GazeCalibrationView(
+                    controller: gazeController,
+                    isRecalibration: true,
+                    onCalibrated: finishRecalibration,
+                    onCancel: { isPresentingRecalibration = false }
+                )
+            }
+        }
     }
 
     private var gameplay: some View {
@@ -62,7 +93,13 @@ struct WhackAMoleGameView: View {
             playfield
                 .overlayPreferenceValue(FoxAnchorKey.self) { anchors in
                     ZStack {
-                        AttackAnimationView(pose: viewModel.foxPose, anchors: anchors)
+                        if viewModel.foxPoses.isEmpty {
+                            AttackAnimationView(pose: nil, anchors: anchors, helper: viewModel.helper)
+                        } else {
+                            ForEach(viewModel.foxPoses, id: \.holeIndex) { pose in
+                                AttackAnimationView(pose: pose, anchors: anchors, helper: viewModel.helper)
+                            }
+                        }
                         HitFeedbackOverlay(viewModel: viewModel, anchors: anchors)
                         if let gazeController {
                             GazeInteractionView(
@@ -76,10 +113,7 @@ struct WhackAMoleGameView: View {
 
             overlay
         }
-        .confirmationDialog("Stop the game?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
-            Button("Stop and see my stars") { viewModel.finishEarly(reason: .stopped) }
-            Button("Keep playing", role: .cancel) { resumeAfterStopDialog() }
-        }
+        .animation(.easeInOut(duration: 0.3), value: isPausedForMissingPatch)
     }
 
     /// Board plus the fox's corner spot. The holes and the corner report their positions so the
@@ -103,15 +137,15 @@ struct WhackAMoleGameView: View {
     private func playfieldContent(screenSize: CGSize) -> some View {
         ZStack {
             VStack(spacing: 0) {
-                GameHUDView(viewModel: viewModel, onExit: requestStop)
+                GameHUDView(viewModel: viewModel)
                 // Side margins keep the fox's corner clear of the moles on every iPad size.
                 GameBoardView(viewModel: viewModel, screenSize: screenSize)
-                    .padding(.horizontal, Self.foxSize + 24)
+                    .padding(.horizontal, Self.idleHelperSize + 24)
                     .padding(.bottom, 24)
             }
 
             FoxHomeAnchor()
-                .frame(width: Self.foxSize, height: Self.foxSize)
+                .frame(width: Self.idleHelperSize, height: Self.idleHelperSize)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(16)
         }
@@ -127,39 +161,54 @@ struct WhackAMoleGameView: View {
                 .contentTransition(.numericText(countsDown: true))
                 .animation(.snappy, value: number)
                 .accessibilityLabel("Starting in \(number)")
-        case .paused where !isConfirmingStop:
-            if isPausedForMissingPatch, let gazeController {
-                MissingPatchPauseOverlay(
-                    isPatchVerified: gazeController.isPatchVerified,
-                    onResume: resumeAfterPatchCheck,
+        case .paused:
+            if isPausedForRecalibration {
+                RecalibrationPauseOverlay(
+                    onRecalibrate: { isPresentingRecalibration = true },
                     onRest: { viewModel.finishEarly(reason: .restBreak) }
                 )
+            } else if isPausedForMissingPatch, gazeController != nil {
+                PatchReminderScreen()
+                    .transition(.opacity)
             } else {
-                PauseOverlay(
-                    onResume: viewModel.resume,
-                    onRest: { viewModel.finishEarly(reason: .restBreak) }
-                )
+                GamePausePopup(onResume: viewModel.resume, onRestart: restart, onHome: leaveForHome)
             }
         default:
-            if let level = viewModel.levelBanner {
-                LevelBanner(level: level)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 96)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
+            EmptyView()
         }
     }
 
-    private func requestStop() {
-        viewModel.pause()
-        isConfirmingStop = true
+    /// Pause screen "Home": the game so far is saved as stopped early (it still counts for the
+    /// high score), then the game closes without showing the finish screen.
+    private func leaveForHome() {
+        isLeavingForHome = true
+        viewModel.finishEarly(reason: .stopped)
+        (onHome ?? onClose)()
     }
 
     private func restart() {
         viewModel.stop()
-        viewModel = WhackAMoleGameViewModel(configuration: configuration)
+        viewModel = WhackAMoleGameViewModel(configuration: configuration, helper: helper)
         viewModel.start()
         respondToPatchState(gazeController?.patchWearState)
+        respondToCalibrationState(gazeController?.isCalibrated)
+    }
+
+    private func respondToCalibrationState(_ isCalibrated: Bool?) {
+        guard gazeController != nil,
+              isCalibrated == false,
+              viewModel.phase != .finished else { return }
+        isPausedForRecalibration = true
+        viewModel.pause()
+    }
+
+    private func finishRecalibration() {
+        isPresentingRecalibration = false
+        isPausedForRecalibration = false
+        if gazeController?.isPatchVerified == true {
+            isPausedForMissingPatch = false
+        }
+        viewModel.resume()
     }
 
     private func respondToPatchState(_ state: PatchWearState?) {
@@ -170,125 +219,29 @@ struct WhackAMoleGameView: View {
             }
             return
         }
-        guard state == .missing, viewModel.phase != .finished else { return }
-        isPausedForMissingPatch = true
-        viewModel.pause()
-    }
-
-    private func resumeAfterPatchCheck() {
-        guard gazeController?.isPatchVerified == true else { return }
-        isPausedForMissingPatch = false
-        viewModel.resume()
-    }
-
-    private func resumeAfterStopDialog() {
-        if isPausedForMissingPatch {
-            guard gazeController?.isPatchVerified == true else { return }
+        switch state {
+        case .missing:
+            guard viewModel.phase != .finished else { return }
+            isPausedForMissingPatch = true
+            viewModel.pause()
+        case .verified:
+            // The patch is back on: hide the reminder and carry on without a tap, unless the
+            // game is also waiting on recalibration.
+            guard isPausedForMissingPatch else { return }
             isPausedForMissingPatch = false
+            if !isPausedForRecalibration { viewModel.resume() }
+        default:
+            break
         }
-        viewModel.resume()
     }
 }
 
-private struct MissingPatchPauseOverlay: View {
-    let isPatchVerified: Bool
-    let onResume: () -> Void
+private struct RecalibrationPauseOverlay: View {
+    let onRecalibrate: () -> Void
     let onRest: () -> Void
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.32).ignoresSafeArea()
-            VStack(spacing: 20) {
-                Image(systemName: "eye.slash.fill")
-                    .font(.system(size: 68))
-                    .foregroundStyle(.orange)
-                    .accessibilityHidden(true)
-                Text("Patch check paused the game")
-                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                Text(isPatchVerified
-                     ? "The one-eye check passed again. You can keep playing."
-                     : "Grown-ups: put the prescribed patch back on, then keep the child's face centred while the camera checks it.")
-                    .font(.title3)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 560)
-                HStack(spacing: 20) {
-                    Button(action: onRest) {
-                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
-                            .frame(minWidth: 200, minHeight: 56)
-                    }
-                    .buttonStyle(.bordered)
-                    Button(action: onResume) {
-                        Label(isPatchVerified ? "Play" : "Checking…", systemImage: "play.fill")
-                            .frame(minWidth: 180, minHeight: 56)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(WhackAMolePalette.accent)
-                    .disabled(!isPatchVerified)
-                }
-                .font(.title2.weight(.bold))
-                Text("The camera only checks whether one eye stays visible; it cannot confirm that the correct prescribed eye is patched.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 520)
-            }
-            .padding(48)
-            .background(RoundedRectangle(cornerRadius: 36).fill(WhackAMolePalette.cream))
-        }
-    }
-}
-
-/// Pause screen. Besides resuming, it offers a clear way to stop and rest when the child's eyes
-/// are tired or uncomfortable.
-private struct PauseOverlay: View {
-    let onResume: () -> Void
-    let onRest: () -> Void
-
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.25).ignoresSafeArea()
-            VStack(spacing: 24) {
-                Image(systemName: "pause.circle.fill")
-                    .font(.system(size: 72))
-                    .foregroundStyle(WhackAMolePalette.accent)
-                    .accessibilityHidden(true)
-                Text("Paused")
-                    .font(.system(.largeTitle, design: .rounded).weight(.heavy))
-                HStack(spacing: 20) {
-                    Button(action: onRest) {
-                        Label("Rest my eyes", systemImage: "moon.zzz.fill")
-                            .frame(minWidth: 200, minHeight: 56)
-                    }
-                    .buttonStyle(.bordered)
-                    Button(action: onResume) {
-                        Label("Play", systemImage: "play.fill")
-                            .frame(minWidth: 180, minHeight: 56)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(WhackAMolePalette.accent)
-                }
-                .font(.title2.weight(.bold))
-                Text("Grown-ups: if your child has sore or tired eyes, a headache, or the patch feels uncomfortable, choose Rest my eyes.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 460)
-            }
-            .padding(48)
-            .background(RoundedRectangle(cornerRadius: 36).fill(WhackAMolePalette.cream))
-        }
-    }
-}
-
-private struct LevelBanner: View {
-    let level: DifficultyLevel
-
-    var body: some View {
-        Label("Level \(level.rawValue)", systemImage: "sparkles")
-            .font(.system(.title, design: .rounded).weight(.heavy))
-            .foregroundStyle(WhackAMolePalette.ink)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 14)
-            .background(Capsule().fill(.white.opacity(0.85)))
+        // The shared "Time to check again" card; NEXT opens calibration, then the game carries on.
+        RecalibrationNeededCard(onNext: onRecalibrate)
     }
 }
