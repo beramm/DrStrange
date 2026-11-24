@@ -73,6 +73,7 @@ final class WhackAMoleGameViewModel {
     init(
         configuration: GameConfiguration,
         helper: HelperCharacter? = nil,
+        soundEffectsVolume: Double = 1,
         sessionStore: SessionStore = .standard,
         highScoreStore: HighScoreStore = .standard
     ) {
@@ -81,7 +82,11 @@ final class WhackAMoleGameViewModel {
         self.settings = configuration.board
         self.remainingSeconds = Int(GameConfiguration.sessionDuration.rounded(.up))
         self.soundEnabled = configuration.soundEnabled
-        self.feedback = FeedbackPlayer(soundEnabled: configuration.soundEnabled, hapticsEnabled: configuration.hapticsEnabled)
+        self.feedback = FeedbackPlayer(
+            soundEnabled: configuration.soundEnabled,
+            hapticsEnabled: configuration.hapticsEnabled,
+            volume: soundEffectsVolume
+        )
         self.sessionStore = sessionStore
         self.highScoreStore = highScoreStore
         self.highScore = highScoreStore.best
@@ -189,8 +194,10 @@ final class WhackAMoleGameViewModel {
     private func apply(_ events: [EngineEvent]) {
         for event in events {
             switch event {
-            case .spawned, .missed, .hit, .attackStarted, .attackFinished:
+            case .spawned, .hit, .attackStarted, .attackFinished:
                 break
+            case .missed:
+                feedback.missed()
             case let .attackImpact(target):
                 // Points and sound arrive when the hammer lands, not at the tap.
                 score += target.pointsAwarded ?? GameSessionRecord.defaultPointsPerHit

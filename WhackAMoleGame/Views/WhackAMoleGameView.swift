@@ -9,6 +9,9 @@ struct WhackAMoleGameView: View {
     let gazeController: GazeInputController?
     /// The player's character, who swings the hammer. Nil picks one at random (standalone app).
     let helper: HelperCharacter?
+    let soundEffectsVolume: Double
+    let onResultShown: (() -> Void)?
+    let onGameplayRestarted: (() -> Void)?
     let onClose: () -> Void
     /// Finish screen "Next": goes on to another game. Nil hides the button (standalone app).
     let onNextGame: (() -> Void)?
@@ -30,6 +33,9 @@ struct WhackAMoleGameView: View {
         onNextGame: (() -> Void)? = nil,
         onHome: (() -> Void)? = nil,
         helper: HelperCharacter? = nil,
+        soundEffectsVolume: Double = 1,
+        onResultShown: (() -> Void)? = nil,
+        onGameplayRestarted: (() -> Void)? = nil,
         onClose: @escaping () -> Void
     ) {
         self.configuration = configuration
@@ -37,8 +43,15 @@ struct WhackAMoleGameView: View {
         self.onNextGame = onNextGame
         self.onHome = onHome
         self.helper = helper
+        self.soundEffectsVolume = soundEffectsVolume
+        self.onResultShown = onResultShown
+        self.onGameplayRestarted = onGameplayRestarted
         self.onClose = onClose
-        _viewModel = State(initialValue: WhackAMoleGameViewModel(configuration: configuration, helper: helper))
+        _viewModel = State(initialValue: WhackAMoleGameViewModel(
+            configuration: configuration,
+            helper: helper,
+            soundEffectsVolume: soundEffectsVolume
+        ))
     }
 
     var body: some View {
@@ -62,6 +75,9 @@ struct WhackAMoleGameView: View {
         .persistentSystemOverlays(.hidden)
         .onAppear { viewModel.start() }
         .onDisappear { viewModel.stop() }
+        .onChange(of: viewModel.finishedSession != nil) { _, isShowingResult in
+            if isShowingResult { onResultShown?() }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 gazeController?.resumeForActiveScene()
@@ -188,7 +204,12 @@ struct WhackAMoleGameView: View {
 
     private func restart() {
         viewModel.stop()
-        viewModel = WhackAMoleGameViewModel(configuration: configuration, helper: helper)
+        onGameplayRestarted?()
+        viewModel = WhackAMoleGameViewModel(
+            configuration: configuration,
+            helper: helper,
+            soundEffectsVolume: soundEffectsVolume
+        )
         viewModel.start()
         respondToPatchState(gazeController?.patchWearState)
         respondToCalibrationState(gazeController?.isCalibrated)

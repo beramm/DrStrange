@@ -26,6 +26,9 @@ struct FixationGameView: View {
     var onHome: (() -> Void)? = nil
     /// Finish screen "Next": on to another game. Nil hides the button.
     var onNextGame: (() -> Void)? = nil
+    /// Optional host hooks for switching between gameplay and result music.
+    var onResultShown: (() -> Void)? = nil
+    var onGameplayRestarted: (() -> Void)? = nil
 
     private enum Phase: Equatable {
         case waiting                          // before the child first watches the stall
@@ -106,6 +109,9 @@ struct FixationGameView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: phase)
+        .onChange(of: isFinished) { _, finished in
+            if finished { onResultShown?() }
+        }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
         // Runs again each time "watching" changes or the phase changes.
@@ -441,6 +447,7 @@ struct FixationGameView: View {
     }
 
     private func restart() {
+        onGameplayRestarted?()
         smoother.reset()
         #if !VEGGIE_KEEPER_STANDALONE
         smoothedNormalizedPoint = nil

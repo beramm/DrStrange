@@ -81,6 +81,10 @@ struct SelectedGameView: View {
                 player: PathCharacter(rawValue: characterID) ?? .fox,
                 onNextGame: { closeGameFlow(then: onNextGame) },
                 onHome: { closeGameFlow(then: onHome) },
+                onResultShown: playResultsMusic,
+                onGameplayRestarted: {
+                    BackgroundMusicPlayer.shared.play(.gameSelected)
+                },
                 onClose: { closeGameFlow() }
             )
         case .whackAMole:
@@ -91,6 +95,11 @@ struct SelectedGameView: View {
                 onHome: { closeGameFlow(then: onHome) },
                 // The player's character swings the hammer.
                 helper: HelperCharacter(rawValue: characterID) ?? .fox,
+                soundEffectsVolume: soundEffectsVolume,
+                onResultShown: playResultsMusic,
+                onGameplayRestarted: {
+                    BackgroundMusicPlayer.shared.play(.whackAMole)
+                },
                 onClose: { closeGameFlow() }
             )
         case .veggieKeeper:
@@ -99,7 +108,11 @@ struct SelectedGameView: View {
                 character: FixationCharacter(rawValue: characterID) ?? .fox,
                 onExit: { closeGameFlow() },
                 onHome: { closeGameFlow(then: onHome) },
-                onNextGame: { closeGameFlow(then: onNextGame) }
+                onNextGame: { closeGameFlow(then: onNextGame) },
+                onResultShown: playResultsMusic,
+                onGameplayRestarted: {
+                    BackgroundMusicPlayer.shared.play(.veggieKeeper)
+                }
             )
         }
     }
@@ -123,12 +136,16 @@ struct SelectedGameView: View {
         }
     }
 
-    /// Whack a Mole's hit sounds are short system sounds, which have no volume of their own:
-    /// they are switched off when the "Sound effect" slider is all the way down.
+    /// Built-in fallback sounds have no volume of their own, so they are switched off when the
+    /// sound-effect slider is all the way down. Custom mole effects receive the exact volume.
     private var configurationWithSoundSetting: GameConfiguration {
         var adjusted = configuration
         if soundEffectsVolume <= 0 { adjusted.soundEnabled = false }
         return adjusted
+    }
+
+    private func playResultsMusic() {
+        BackgroundMusicPlayer.shared.play(.results)
     }
 
     /// Stops the camera, closes the game and hands over to `destination` (by default the usual

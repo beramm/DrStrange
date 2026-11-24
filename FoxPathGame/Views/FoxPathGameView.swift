@@ -27,6 +27,9 @@ struct FoxPathGameView: View {
     let onNextGame: (() -> Void)?
     /// Finish and pause screen "Home": back to the start of the app. Nil falls back to `onClose`.
     let onHome: (() -> Void)?
+    /// Optional host hooks for switching between gameplay and result music.
+    let onResultShown: (() -> Void)?
+    let onGameplayRestarted: (() -> Void)?
 
     @State private var viewModel: FoxPathGameViewModel
     @State private var isPausedForMissingPatch = false
@@ -39,6 +42,8 @@ struct FoxPathGameView: View {
         player: PathCharacter? = nil,
         onNextGame: (() -> Void)? = nil,
         onHome: (() -> Void)? = nil,
+        onResultShown: (() -> Void)? = nil,
+        onGameplayRestarted: (() -> Void)? = nil,
         onClose: @escaping () -> Void
     ) {
         self.configuration = configuration
@@ -46,6 +51,8 @@ struct FoxPathGameView: View {
         self.player = player
         self.onNextGame = onNextGame
         self.onHome = onHome
+        self.onResultShown = onResultShown
+        self.onGameplayRestarted = onGameplayRestarted
         self.onClose = onClose
         _viewModel = State(initialValue: Self.makeViewModel(configuration: configuration, input: input, player: player))
     }
@@ -76,6 +83,9 @@ struct FoxPathGameView: View {
         .persistentSystemOverlays(.hidden)
         .onAppear { viewModel.start() }
         .onDisappear { viewModel.stop() }
+        .onChange(of: viewModel.result != nil) { _, isShowingResult in
+            if isShowingResult { onResultShown?() }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             // Leaving the app pauses the game and the camera too, so no gaze is tracked in the
             // background. The game stays paused until the child taps Resume.
@@ -167,6 +177,7 @@ struct FoxPathGameView: View {
     /// Every new game draws new maps and new roles.
     private func restart() {
         viewModel.stop()
+        onGameplayRestarted?()
         viewModel = Self.makeViewModel(configuration: configuration, input: input, player: player)
         viewModel.start()
         isPausedForMissingPatch = false

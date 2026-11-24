@@ -26,6 +26,9 @@ struct GameStartView: View {
     let onHome: (() -> Void)?
     /// Finish screen "Next": on to another game in the host app. Nil hides the button.
     let onNextGame: (() -> Void)?
+    /// Host music hooks. Nil in the standalone Veggie Keeper app.
+    let onResultShown: (() -> Void)?
+    let onGameplayRestarted: (() -> Void)?
     /// Who keeps the stall (the player's character). The thief is a mole.
     let character: FixationCharacter
     let oneEyeEnforcerEnabled: Bool
@@ -36,7 +39,9 @@ struct GameStartView: View {
         onExit: (() -> Void)? = nil,
         onGameplayStarted: (() -> Void)? = nil,
         onHome: (() -> Void)? = nil,
-        onNextGame: (() -> Void)? = nil
+        onNextGame: (() -> Void)? = nil,
+        onResultShown: (() -> Void)? = nil,
+        onGameplayRestarted: (() -> Void)? = nil
     ) {
         self.character = character
         self.oneEyeEnforcerEnabled = oneEyeEnforcerEnabled
@@ -44,6 +49,8 @@ struct GameStartView: View {
         self.onGameplayStarted = onGameplayStarted
         self.onHome = onHome
         self.onNextGame = onNextGame
+        self.onResultShown = onResultShown
+        self.onGameplayRestarted = onGameplayRestarted
     }
 
     var body: some View {
@@ -117,7 +124,9 @@ struct GameStartView: View {
                     character: character,
                     onExit: { closeGame() },
                     onHome: goHome,
-                    onNextGame: onNextGame.map { next in { closeGame(then: next) } }
+                    onNextGame: onNextGame.map { next in { closeGame(then: next) } },
+                    onResultShown: onResultShown,
+                    onGameplayRestarted: onGameplayRestarted
                 )
             case .fingerGame:
                 FixationGameView(
@@ -125,7 +134,9 @@ struct GameStartView: View {
                     character: character,
                     onExit: { closeGame() },
                     onHome: goHome,
-                    onNextGame: onNextGame.map { next in { closeGame(then: next) } }
+                    onNextGame: onNextGame.map { next in { closeGame(then: next) } },
+                    onResultShown: onResultShown,
+                    onGameplayRestarted: onGameplayRestarted
                 )
             }
         }
